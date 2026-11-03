@@ -1,0 +1,11 @@
+#!/bin/sh
+# Wrapper de rustc para o kernel.
+#
+# Em distros como Arch, /usr/bin/rustc e o rustc do sistema e nao tem o alvo
+# x86_64-unknown-none. O rustup tem. Este wrapper garante que o cargo use o
+# rustc do rustup (respeitando rust-toolchain.toml), sem depender de caminho
+# absoluto com o nome do usuario.
+if command -v rustup >/dev/null 2>&1; then
+    exec rustup run stable rustc "$@"
+fi
+exec rustc "$@"

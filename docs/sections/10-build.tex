@@ -28,6 +28,7 @@ targets = ["x86_64-unknown-none"]
 \begin{lstlisting}[caption={\code{.cargo/config.toml}.},label={lst:cargoconfig}]
 [build]
 target = "x86_64-unknown-none"
+rustc = "scripts/rustc"
 
 [target.x86_64-unknown-none]
 rustflags = [
@@ -37,6 +38,26 @@ rustflags = [
     "-C", "link-arg=--gc-sections",
 ]
 \end{lstlisting}
+
+A op\c{c}\~ao \code{rustc} aponta para o \emph{wrapper} \code{scripts/rustc}
+do projeto. Ele existe porque, em distribui\c{c}\~oes como Arch Linux, o
+\code{cargo} e o \code{rustc} encontrados primeiro no \code{PATH} s\~ao os do
+sistema, que n\~ao possuem o alvo \code{x86\_64-unknown-none}. O wrapper
+executa:
+
+\begin{lstlisting}[style=shell,caption={Conte\'udo de \code{scripts/rustc}.},label={lst:rustcwrapper}]
+#!/bin/sh
+if command -v rustup >/dev/null 2>&1; then
+    exec rustup run stable rustc "$@"
+fi
+exec rustc "$@"
+\end{lstlisting}
+
+Assim, um \code{cargo build} comum usa o compilador do \code{rustup} mesmo
+quando o \code{cargo} \'e o do sistema. Se o \code{rustup} n\~ao estiver
+instalado, o wrapper recai no \code{rustc} do \code{PATH}. O caminho
+\code{scripts/rustc} \'e relativo ao diret\'orio do projeto, de modo que
+n\~ao depende do nome do usu\'ario nem de \code{\$HOME}.
 
 \begin{table}[H]
 \centering
@@ -119,10 +140,40 @@ clean:
 \begin{nota}[Compatibilidade com o sistema]
 Em algumas distribui\c{c}\~oes, \code{/usr/bin/cargo} e \code{/usr/bin/rustc}
 n\~ao s\~ao os do \code{rustup} e n\~ao t\^em o alvo
-\code{x86\_64-unknown-none}. O Makefile detecta \code{rustup}, usa
-\code{rustup run stable cargo} e exporta \code{RUSTC} para que o Cargo n\~ao
-encontre o \code{rustc} errado pelo \code{PATH}.
+\code{x86\_64-unknown-none}. H\'a duas prote\c{c}\~oes independentes:
+
+\begin{itemize}
+  \item o \code{.cargo/config.toml} aponta \code{rustc} para
+        \code{scripts/rustc}, que usa o \code{rustup};
+  \item o \code{Makefile} detecta \code{rustup}, chama
+        \code{rustup run stable cargo} e exporta \code{RUSTC}.
+\end{itemize}
+
+Com isso, tanto \code{cargo build} quanto \code{make} funcionam mesmo que o
+\code{cargo} do sistema seja o primeiro do \code{PATH}.
 \end{nota}
+
+\subsection{Compila\c{c}\~ao direta com Cargo}
+
+Antes do ajuste, \code{cargo build} usava o alvo do \emph{host}
+(\code{x86\_64-unknown-linux-gnu}); o linker tentava produzir um execut\'avel
+Linux e falhava com \code{duplicate symbol: \_start}, porque o stub do kernel
+e o \code{Scrt1.o} da libc definem \code{\_start}. Al\'em disso, o
+\code{rustc} do sistema n\~ao tinha o alvo \code{x86\_64-unknown-none}.
+
+Agora o alvo padr\~ao vem do \code{.cargo/config.toml} e o compilador vem do
+wrapper. Os comandos usuais funcionam sem vari\'aveis de ambiente:
+
+\begin{lstlisting}[style=shell,caption={Compila\c{c}\~ao direta com Cargo.},label={lst:cargodirect}]
+cargo build              # ELF de depuracao em target/x86_64-unknown-none/debug/
+cargo build --release    # ELF otimizado usado na ISO
+cargo clean              # remove target/
+\end{lstlisting}
+
+N\~ao \'e necess\'ario passar \code{--target}: ele j\'a est\'a fixado no
+arquivo de configura\c{c}\~ao. O bin\'ario resultante \'e um ELF64
+\code{EXEC} para \code{x86-64}, com ponto de entrada
+\code{0x100018}, e n\~ao um execut\'avel Linux.
 
 \subsection{Alvos}
 

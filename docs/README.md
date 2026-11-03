@@ -48,6 +48,11 @@ Ou diretamente:
 latexmk -pdf -interaction=nonstopmode -halt-on-error main.tex
 ```
 
+O kernel em si compila com `cargo build` (ou `cargo build --release`). O
+`.cargo/config.toml` fixa o alvo `x86_64-unknown-none` e usa o wrapper
+`../scripts/rustc`, que chama o `rustc` do `rustup`; assim o comando funciona
+mesmo quando o `cargo` do sistema é o primeiro do `PATH`.
+
 ## Conteúdo
 
 1. Introdução, escopo e estado do projeto.

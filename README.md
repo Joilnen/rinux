@@ -47,9 +47,10 @@ output/
 ## Requisitos
 
 - Rust com `rustup` (o `rust-toolchain.toml` já pede o alvo
-  `x86_64-unknown-none`). O `Makefile` chama `rustup run stable cargo` quando
-  o `rustup` existe, porque em algumas distros o `cargo` do sistema não tem
-  esse alvo instalado.
+  `x86_64-unknown-none`). O `scripts/rustc` garante que `cargo build` use o
+  compilador do `rustup`; o `Makefile` também chama `rustup run stable cargo`
+  quando o `rustup` existe. Isso evita usar o `cargo`/`rustc` do sistema, que
+  em algumas distros não têm esse alvo instalado.
 - `ld.lld` (LLVM linker).
 - `grub-mkrescue` e `xorriso`/`libisoburn` para gerar a ISO.
 - QEMU (opcional, para executar): `qemu-system-x86`.
@@ -69,6 +70,13 @@ make            # gera target/x86_64-unknown-none/release/vga-kernel e vga-kerne
 make run        # abre o QEMU mostrando a tela VGA
 ```
 
+Também é possível compilar diretamente com Cargo, sem `--target`:
+
+```sh
+cargo build              # ELF de depuração em target/x86_64-unknown-none/debug/
+cargo build --release    # ELF otimizado usado na ISO
+```
+
 O `make run` usa:
 
 ```sh
@@ -82,15 +90,21 @@ make clean
 ```
 
 Se aparecer `can't find crate for core` / `the x86_64-unknown-none target
-may not be installed`, o `cargo` usado não é o do `rustup`. O `Makefile` já
-contorna isso, mas você também pode rodar diretamente:
+may not be installed`, o `rustc` usado não é o do `rustup`. Confirme que o
+alvo está instalado:
 
 ```sh
 rustup target add x86_64-unknown-none
+```
+
+O projeto já contorna o `PATH` com `scripts/rustc` (usado pelo
+`.cargo/config.toml`) e com o `Makefile`. Se ainda assim falhar, rode:
+
+```sh
 rustup run stable cargo build --release --target x86_64-unknown-none
 ```
 
-Ou colocar `$HOME/.cargo/bin` antes de `/usr/bin` no `PATH`.
+Ou coloque `$HOME/.cargo/bin` antes de `/usr/bin` no `PATH`.
 
 ### Por que `-boot order=d`
 

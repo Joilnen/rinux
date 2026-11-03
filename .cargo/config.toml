@@ -1,0 +1,14 @@
+[build]
+target = "x86_64-unknown-none"
+rustc = "scripts/rustc"
+
+[target.x86_64-unknown-none]
+rustflags = [
+    # O alvo x86_64-unknown-none usa o modelo de codigo "kernel" (metade
+    # alta). O kernel e ligado em 0xFFFFFFFF80000000; apenas o stub inicial
+    # fica em 1 MiB. Veja linker.ld e src/boot.rs.
+    "-C", "relocation-model=static",
+    "-C", "linker=ld.lld",
+    "-C", "link-arg=-Tlinker.ld",
+    "-C", "link-arg=--gc-sections",
+]
