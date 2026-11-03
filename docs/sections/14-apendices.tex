@@ -1,0 +1,336 @@
+\appendix
+
+\chapter{Cat\'alogo de fun\c{c}\~oes}
+\label{ap:funcoes}
+
+Esta se\c{c}\~ao lista as 43 fun\c{c}\~oes do c\'odigo Rust, agrupadas por
+m\'odulo. O \emph{stub} \code{\_start} n\~ao \'e uma fun\c{c}\~ao Rust e
+aparece separadamente no Cap\'itulo~\ref{cap:boot}.
+
+\section{\code{main.rs} (2 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{6.2cm}p{8.3cm}@{}}
+\caption{Fun\c{c}\~oes de \code{main.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{kernel\_main(multiboot\_magic: u32, multiboot\_info: u32) -> !} &
+Ponto de entrada Rust; inicializa drivers, imprime banner e entra no shell. \\
+\code{panic(info: \&PanicInfo) -> !} &
+\emph{Panic handler}; imprime a mensagem e para a CPU. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{arch.rs} (4 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{5.2cm}p{9.3cm}@{}}
+\caption{Fun\c{c}\~oes de \code{arch.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{inb(port: u16) -> u8} &
+L\^e um byte de uma porta. \code{unsafe}. \\
+\code{outb(port: u16, value: u8)} &
+Escreve um byte em uma porta. \code{unsafe}. \\
+\code{halt\_loop() -> !} &
+La\c{c}o infinito com \code{cli; hlt}. \\
+\code{reboot() -> !} &
+Envia \code{0xFE} ao 8042; se falhar, para a CPU. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{sync.rs} (5 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{5.7cm}p{8.8cm}@{}}
+\caption{Fun\c{c}\~oes de \code{sync.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{SpinLock::new(data: T) -> SpinLock<T>} &
+Cria o lock em contexto \code{const}. \\
+\code{SpinLock::lock(\&self) -> SpinLockGuard<'\_, T>} &
+Adquire o lock girando at\'e conseguir. \\
+\code{SpinLockGuard::deref(\&self) -> \&T} &
+Acesso imut\'avel ao dado protegido. \\
+\code{SpinLockGuard::deref\_mut(\&mut self) -> \&mut T} &
+Acesso mut\'avel ao dado protegido. \\
+\code{SpinLockGuard::drop(\&mut self)} &
+Libera o lock com ordena\c{c}\~ao \code{Release}. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{vga.rs} (15 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{6.1cm}p{8.4cm}@{}}
+\caption{Fun\c{c}\~oes de \code{vga.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{blank\_cell() -> u16} &
+C\'elula de espa\c{c}o com atributo padr\~ao; \code{const fn}. \\
+\code{Console::new() -> Console} &
+Inicializa coluna, linha e cor em contexto \code{const}. \\
+\code{Console::clear(\&mut self)} &
+Preenche as 2.000 c\'elulas e reposiciona o cursor. \\
+\code{Console::write\_byte(\&mut self, byte: u8)} &
+Interpreta \code{\textbackslash n}, \code{\textbackslash r},
+\code{\textbackslash t}, backspace e ASCII imprim\'ivel. \\
+\code{Console::write\_char(\&mut self, ch: char)} &
+Grava uma c\'elula e avan\c{c}a a coluna. \\
+\code{Console::write\_string(\&mut self, text: \&str)} &
+Itera sobre os bytes de uma string. \\
+\code{Console::newline(\&mut self)} &
+Avan\c{c}a a linha, com rolagem na \'ultima. \\
+\code{Console::backspace(\&mut self)} &
+Recua uma posi\c{c}\~ao e apaga a c\'elula. \\
+\code{Console::scroll(\&mut self)} &
+Move o conte\'udo uma linha para cima. \\
+\code{Console::update\_cursor(\&self)} &
+Escreve a posi\c{c}\~ao na CRTC. \\
+\code{<Console as fmt::Write>::write\_str(\&mut self, text: \&str) -> fmt::Result} &
+Implementa\c{c}\~ao de \code{fmt::Write} para o console. \\
+\code{vga::init()} &
+Limpa a tela e configura o cursor de hardware. \\
+\code{vga::clear()} &
+Limpa a tela a partir do comando \code{clear}. \\
+\code{<ConsoleWriter as fmt::Write>::write\_str(\&mut self, text: \&str) -> fmt::Result} &
+Escreve no VGA (com lock) e depois na serial. \\
+\code{vga::\_print(args: fmt::Arguments<'\_>)} &
+Ponto de entrada das macros \code{print!}/\code{println!}. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{keyboard.rs} (9 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{5.3cm}p{9.2cm}@{}}
+\caption{Fun\c{c}\~oes de \code{keyboard.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{build\_keymap() -> [u8; 128]} &
+Constr\'oi a tabela de scancodes em tempo de compila\c{c}\~ao. \\
+\code{apply\_shift(byte: u8) -> u8} &
+Aplica Shift a letras, d\'igitos e pontua\c{c}\~ao. \\
+\code{wait\_input\_clear() -> bool} &
+Espera o buffer de entrada esvaziar. \code{unsafe}. \\
+\code{wait\_output\_full() -> bool} &
+Espera um byte na sa\'ida. \code{unsafe}. \\
+\code{flush\_output()} &
+Descarta at\'e 64 bytes pendentes. \code{unsafe}. \\
+\code{send\_command(command: u8)} &
+Envia comando ao 8042. \code{unsafe}. \\
+\code{send\_data(data: u8)} &
+Envia dado ao teclado. \code{unsafe}. \\
+\code{init()} &
+Configura tradu\c{c}\~ao, IRQ, clock e varredura. \\
+\code{read\_char() -> Option<u8>} &
+L\^e e traduz um scancode; devolve \code{None} se n\~ao h\'a tecla. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{serial.rs} (4 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{4.8cm}p{9.7cm}@{}}
+\caption{Fun\c{c}\~oes de \code{serial.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{init()} &
+Configura COM1 em 38400 8N1 e detecta presen\c{c}a. \\
+\code{read\_byte() -> Option<u8>} &
+Leitura n\~ao bloqueante de um byte. \\
+\code{write\_byte(byte: u8)} &
+Envia um byte, esperando o THR. Interna. \\
+\code{write\_str(text: \&str)} &
+Envia string com convers\~ao de \code{\textbackslash n} para CRLF. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{shell.rs} (4 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{4.8cm}p{9.7cm}@{}}
+\caption{Fun\c{c}\~oes de \code{shell.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{run() -> !} &
+La\c{c}o eterno de prompt, leitura e execu\c{c}\~ao. \\
+\code{trim(bytes: \&[u8]) -> \&[u8]} &
+Remove espa\c{c}os ASCII das extremidades. \\
+\code{as\_text(bytes: \&[u8]) -> \&str} &
+Converte bytes em \code{\&str} ou texto de erro. \\
+\code{execute(line: \&[u8])} &
+Compara e executa o comando. \\
+\bottomrule
+\end{longtable}
+
+\chapter{Mapa de portas e mem\'oria}
+\label{ap:portas}
+
+\section{Portas de I/O}
+
+\begin{table}[H]
+\centering
+\caption{Portas de I/O usadas pelo kernel.}
+\label{tab:portmap}
+\begin{tabular}{@{}llp{7.5cm}@{}}
+\toprule
+\textbf{Porta} & \textbf{Dispositivo} & \textbf{Uso} \\
+\midrule
+\code{0x60} & 8042 dados & Scancodes e dados ao teclado \\
+\code{0x64} & 8042 status/comando & Status, comandos, reset \\
+\code{0x3D4} & VGA CRTC \'indice & Sele\c{c}\~ao de registrador \\
+\code{0x3D5} & VGA CRTC dados & Posi\c{c}\~ao e forma do cursor \\
+\code{0x3F8--0x3FF} & UART 16550 COM1 & Dados, LSR, divisor, FIFO \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Mapa de mem\'oria}
+
+\begin{table}[H]
+\centering
+\caption{Regi\~oes de mem\'oria relevantes.}
+\label{tab:memmap}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Endere\c{c}o} & \textbf{Uso} \\
+\midrule
+\code{0x00000000--0x000FFFFF} & Mem\'oria baixa, BIOS, estruturas do GRUB. \\
+\code{0x00100000} & In\'icio de \code{.boot} (stub, cabe\c{c}alho, GDT,
+tabelas de p\'agina, pilha de 8 KiB). \\
+\code{0x00107000} & \emph{Load address} de \code{.text} (virtual alto). \\
+\code{0x00109518} & \emph{Load address} de \code{.rodata}. \\
+\code{0x0010A000} & \emph{Load address} de \code{.data}. \\
+\code{0x0010A020} & \emph{Load address} de \code{.bss}; inclui a pilha de
+32 KiB do kernel. \\
+\code{0x000B8000} & Framebuffer de texto VGA (80x25, 4.000 bytes). \\
+\code{0xFFFFFFFF80000000} & Base virtual do kernel (metade alta). \\
+\code{0xFFFFFFFF80107000} & In\'icio virtual de \code{.text}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{nota}[Endere\c{c}os observados]
+Os valores de \code{.text}, \code{.rodata}, \code{.data} e \code{.bss}
+correspondem \`a compila\c{c}\~ao de refer\^encia. Eles podem mudar com
+otimiza\c{c}\~oes, vers\~ao do compilador ou altera\c{c}\~oes no c\'odigo.
+O que n\~ao muda \'e o esquema: stub em 1 MiB, kernel em
+\code{0xFFFFFFFF80000000}.
+\end{nota}
+
+\chapter{Gloss\'ario}
+\label{ap:glossario}
+
+\begin{description}[style=nextline,leftmargin=2em]
+  \item[BIOS] Firmware legado de inicializa\c{c}\~ao de PCs, respons\'avel
+        por detectar hardware e iniciar o bootloader.
+  \item[Bootloader] Programa que carrega o kernel; aqui, o GRUB.
+  \item[CR0/CR3/CR4] Registradores de controle da CPU x86; controlam
+        pagina\c{c}\~ao, modo protegido e features.
+  \item[CRTC] Controlador de tubo de raios cat\'odicos da VGA; controla
+        cursor e timing de v\'ideo.
+  \item[El Torito] Padr\~ao para tornar CDs/DVDs inicializ\'aveis.
+  \item[GDT] Global Descriptor Table; define segmentos de c\'odigo e dados.
+  \item[GOP] Graphics Output Protocol, interface de framebuffer em UEFI.
+  \item[IDT] Interrupt Descriptor Table; define handlers de interrup\c{c}\~oes
+        e exce\c{c}\~oes.
+  \item[LME] Long Mode Enable, bit do registrador EFER que habilita o modo
+        de 64 bits.
+  \item[LSR] Line Status Register da UART; indica dados dispon\'iveis e
+        transmissor vazio.
+  \item[Multiboot2] Especifica\c{c}\~ao de protocolo entre bootloader e
+        kernel; usada pelo GRUB.
+  \item[PML4/PDPT/PD] N\'iveis da tabela de p\'aginas x86\_64.
+  \item[Polling] Consulta repetida de hardware, sem interrup\c{c}\~oes.
+  \item[Ring 0] N\'ivel de privil\'egio mais alto da CPU; c\'odigo de kernel.
+  \item[Scancode] C\'odigo enviado pelo teclado para representar uma tecla.
+  \item[Spinlock] Lock que faz a CPU girar at\'e a regi\~ao cr\'itica ser
+        liberada.
+  \item[Stub] C\'odigo inicial em assembly que prepara a CPU antes do Rust.
+  \item[Triple fault] Falha de exce\c{c}\~ao durante o tratamento de outra,
+        que faz a CPU resetar.
+  \item[UART] Universal Asynchronous Receiver/Transmitter; controlador
+        serial.
+  \item[VGA texto] Modo de v\'ideo legado com matriz de caracteres em
+        \code{0xB8000}.
+\end{description}
+
+\begin{thebibliography}{9}
+
+\bibitem{intel}
+Intel Corporation.
+\newblock \emph{Intel 64 and IA-32 Architectures Software Developer's
+Manual}.
+\newblock Volume 3A: System Programming Guide, cap\'itulos sobre modo
+protegido, pagina\c{c}\~ao e long mode.
+
+\bibitem{multiboot2}
+Free Software Foundation.
+\newblock \emph{Multiboot2 Specification}.
+\newblock Dispon\'ivel em \url{https://www.gnu.org/software/grub/manual/multiboot2/}.
+
+\bibitem{linux}
+Linux Kernel Organization.
+\newblock \emph{Linux Kernel 7.3.1 Source Tree}.
+\newblock Arquivos \code{arch/x86}, \code{drivers/video/console/vgacon.c},
+\code{drivers/input}, \code{drivers/tty/serial/8250} e \code{kernel/}.
+
+\bibitem{osdev}
+OSDev Wiki.
+\newblock \emph{PS/2 Keyboard}, \emph{Serial Ports}, \emph{VGA Text Mode} e
+\emph{Setting Up Long Mode}.
+\newblock Dispon\'ivel em \url{https://wiki.osdev.org/}.
+
+\bibitem{rust}
+The Rust Project.
+\newblock \emph{The Rust Programming Language} e \emph{Rust Platform Support:
+x86\_64-unknown-none}.
+\newblock Dispon\'ivel em \url{https://doc.rust-lang.org/}.
+
+\bibitem{qemu}
+QEMU Project.
+\newblock \emph{QEMU Emulator User Documentation}.
+\newblock Dispon\'ivel em \url{https://www.qemu.org/documentation/}.
+
+\bibitem{grub}
+GNU GRUB.
+\newblock \emph{GNU GRUB Manual}.
+\newblock Dispon\'ivel em \url{https://www.gnu.org/software/grub/manual/grub/}.
+
+\end{thebibliography}

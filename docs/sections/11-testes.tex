@@ -1,0 +1,202 @@
+\chapter{Testes e valida\c{c}\~ao}
+\label{cap:testes}
+
+\section{Estrat\'egia}
+
+O projeto n\~ao possui testes unit\'arios automatizados no sentido usual
+(\code{cargo test}), porque o c\'odigo depende de hardware, de um bootloader
+e de um ambiente de execu\c{c}\~ao bare metal. A valida\c{c}\~ao foi feita por
+\emph{testes de integra\c{c}\~ao} em QEMU, com verifica\c{c}\~ao de:
+
+\begin{itemize}
+  \item sa\'ida textual na serial;
+  \item conte\'udo da mem\'oria VGA, lido pelo monitor do QEMU;
+  \item entrada pelo teclado PS/2, simulada com \code{sendkey};
+  \item entrada pela serial, enviada por socket Unix;
+  \item validade do ELF e da ISO com ferramentas externas.
+\end{itemize}
+
+\section{Matriz de testes}
+
+\begin{table}[H]
+\centering
+\caption{Matriz de testes executados.}
+\label{tab:testmatrix}
+\begin{tabularx}{\linewidth}{@{}lXc@{}}
+\toprule
+\textbf{ID} & \textbf{Teste} & \textbf{Resultado} \\
+\midrule
+T01 & \code{make clean \&\& make} conclui sem erros & Passou \\
+T02 & \code{grub-file --is-x86-multiboot2} aceita o ELF & Passou \\
+T03 & ISO reconhecida como El Torito BIOS & Passou \\
+T04 & QEMU/SeaBIOS inicializa a ISO e chega ao banner & Passou \\
+T05 & Prompt \code{rinux>} aparece na tela VGA & Passou \\
+T06 & Entrada PS/2: \code{help} lista os comandos & Passou \\
+T07 & Entrada PS/2: \code{echo ola} imprime \code{ola} & Passou \\
+T08 & Entrada serial: \code{echo serial ok} funciona & Passou \\
+T09 & Prompt retorna ap\'os cada comando & Passou \\
+T10 & \code{info} mostra as configura\c{c}\~oes do kernel & Passou \\
+T11 & \code{clear} limpa a tela & Passou \\
+T12 & \code{reboot} e \code{halt} encerram o fluxo & Verificado manualmente \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Evid\^encias de execu\c{c}\~ao}
+
+\subsection{Banner e prompt}
+
+\begin{lstlisting}[style=shell,caption={Tela VGA ap\'os o boot.},label={lst:testboot}]
+==============================================================
+  Rust VGA Kernel - x86_64 / modo longo
+  Boot: Multiboot2 (BIOS)
+  Video: VGA texto 80x25 @ 0xB8000
+==============================================================
+Multiboot2: magic=0x36d76289 info=0x00112040
+
+Digite 'help' para ver os comandos.
+
+rinux>
+\end{lstlisting}
+
+O valor de \code{info} varia a cada execu\c{c}\~ao, porque depende da
+aloca\c{c}\~ao feita pelo GRUB. O \code{magic} deve ser sempre
+\code{0x36d76289}.
+
+\subsection{Comando \code{help} via PS/2}
+
+\begin{lstlisting}[style=shell,caption={Sa\'ida de \code{help} ap\'os entrada PS/2.},label={lst:testhelp}]
+rinux> help
+Comandos disponiveis:
+  help          mostra esta ajuda
+  clear         limpa a tela
+  echo <texto>  imprime o texto
+  info          informacoes do kernel
+  reboot        reinicia o PC
+  halt          para a CPU
+rinux>
+\end{lstlisting}
+
+\subsection{Comando \code{echo} via PS/2}
+
+\begin{lstlisting}[style=shell,caption={Sa\'ida de \code{echo ola} ap\'os entrada PS/2.},label={lst:testecho}]
+rinux> echo ola
+ola
+rinux>
+\end{lstlisting}
+
+\subsection{Entrada serial}
+
+\begin{lstlisting}[style=shell,caption={Entrada e sa\'ida pela COM1.},label={lst:testserial}]
+echo serial ok
+serial ok
+rinux>
+\end{lstlisting}
+
+O texto digitado no socket serial aparece no VGA porque o shell ecoa cada
+caractere e o console escreve tanto no VGA quanto na serial.
+
+\section{Script de teste headless}
+
+O procedimento abaixo pode ser adaptado para CI. Ele inicia o QEMU sem
+interface gr\'afica, envia um comando pela serial e l\^e a sa\'ida.
+
+\begin{lstlisting}[language=Python,caption={Esqueleto de teste headless com socket serial.},label={lst:testscript}]
+import socket, subprocess, time, os
+
+ISO = "vga-kernel.iso"
+SER = "/tmp/vga-serial.sock"
+MON = "/tmp/vga-mon.sock"
+
+for path in (SER, MON):
+    try: os.unlink(path)
+    except FileNotFoundError: pass
+
+qemu = subprocess.Popen([
+    "qemu-system-x86_64", "-cdrom", ISO, "-boot", "order=d",
+    "-m", "128M", "-display", "none",
+    "-serial", f"unix:{SER},server=on,wait=off",
+    "-monitor", f"unix:{MON},server=on,wait=off",
+])
+
+time.sleep(7)
+ser = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+ser.connect(SER)
+ser.sendall(b"echo serial ok\r")
+time.sleep(1)
+data = ser.recv(65536).decode(errors="replace")
+assert "serial ok" in data
+ser.close()
+qemu.terminate()
+qemu.wait(timeout=10)
+\end{lstlisting}
+
+Para verificar o VGA, conecte ao monitor, envie
+\code{xp /4000bx 0xb8000}, interprete os pares (caractere, atributo) e
+reconstrua as linhas. O teste PS/2 usa \code{sendkey}:
+
+\begin{lstlisting}[style=shell,caption={Envio de teclas pelo monitor do QEMU.},label={lst:sendkey}]
+sendkey h
+sendkey e
+sendkey l
+sendkey p
+sendkey ret
+\end{lstlisting}
+
+\begin{atencao}[N\~ao envie \code{quit} antes de terminar]
+O comando \code{quit} no monitor encerra o QEMU. Se o script ainda precisar
+inspecionar o VGA ou enviar mais teclas, use uma conex\~ao separada para cada
+comando e s\'o encerre o processo ao final.
+\end{atencao}
+
+\section{Testes de build e formato}
+
+\begin{lstlisting}[style=shell,caption={Comandos de valida\c{c}\~ao estrutural.},label={lst:testbuild}]
+make clean && make
+grub-file --is-x86-multiboot2 target/x86_64-unknown-none/release/vga-kernel
+readelf -h target/x86_64-unknown-none/release/vga-kernel
+readelf -l target/x86_64-unknown-none/release/vga-kernel
+xorriso -indev vga-kernel.iso -report_el_torito plain
+\end{lstlisting}
+
+Resultados esperados:
+
+\begin{itemize}
+  \item \code{grub-file} retorna c\'odigo 0;
+  \item \code{readelf -h} mostra \code{Type: EXEC}, \code{Machine: Advanced
+        Micro Devices X86-64} e \code{Entry point address: 0x100018};
+  \item \code{readelf -l} mostra um segmento baixo em \code{0x100000} e
+        segmentos altos em \code{0xFFFFFFFF8010...};
+  \item \code{xorriso} reporta \emph{El Torito} com
+        \code{boot\_hybrid.img}.
+\end{itemize}
+
+\section{Limita\c{c}\~oes dos testes}
+
+\begin{itemize}
+  \item N\~ao h\'a cobertura automatizada de todos os caminhos do teclado
+        (Shift, Tab, Backspace, teclas estendidas).
+  \item O teste PS/2 depende do \code{sendkey} do QEMU e do layout de teclas
+        do monitor; nem todos os caracteres s\~ao f\'aceis de simular.
+  \item A leitura do VGA pelo monitor depende do formato de dump e do
+        endere\c{c}o \code{0xB8000}.
+  \item O comportamento em hardware f\'isico pode diferir do QEMU,
+        especialmente em UEFI sem CSM, teclados USB e chipsets sem 8042.
+  \item \code{reboot} e \code{halt} foram verificados manualmente; n\~ao h\'a
+        teste automatizado de reset.
+  \item N\~ao h\'a testes de estresse, tempo ou concorr\^encia.
+\end{itemize}
+
+\section{Checklist de aceita\c{c}\~ao}
+
+\begin{itemize}
+  \item[$\square$] \code{make} gera ELF e ISO sem erros.
+  \item[$\square$] \code{grub-file} reconhece Multiboot2.
+  \item[$\square$] QEMU chega ao banner e ao prompt \code{rinux>}.
+  \item[$\square$] \code{help}, \code{echo}, \code{info} e \code{clear}
+        funcionam pelo teclado PS/2.
+  \item[$\square$] Entrada pela serial funciona.
+  \item[$\square$] \code{halt} para a CPU e \code{reboot} reinicia (quando o
+        ambiente suporta).
+  \item[$\square$] A documenta\c{c}\~ao LaTeX compila e gera o PDF.
+\end{itemize}

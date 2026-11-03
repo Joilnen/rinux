@@ -1,0 +1,178 @@
+% =============================================================================
+%  Documentacao tecnica do Rust VGA Kernel
+%  Compile com: latexmk -pdf main.tex   (ou make)
+% =============================================================================
+\documentclass[11pt,a4paper,oneside]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[brazilian]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[a4paper,top=2.6cm,bottom=2.6cm,left=2.6cm,right=2.6cm]{geometry}
+
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{amssymb}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage[most]{tcolorbox}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds,calc}
+\usepackage{caption}
+\usepackage{float}
+\usepackage[hidelinks,unicode]{hyperref}
+
+% -----------------------------------------------------------------------------
+% Cores e estilo
+% -----------------------------------------------------------------------------
+\definecolor{rinuxblue}{HTML}{1F4E79}
+\definecolor{rinuxlight}{HTML}{EAF1F8}
+\definecolor{rinuxgray}{HTML}{4D4D4D}
+\definecolor{codegreen}{HTML}{2E7D32}
+\definecolor{codegray}{HTML}{6A737D}
+\definecolor{codepurple}{HTML}{8E24AA}
+\definecolor{codebackground}{HTML}{F6F8FA}
+
+\titleformat{\chapter}[display]
+  {\normalfont\bfseries\color{rinuxblue}}
+  {\filright\Large Cap\'itulo \thechapter}
+  {0.6ex}
+  {\Huge}
+\titlespacing*{\chapter}{0pt}{-10pt}{24pt}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{rinuxblue}}{\thesection}{0.8em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{rinuxgray}}{\thesubsection}{0.8em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{rinuxgray}{Rust VGA Kernel --- Documenta\c{c}\~ao T\'ecnica}}
+\fancyhead[R]{\small\textcolor{rinuxgray}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\setlength{\headheight}{14pt}
+
+\setlist[itemize]{topsep=2pt,itemsep=2pt,parsep=0pt}
+\setlist[enumerate]{topsep=2pt,itemsep=2pt,parsep=0pt}
+
+\captionsetup{font=small,labelfont=bf,width=0.95\linewidth}
+
+% -----------------------------------------------------------------------------
+% Listings (Rust)
+% -----------------------------------------------------------------------------
+\lstdefinelanguage{Rust}{
+  keywords={as,break,const,continue,crate,else,enum,extern,false,fn,for,if,impl,in,let,loop,match,mod,move,mut,pub,ref,return,self,Self,static,struct,trait,true,type,unsafe,use,where,while,async,await,dyn,yield},
+  keywordstyle=\color{rinuxblue}\bfseries,
+  ndkeywords={u8,u16,u32,u64,usize,i32,bool,char,str,Option,Some,None,Result,Ok,Err,AtomicBool,UnsafeCell},
+  ndkeywordstyle=\color{codepurple},
+  sensitive=true,
+  morecomment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  morestring=[b]",
+  morestring=[b]',
+}
+
+\lstset{
+  language=Rust,
+  backgroundcolor=\color{codebackground},
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{rinuxblue}\bfseries,
+  commentstyle=\color{codegreen}\itshape,
+  stringstyle=\color{codepurple},
+  numbers=left,
+  numberstyle=\tiny\color{codegray},
+  numbersep=8pt,
+  frame=single,
+  rulecolor=\color{black!20},
+  breaklines=true,
+  breakatwhitespace=false,
+  postbreak=\mbox{\textcolor{codegray}{$\hookrightarrow$}\space},
+  showstringspaces=false,
+  tabsize=4,
+  captionpos=b,
+  columns=fullflexible,
+  keepspaces=true,
+  upquote=true,
+}
+
+\lstdefinestyle{shell}{
+  language={},
+  basicstyle=\ttfamily\footnotesize,
+  numbers=none,
+  frame=single,
+  backgroundcolor=\color{black!3},
+}
+
+% Caixas de destaque
+\newtcolorbox{nota}[1][]{
+  enhanced, colback=rinuxlight, colframe=rinuxblue,
+  boxrule=0.5pt, left=6pt, right=6pt, top=4pt, bottom=4pt,
+  fonttitle=\bfseries, title=#1
+}
+\newtcolorbox{atencao}[1][]{
+  enhanced, colback=orange!7, colframe=orange!70!black,
+  boxrule=0.5pt, left=6pt, right=6pt, top=4pt, bottom=4pt,
+  fonttitle=\bfseries, title=#1
+}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\termo}[1]{\textit{#1}}
+
+% Metadados
+\title{\vspace{-2cm}\textbf{Rust VGA Kernel}\\[0.4em]
+       \Large Documenta\c{c}\~ao T\'ecnica, Arquitetura e Compara\c{c}\~ao com o Linux}
+\author{Documenta\c{c}\~ao gerada a partir do c\'odigo-fonte}
+\date{Vers\~ao 1.0 --- 3 de novembro de 2026}
+
+\begin{document}
+
+\hypersetup{
+  pdftitle={Rust VGA Kernel - Documentacao Tecnica},
+  pdfauthor={Rust VGA Kernel},
+  pdfsubject={Kernel minimalista x86-64 em Rust},
+  pdfkeywords={Rust, kernel, x86-64, multiboot2, VGA, PS/2, Linux}
+}
+
+\maketitle
+
+\begin{abstract}
+Este documento descreve integralmente o \textbf{Rust VGA Kernel}, um kernel
+did\'atico escrito em Rust com \code{no\_std} para PCs padr\~ao com BIOS/x86\_64.
+O texto cobre a arquitetura, a cadeia de boot, o modelo de mem\'oria, os
+drivers de v\'ideo VGA, teclado PS/2 e serial, o shell embutido, o processo de
+compila\c{c}\~ao e empacotamento da ISO, os testes realizados e uma an\'alise
+quantitativa e qualitativa do grau de similaridade com o kernel Linux.
+O c\'odigo implementa apenas o caminho m\'inimo entre o bootloader e um
+terminal funcional; n\~ao \'e um porte do Linux e n\~ao implementa
+gerenciamento de processos, heap, interrup\c{c}\~oes, sistema de arquivos ou
+chamadas de sistema.
+\end{abstract}
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+\clearpage
+\input{sections/01-introducao}
+\input{sections/02-visao-geral}
+\input{sections/03-arquitetura}
+\input{sections/04-boot}
+\input{sections/05-base}
+\input{sections/06-vga}
+\input{sections/07-keyboard}
+\input{sections/08-serial}
+\input{sections/09-shell}
+\input{sections/10-build}
+\input{sections/11-testes}
+\input{sections/12-similaridade}
+\input{sections/13-limitacoes}
+\input{sections/14-apendices}
+
+\end{document}

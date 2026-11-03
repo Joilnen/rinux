@@ -1,0 +1,6 @@
+*.iso
+*.elf
+*.o
+*.pdf
+target
+

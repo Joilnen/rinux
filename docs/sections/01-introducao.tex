@@ -1,0 +1,133 @@
+\chapter{Introdu\c{c}\~ao}
+\label{cap:introducao}
+
+\section{Motiva\c{c}\~ao}
+
+O kernel Linux \'e um sistema operacional completo, com milh\~oes de linhas de
+c\'odigo e d\'ecadas de evolu\c{c}\~ao. Estudar seu funcionamento a partir do
+c\'odigo real exige percorrer camadas de abstra\c{c}\~ao, configura\c{c}\~oes de
+compila\c{c}\~ao, subsistemas e caminhos de c\'odigo que n\~ao s\~ao essenciais
+para entender o n\'ucleo do problema ``como um computador sai do boot e abre um
+terminal?''.
+
+O \textbf{Rust VGA Kernel} foi criado como um recorte did\'atico desse
+problema. Ele reimplementa, em Rust, o caminho m\'inimo necess\'ario para:
+
+\begin{enumerate}
+  \item ser carregado por um bootloader padr\~ao (GRUB via Multiboot2);
+  \item sair do modo de 32 bits e entrar em modo longo x86\_64;
+  \item configurar p\'aginas e uma pilha de kernel;
+  \item inicializar um console de texto VGA 80$\times$25;
+  \item ler teclas do controlador PS/2 8042 e da serial COM1;
+  \item oferecer um pequeno shell com comandos b\'asicos.
+\end{enumerate}
+
+O resultado n\~ao \'e um Linux reduzido, nem um porte linha a linha. \'E um
+kernel independente, sem depend\^encias externas de Rust, que reproduz
+\emph{conceitos} dos subsistemas equivalentes do Linux em uma escala
+compreens\'ivel.
+
+\section{Objetivo do documento}
+
+Esta documenta\c{c}\~ao tem quatro objetivos:
+
+\begin{itemize}
+  \item \textbf{Explicar a arquitetura} do kernel: camadas, fluxo de boot,
+        modelo de mem\'oria, modelo de execu\c{c}\~ao e depend\^encias entre
+        m\'odulos.
+  \item \textbf{Documentar as principais fun\c{c}\~oes} de cada m\'odulo,
+        incluindo contratos, pr\'e-condi\c{c}\~oes, efeitos colaterais e
+        limita\c{c}\~oes. O Ap\^endice~\ref{ap:funcoes} traz o cat\'alogo
+        completo das 43 fun\c{c}\~oes do projeto.
+  \item \textbf{Registrar o processo de build, execu\c{c}\~ao e valida\c{c}\~ao},
+        de forma que outra pessoa consiga reproduzir o ambiente e os testes.
+  \item \textbf{Comparar o projeto com o kernel Linux}, apresentando
+        correspond\^encias de arquivos e fun\c{c}\~oes e uma estimativa
+        transparente do n\'ivel de similaridade.
+\end{itemize}
+
+\section{Escopo}
+
+\subsection*{O que est\'a inclu\'ido}
+
+\begin{itemize}
+  \item Boot BIOS por CD/ISO usando GRUB e o protocolo Multiboot2.
+  \item Transi\c{c}\~ao de 32 bits para modo longo (x86\_64).
+  \item GDT m\'inima, tabelas de p\'agina est\'aticas e mapeamento da metade
+        alta do espa\c{c}o de endere\c{c}amento.
+  \item Console VGA em modo texto, com cursor de hardware, rolagem e
+        atributos de cor.
+  \item Driver de teclado PS/2 por \emph{polling}, com Shift, Enter, Tab e
+        Backspace.
+  \item Driver da UART 16550 em COM1, usado para depura\c{c}\~ao e entrada.
+  \item Shell sem aloca\c{c}\~ao din\^amica com seis comandos.
+  \item \emph{Panic handler} que imprime a falha e para a CPU.
+  \item Build reprodut\'ivel com Cargo, \code{ld.lld}, \code{grub-mkrescue}
+        e QEMU.
+\end{itemize}
+
+\subsection*{O que n\~ao est\'a inclu\'ido}
+
+\begin{itemize}
+  \item Interrup\c{c}\~oes, IDT, PIC/PIT/APIC e temporizadores.
+  \item Gerenciamento de mem\'oria f\'isica ou virtual al\'em do mapeamento
+        est\'atico inicial.
+  \item Heap, alocador, \code{alloc} ou cole\c{c}\~oes din\^amicas.
+  \item Processos, threads, escalonador, espa\c{c}os de endere\c{c}amento ou
+        chamadas de sistema.
+  \item Sistema de arquivos, rede, USB, ACPI, SMP ou suporte UEFI nativo.
+  \item Drivers para outros v\'ideos al\'em do VGA texto legado.
+  \item Seguran\c{c}a de ring 3, prote\c{c}\~ao de mem\'oria ou \emph{sandbox}.
+\end{itemize}
+
+\section{P\'ublico-alvo}
+
+O documento \'e destinado a:
+
+\begin{itemize}
+  \item estudantes de sistemas operacionais e arquitetura de computadores;
+  \item desenvolvedores Rust interessados em \code{no\_std} e bare metal;
+  \item pessoas que desejam entender o caminho entre BIOS, bootloader e
+        console antes de estudar o kernel Linux em profundidade;
+  \item avaliadores que precisem julgar o grau de correspond\^encia entre
+        este projeto e o Linux.
+\end{itemize}
+
+\section{Conven\c{c}\~oes}
+
+\begin{itemize}
+  \item Nomes de c\'odigo aparecem em \code{fonte monoespa\c{c}ada}.
+  \item Endere\c{c}os hexadecimais usam o prefixo \code{0x}.
+  \item ``Metade alta'' refere-se a endere\c{c}os acima de
+        \code{0xFFFF800000000000}, conven\c{c}\~ao usada pelo Linux e pelo
+        alvo \code{x86\_64-unknown-none}.
+  \item ``Original'' ou ``Linux'' refere-se, salvo indica\c{c}\~ao contr\'aria,
+        \`a \'arvore Linux 7.3.1 usada como refer\^encia de compara\c{c}\~ao.
+  \item Valores de endere\c{c}o e tamanho de se\c{c}\~ao citados como
+        ``observados'' foram extra\'idos da compila\c{c}\~ao de refer\^encia e
+        podem variar ligeiramente entre vers\~oes do compilador.
+\end{itemize}
+
+\section{Estado do projeto}
+
+A vers\~ao documentada \'e a \code{0.1.0}, com as seguintes caracter\'isticas:
+
+\begin{table}[H]
+\centering
+\caption{Resumo do estado da vers\~ao documentada.}
+\label{tab:estado}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Item} & \textbf{Situa\c{c}\~ao} \\
+\midrule
+Compila\c{c}\~ao & \texttt{make} conclui sem erros; alvo \code{x86\_64-unknown-none}. \\
+Imagem & \code{vga-kernel.iso} El Torito, inicializ\'avel por BIOS. \\
+Boot & Validado em QEMU com SeaBIOS e GRUB Multiboot2. \\
+Console & VGA texto 80$\times$25, cursor, rolagem e cores. \\
+Entrada & PS/2 por polling e serial COM1. \\
+Shell & \code{help}, \code{clear}, \code{echo}, \code{info}, \code{reboot}, \code{halt}. \\
+Testes & Boot, comandos e entrada PS/2/serial verificados. \\
+Cobertura Linux & Subconjunto pequeno; similaridade baixa (Cap\'itulo~\ref{cap:similaridade}). \\
+\bottomrule
+\end{tabularx}
+\end{table}

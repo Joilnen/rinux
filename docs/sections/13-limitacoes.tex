@@ -1,0 +1,117 @@
+\chapter{Limita\c{c}\~oes, riscos e evolu\c{c}\~ao}
+\label{cap:limitacoes}
+
+\section{Limita\c{c}\~oes t\'ecnicas}
+
+\begin{table}[H]
+\centering
+\caption{Limita\c{c}\~oes por \'area e consequ\^encias.}
+\label{tab:limitacoes}
+\begin{tabularx}{\linewidth}{@{}p{3.3cm}X@{}}
+\toprule
+\textbf{\'Area} & \textbf{Limita\c{c}\~ao e consequ\^encia} \\
+\midrule
+Interrup\c{c}\~oes & Sem IDT/PIC/APIC. Qualquer exce\c{c}\~ao causa
+\emph{triple fault}; n\~ao h\'a timer, teclado por IRQ ou \emph{preemption}. \\
+Mem\'oria & Sem heap e sem alocador. Estruturas s\~ao est\'aticas ou de pilha;
+n\~ao h\'a \code{Vec}, \code{String} ou buffers din\^amicos. \\
+Processos & Sem scheduler, context switch, espa\c{c}o de usu\'ario, sinais
+ou syscalls. Todo c\'odigo roda em ring 0. \\
+Armazenamento & Sem VFS, block layer, FAT, ext2 ou qualquer sistema de
+arquivos. A ISO \'e s\'o o meio de boot. \\
+Rede & Sem pilha TCP/IP, netdevice ou drivers de rede. \\
+V\'ideo & Apenas VGA texto legado. UEFI sem CSM, GPUs e modos gr\'aficos
+n\~ao s\~ao suportados. \\
+Entrada & Teclado PS/2 por polling, sem USB-HID nativo, Caps Lock, AltGr,
+setas ou layout ABNT2. \\
+Serial & Apenas COM1, polling, sem IRQ, DMA ou controle de fluxo. \\
+Concorr\^encia & Uma CPU, sem preemp\c{c}\~ao; o spinlock \'e uma salvaguarda,
+n\~ao um modelo completo. \\
+Seguran\c{c}a & Sem ASLR, NX, SMEP/SMAP, \emph{stack canary}, prote\c{c}\~ao
+de pilha ou separa\c{c}\~ao kernel/usu\'ario. \\
+Robustez & Sem tratamento de exce\c{c}\~oes, recupera\c{c}\~ao de falhas,
+watchdog ou logs persistentes. \\
+Portabilidade & C\'odigo espec\'ifico para x86\_64 BIOS; n\~ao compila para
+ARM, RISC-V ou UEFI puro. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Riscos}
+
+\begin{table}[H]
+\centering
+\caption{Riscos e mitiga\c{c}\~oes atuais.}
+\label{tab:riscos}
+\begin{tabularx}{\linewidth}{@{}p{3.7cm}p{3.0cm}X@{}}
+\toprule
+\textbf{Risco} & \textbf{Probabilidade} & \textbf{Mitiga\c{c}\~ao} \\
+\midrule
+\emph{Triple fault} por exce\c{c}\~ao & Alta em c\'odigo novo & Testar em
+QEMU; adicionar IDT antes de funcionalidades novas. \\
+\emph{Deadlock} no console & Baixa hoje & N\~ao adquirir o lock duas vezes;
+ao habilitar IRQs, usar \code{irqsave}. \\
+\emph{Hang} em espera de hardware & M\'edia & Timeouts nas esperas do 8042;
+a UART ainda pode travar se presente e defeituosa. \\
+Teclado n\~ao funciona em hardware real & M\'edia & Testar com \emph{legacy
+USB}/PS/2; usar serial como alternativa. \\
+Tela preta em UEFI & Alta sem CSM & Documentar requisito de BIOS/CSM;
+implementar GOP no futuro. \\
+Perda de bytes na serial & M\'edia & Polling r\'apido; futuramente FIFO/IRQ. \\
+Corrup\c{c}\~ao por bug de \'indice & Baixa & Revisar invariantes de
+\code{row}/\code{column}; adicionar testes. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Roadmap sugerido}
+
+A ordem abaixo prioriza ganhos de robustez e de compreens\~ao antes de
+adicionar complexidade.
+
+\begin{table}[H]
+\centering
+\caption{Roadmap priorizado.}
+\label{tab:roadmap}
+\begin{tabularx}{\linewidth}{@{}clX@{}}
+\toprule
+\textbf{Prior.} & \textbf{Item} & \textbf{Objetivo} \\
+\midrule
+1 & IDT e exce\c{c}\~oes & Evitar \emph{triple fault}; imprimir RIP, erro e
+pilha. \\
+2 & PIC/PIT e IRQ1/IRQ4 & Entrada por interrup\c{c}\~ao; timer para
+\emph{timeouts} e \emph{sleep}. \\
+3 & Heap simples & \code{alloc} + alocador de blocos; habilitar
+\code{Vec}/\code{String}. \\
+4 & Framebuffer GOP/VBE & Suporte a UEFI e modos gr\'aficos; fonte bitmap. \\
+5 & Console virtual e log & M\'ultiplos terminais, \emph{scrollback},
+n\'iveis de log. \\
+6 & Driver de teclado completo & USB-HID, Caps Lock, AltGr, layout ABNT2,
+teclas estendidas. \\
+7 & Processos e syscalls & \code{task\_struct}, scheduler round-robin,
+\code{syscall}/\code{sysret}, ring 3. \\
+8 & Sistema de arquivos & Leitura de FAT ou initramfs; \emph{loader} de
+programas. \\
+9 & Rede & NE2000/virtio-net, ARP/IP/ICMP/UDP, testes com QEMU. \\
+10 & Testes automatizados & CI com QEMU headless, dumps VGA e asserts. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Crit\'erios para considerar o projeto ``um kernel''}
+
+Do ponto de vista did\'atico, o projeto j\'a \'e um kernel: roda em ring 0,
+controla hardware e n\~ao depende de sistema operacional. Do ponto de vista
+de um sistema operacional utiliz\'avel, ainda faltam, no m\'inimo:
+
+\begin{itemize}
+  \item isolamento de processos e espa\c{c}o de usu\'ario;
+  \item interrup\c{c}\~oes e timer;
+  \item aloca\c{c}\~ao de mem\'oria e prote\c{c}\~ao;
+  \item sistema de arquivos e \emph{loader};
+  \item drivers de entrada/sa\'ida al\'em de VGA/PS/2/serial;
+  \item tratamento de erros e recupera\c{c}\~ao.
+\end{itemize}
+
+O projeto atual \'e melhor classificado como \textbf{kernel monol\'itico
+m\'inimo de demonstra\c{c}\~ao}, focado em boot e console.

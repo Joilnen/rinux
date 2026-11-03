@@ -1,0 +1,150 @@
+\chapter{Vis\~ao geral do sistema}
+\label{cap:visao}
+
+\section{Resumo executivo}
+
+O Rust VGA Kernel \'e um execut\'avel ELF x86\_64 carregado pelo GRUB. O GRUB
+usa o protocolo Multiboot2 para transferir o controle a um pequeno \emph{stub}
+em linguagem de montagem, ligado em 1 MiB. Esse stub constr\'oi tabelas de
+p\'agina, ativa PAE e modo longo e salta para o c\'odigo Rust, ligado na metade
+alta em \code{0xFFFFFFFF80000000}.
+
+O c\'odigo Rust inicializa, nesta ordem, o console VGA, a serial COM1 e o
+teclado PS/2. Em seguida imprime um \emph{banner}, valida a assinatura
+Multiboot2 e entra no shell, que exibe o prompt \code{rinux>} e processa
+comandos lidos do teclado ou da serial.
+
+O sistema inteiro cabe em cerca de 48 KiB de ELF e 1.035 linhas de Rust
+(773 linhas efetivas de c\'odigo, sem coment\'arios e linhas em branco).
+N\~ao h\'a aloca\c{c}\~ao din\^amica, interrup\c{c}\~oes, processos ou
+chamadas de sistema.
+
+\section{Funcionalidades}
+
+\begin{table}[H]
+\centering
+\caption{Funcionalidades implementadas e seu estado.}
+\label{tab:funcionalidades}
+\begin{tabularx}{\linewidth}{@{}lXc@{}}
+\toprule
+\textbf{\'Area} & \textbf{Funcionalidade} & \textbf{Estado} \\
+\midrule
+Boot & Cabe\c{c}alho Multiboot2 v\'alido & Completo \\
+Boot & Transi\c{c}\~ao 32 $\rightarrow$ 64 bits & Completo \\
+Mem\'oria & PML4/PDPT/PD est\'aticos, 1 GiB & Completo \\
+Mem\'oria & Metade alta do kernel & Completo \\
+V\'ideo & Console VGA texto 80$\times$25 & Completo \\
+V\'ideo & Rolagem, cursor, tab, backspace & Completo \\
+V\'ideo & Framebuffer gr\'afico / GOP & Ausente \\
+Teclado & PS/2 8042, conjunto 1, polling & Completo (subconjunto) \\
+Teclado & Shift, Enter, Tab, Backspace & Completo \\
+Teclado & IRQ1, Caps Lock, AltGr, setas & Ausente \\
+Serial & COM1 16550, 38400 8N1 & Completo (subconjunto) \\
+Serial & Entrada pelo terminal do QEMU & Completo \\
+Shell & \code{help}, \code{clear}, \code{echo} & Completo \\
+Shell & \code{info}, \code{reboot}, \code{halt} & Completo \\
+Sistema & Panic handler & Completo \\
+Sistema & IDT, exce\c{c}\~oes, IRQs & Ausente \\
+Sistema & Heap, processos, syscalls & Ausente \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Requisitos}
+
+\subsection{Hardware}
+
+\begin{itemize}
+  \item PC compat\'ivel x86\_64 com BIOS legada ou CSM habilitado.
+  \item Controlador de teclado PS/2 8042 (ou emula\c{c}\~ao equivalente).
+  \item Adaptador VGA em modo texto, com buffer em \code{0xB8000}.
+  \item Unidade de CD/DVD ou dispositivo equivalente para inicializar a ISO.
+  \item Mem\'oria suficiente para carregar o kernel e a ISO; 128 MiB s\~ao
+        suficientes no QEMU.
+\end{itemize}
+
+\subsection{Software de desenvolvimento}
+
+\begin{itemize}
+  \item Rust est\'avel com o alvo \code{x86\_64-unknown-none} instalado.
+  \item \code{rustup} (recomendado; o Makefile prioriza o toolchain dele).
+  \item \code{ld.lld} (LLVM linker).
+  \item \code{grub-mkrescue}, \code{xorriso}, \code{libisoburn} e
+        \code{mtools}.
+  \item QEMU (\code{qemu-system-x86\_64}) para execu\c{c}\~ao e testes.
+  \item Para esta documenta\c{c}\~ao: uma distribui\c{c}\~ao TeX Live com
+        \code{pdflatex} e \code{latexmk}.
+\end{itemize}
+
+\section{Estrutura de diret\'orios}
+
+\begin{lstlisting}[style=shell]
+output/
+|-- Cargo.toml              metadados e perfis de compilacao
+|-- Cargo.lock              lockfile (sem dependencias externas)
+|-- rust-toolchain.toml     canal stable + alvo x86_64-unknown-none
+|-- .cargo/config.toml      alvo padrao, linker e flags
+|-- linker.ld               layout do ELF (stub baixo + kernel alto)
+|-- Makefile                build do kernel, ISO e execucao no QEMU
+|-- boot/grub/grub.cfg      menu Multiboot2 e console VGA
+|-- src/
+|   |-- main.rs             entrada Rust, macros e panic handler
+|   |-- boot.rs             Multiboot2, GDT, paginacao e modo longo
+|   |-- arch.rs             portas de I/O, halt e reboot
+|   |-- vga.rs              console VGA 80x25
+|   |-- keyboard.rs         teclado PS/2 (8042)
+|   |-- serial.rs           UART 16550 / COM1
+|   |-- shell.rs            prompt e comandos
+|   `-- sync.rs             spinlock do console
+|-- docs/                   esta documentacao (LaTeX e PDF)
+|-- build/                  arvore temporaria da ISO (gerada)
+|-- target/                 artefatos do Cargo (gerado)
+|-- vga-kernel.iso          imagem inicializavel (gerada)
+`-- README.md               guia rapido de uso
+\end{lstlisting}
+
+\section{M\'etricas do c\'odigo}
+
+\begin{table}[H]
+\centering
+\caption{M\'etricas dos m\'odulos Rust (contagem por linhas f\'isicas).}
+\label{tab:metricas}
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+\textbf{M\'odulo} & \textbf{Linhas} & \textbf{Fun\c{c}\~oes} & \textbf{Responsabilidade} \\
+\midrule
+\code{boot.rs}     & 202 & 0 & Stub de boot e tabelas de p\'agina \\
+\code{keyboard.rs} & 238 & 9 & Driver PS/2 8042 \\
+\code{vga.rs}      & 217 & 15 & Console VGA texto \\
+\code{shell.rs}    & 105 & 4 & Linha de comando \\
+\code{main.rs}     &  91 & 2 & Entrada Rust, macros, panic \\
+\code{serial.rs}   &  64 & 4 & UART 16550 / COM1 \\
+\code{arch.rs}     &  62 & 4 & Portas de I/O, halt, reboot \\
+\code{sync.rs}     &  56 & 5 & Spinlock \\
+\midrule
+\textbf{Total}     & \textbf{1.035} & \textbf{43} & 773 linhas efetivas de c\'odigo \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{nota}[Sobre a contagem]
+A contagem inclui 124 linhas de coment\'ario e 138 linhas em branco. O n\'umero
+de fun\c{c}\~oes inclui m\'etodos de \code{impl} e fun\c{c}\~oes de trait
+(\code{Deref}, \code{DerefMut}, \code{Drop} e \code{fmt::Write}).
+\code{boot.rs} n\~ao possui fun\c{c}\~oes Rust porque sua l\'ogica est\'a em
+\code{global\_asm!}; o \emph{stub} \'e contado como bloco de montagem.
+\end{nota}
+
+\section{Fluxo resumido de execu\c{c}\~ao}
+
+\begin{enumerate}
+  \item A BIOS seleciona o CD e executa o El Torito.
+  \item O GRUB carrega o ELF e l\^e o cabe\c{c}alho Multiboot2.
+  \item O GRUB entra em modo protegido de 32 bits e salta para \code{\_start}.
+  \item O stub salva \code{eax} e \code{ebx}, monta as p\'aginas, carrega a
+        GDT e ativa o modo longo.
+  \item O stub salta para \code{kernel\_main(magic, info)} na metade alta.
+  \item O Rust limpa a tela VGA, configura a serial e inicializa o teclado.
+  \item O shell exibe \code{rinux>} e processa comandos at\'e
+        \code{halt}, \code{reboot} ou reset f\'isico.
+\end{enumerate}

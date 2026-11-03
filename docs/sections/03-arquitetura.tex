@@ -1,0 +1,219 @@
+\chapter{Arquitetura}
+\label{cap:arquitetura}
+
+\section{Vis\~ao em camadas}
+
+O kernel \'e organizado em cinco camadas conceituais. As camadas inferiores
+dependem apenas de hardware e de \code{core}; as superiores usam as
+inferiores. N\~ao h\'a \code{std}, alocador, \emph{runtime} de Rust nem
+bibliotecas de terceiros.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  layer/.style={draw=rinuxblue, fill=rinuxlight, rounded corners=2pt,
+                minimum width=11.4cm, minimum height=1.0cm,
+                align=center, font=\small},
+  hw/.style={draw=black!60, fill=black!8, rounded corners=2pt,
+             minimum width=11.4cm, minimum height=1.0cm,
+             align=center, font=\small},
+  node distance=0.35cm
+]
+\node[layer] (shell) {\textbf{Interface} --- shell: linha de comando, \code{help}, \code{echo}, \code{info}, \code{clear}};
+\node[layer, below=of shell] (services) {\textbf{Servi\c{c}os} --- console VGA, entrada PS/2, serial, macros de impress\~ao};
+\node[layer, below=of services] (core) {\textbf{N\'ucleo} --- \code{kernel\_main}, panic handler, spinlock, portas de I/O};
+\node[layer, below=of core] (boot) {\textbf{Boot} --- stub 32/64 bits, GDT, PML4/PDPT/PD, Multiboot2};
+\node[hw, below=of boot] (hw) {\textbf{Hardware} --- CPU x86\_64, VGA, 8042, UART 16550, BIOS/GRUB};
+\draw[-{Latex[length=2mm]}, thick, rinuxblue] (shell) -- (services);
+\draw[-{Latex[length=2mm]}, thick, rinuxblue] (services) -- (core);
+\draw[-{Latex[length=2mm]}, thick, rinuxblue] (core) -- (boot);
+\draw[-{Latex[length=2mm]}, thick, black!60] (boot) -- (hw);
+\end{tikzpicture}
+\caption{Camadas do Rust VGA Kernel.}
+\label{fig:camadas}
+\end{figure}
+
+\section{Modelo de execu\c{c}\~ao}
+
+O kernel executa em \textbf{ring 0}, em uma \'unica CPU, com
+\textbf{interrup\c{c}\~oes desligadas}. Todo o processamento \'e feito por
+\emph{polling}: o shell consulta o teclado e a serial em um la\c{c}o ativo,
+usando \code{core::hint::spin\_loop()} quando n\~ao h\'a entrada.
+
+\begin{table}[H]
+\centering
+\caption{Caracter\'isticas do modelo de execu\c{c}\~ao.}
+\label{tab:modelo}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Aspecto} & \textbf{Implementa\c{c}\~ao} \\
+\midrule
+Privil\'egio & Ring 0 \'unico; n\~ao h\'a modo usu\'ario. \\
+CPUs & Uma CPU; SMP n\~ao \'e inicializado. \\
+Interrup\c{c}\~oes & Desligadas no stub (\code{cli}); nenhuma IDT instalada. \\
+Entrada & Polling de \code{0x60}/\code{0x64} e de COM1. \\
+Concorr\^encia & Spinlock apenas no console; n\~ao h\'a preemp\c{c}\~ao. \\
+Mem\'oria & Est\'atica; sem heap, \code{alloc} ou \code{Vec}. \\
+Pilhas & 8 KiB no stub (baixa) e 32 KiB no kernel (alta). \\
+Tempo de vida & O shell nunca retorna; \code{halt} e \code{reboot} encerram o fluxo. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Depend\^encias entre m\'odulos}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  mod/.style={draw=rinuxblue, fill=white, rounded corners=2pt,
+              minimum width=2.9cm, minimum height=1.0cm,
+              align=center, font=\small\ttfamily},
+  arrow/.style={-{Latex[length=2mm]}, thick, rinuxblue},
+  node distance=1.1cm and 1.2cm
+]
+\node[mod] (main) {main};
+\node[mod, below left=of main] (shell) {shell};
+\node[mod, below right=of main] (vga) {vga};
+\node[mod, below=of shell] (keyboard) {keyboard};
+\node[mod, right=of keyboard] (serial) {serial};
+\node[mod, below=of vga] (sync) {sync};
+\node[mod, left=of sync] (arch) {arch};
+\node[mod, above=of main] (boot) {boot};
+
+\draw[arrow] (main) -- (shell);
+\draw[arrow] (main) -- (vga);
+\draw[arrow] (main) -- (boot);
+\draw[arrow] (shell) -- (keyboard);
+\draw[arrow] (shell) -- (serial);
+\draw[arrow] (shell) -- (vga);
+\draw[arrow] (shell) -- (arch);
+\draw[arrow] (vga) -- (serial);
+\draw[arrow] (vga) -- (sync);
+\draw[arrow] (vga) -- (arch);
+\draw[arrow] (keyboard) -- (arch);
+\draw[arrow] (serial) -- (arch);
+\end{tikzpicture}
+\caption{Depend\^encias principais entre m\'odulos. Setas indicam ``usa''.}
+\label{fig:dependencias}
+\end{figure}
+
+A figura mostra apenas as depend\^encias relevantes. \code{boot.rs} \'e um
+caso especial: ele cont\'em o c\'odigo de montagem que chama \code{kernel\_main}
+e n\~ao \'e chamado por Rust. \code{main.rs} declara todos os m\'odulos e
+exporta as macros \code{print!} e \code{println!}.
+
+\section{Cadeia de boot}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  stage/.style={draw=rinuxblue, fill=rinuxlight, rounded corners=3pt,
+                minimum width=3.0cm, minimum height=1.25cm,
+                align=center, font=\scriptsize},
+  arrow/.style={-{Latex[length=2mm]}, thick, rinuxblue},
+  node distance=0.55cm
+]
+\node[stage] (bios) {BIOS\\SeaBIOS};
+\node[stage, right=of bios] (eltorito) {El Torito\\CD};
+\node[stage, right=of eltorito] (grub) {GRUB\\i386-pc};
+\node[stage, right=of grub] (mb) {Multiboot2\\kernel.elf};
+\node[stage, below=1.0cm of mb] (stub) {\_start\\32 bits @ 1 MiB};
+\node[stage, left=of stub] (paging) {PML4/PDPT/PD\\GDT + long mode};
+\node[stage, left=of paging] (main) {kernel\_main\\metade alta};
+\node[stage, left=of main] (shell) {vga / serial / kbd\\shell};
+\draw[arrow] (bios) -- (eltorito);
+\draw[arrow] (eltorito) -- (grub);
+\draw[arrow] (grub) -- (mb);
+\draw[arrow] (mb) -- (stub);
+\draw[arrow] (stub) -- (paging);
+\draw[arrow] (paging) -- (main);
+\draw[arrow] (main) -- (shell);
+\end{tikzpicture}
+\caption{Cadeia de boot completa.}
+\label{fig:bootchain}
+\end{figure}
+
+\section{Decis\~oes de projeto}
+
+\begin{table}[H]
+\centering
+\caption{Decis\~oes arquiteturais e justificativas.}
+\label{tab:decisoes}
+\begin{tabularx}{\linewidth}{@{}p{3.3cm}X@{}}
+\toprule
+\textbf{Decis\~ao} & \textbf{Justificativa} \\
+\midrule
+\code{no\_std} & Elimina depend\^encia de sistema operacional, alocador e
+\emph{runtime}; o c\'odigo usa apenas \code{core}. \\
+Sem depend\^encias & Reduz superf\'icie de ataque e mant\'em o build
+reprodut\'ivel; \code{Cargo.lock} n\~ao tem pacotes externos. \\
+Alvo \code{x86\_64-unknown-none} & Alvo oficial bare metal, com modelo de
+c\'odigo \emph{kernel} e sem biblioteca padr\~ao. \\
+Kernel na metade alta & Conven\c{c}\~ao do Linux e do alvo; evita depender de
+endere\c{c}os baixos e deixa o stub separado. \\
+Stub em assembly & O controle inicial vem em 32 bits com pilha indefinida;
+a transi\c{c}\~ao para 64 bits exige c\'odigo posicional e controle exato. \\
+Tabelas de p\'agina est\'aticas & N\~ao h\'a alocador; 3 p\'aginas de 4 KiB
+s\~ao suficientes para mapear 1 GiB com \emph{huge pages} de 2 MiB. \\
+Polling & Evita IDT, PIC e handlers; simplifica o modelo e mant\'em o foco no
+console. \\
+Serial al\'em do VGA & Permite depura\c{c}\~ao e testes automatizados sem
+depender de captura gr\'afica. \\
+\emph{Panic abort} & N\~ao h\'a \emph{unwinding} nem runtime de p\^anico;
+\code{panic=abort} reduz c\'odigo gerado. \\
+LTO e \code{codegen-units=1} & Gera um bin\'ario pequeno e previs\'ivel; o
+linker descarta se\c{c}\~oes n\~ao usadas com \code{--gc-sections}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Tratamento de erros e falhas}
+
+O kernel n\~ao possui um subsistema de erros. As estrat\'egias s\~ao:
+
+\begin{itemize}
+  \item \textbf{Timeout em esperas de hardware}: as fun\c{c}\~oes do 8042
+        tentam por um n\'umero limitado de itera\c{c}\~oes e desistem, evitando
+        \emph{hang} quando o controlador n\~ao responde.
+  \item \textbf{Verifica\c{c}\~ao de presen\c{c}a da UART}: se o registrador de
+        status devolver \code{0xFF}, a serial \'e considerada ausente.
+  \item \textbf{Entrada inv\'alida}: bytes fora da faixa imprim\'ivel s\~ao
+        ignorados no shell; UTF-8 inv\'alido em \code{echo} vira uma
+        mensagem fixa.
+  \item \textbf{Panic}: o handler imprime \code{[PANIC]} no console e entra em
+        \code{halt\_loop()}. Como n\~ao h\'a IDT, uma exce\c{c}\~ao de CPU
+        (por exemplo, page fault) causa \emph{triple fault} e reset.
+  \item \textbf{Sem recupera\c{c}\~ao}: n\~ao h\'a \emph{kernel oops},
+        reinicializa\c{c}\~ao controlada ou despejo de pilha.
+\end{itemize}
+
+\section{Concorr\^encia e sincroniza\c{c}\~ao}
+
+Apesar de o sistema ser monoprocessado e rodar com interrup\c{c}\~oes
+desligadas, o console \'e protegido por um \code{SpinLock}. Isso permite que
+chamadas de impress\~ao vindas de contextos diferentes no futuro n\~ao
+intercalem bytes no buffer VGA. O lock usa \code{AtomicBool::swap} com
+ordena\c{c}\~ao \code{Acquire} na aquisi\c{c}\~ao e \code{Release} na
+libera\c{c}\~ao. A serial n\~ao \'e protegida pelo lock; como o console
+escreve VGA e serial em sequ\^encia, uma futura implementa\c{c}\~ao
+multithread precisaria de um lock adicional para a UART.
+
+\section{Ciclo de vida da inicializa\c{c}\~ao}
+
+\begin{table}[H]
+\centering
+\caption{Ordem de inicializa\c{c}\~ao em \code{kernel\_main}.}
+\label{tab:init}
+\begin{tabular}{@{}clp{7.5cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Chamada} & \textbf{Efeito} \\
+\midrule
+1 & \code{vga::init()} & Limpa a tela, zera o cursor, define forma do cursor. \\
+2 & \code{serial::init()} & Configura COM1 em 38400 8N1 e detecta presen\c{c}a. \\
+3 & \code{keyboard::init()} & Configura o 8042, tradu\c{c}\~ao e varredura. \\
+4 & \code{println!} & Banner e mensagem de boas-vindas (VGA + serial). \\
+5 & valida\c{c}\~ao & Confere \code{magic == 0x36d76289}. \\
+6 & \code{shell::run()} & La\c{c}o eterno de prompt e leitura de comandos. \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,244 @@
+\chapter{Teclado PS/2}
+\label{cap:keyboard}
+
+\section{Vis\~ao geral}
+
+O driver \code{src/keyboard.rs} implementa o subconjunto necess\'ario para
+ler teclas de um teclado PS/2 conectado ao controlador 8042. Ele combina
+conceitos de dois subsistemas do Linux:
+
+\begin{itemize}
+  \item \code{drivers/input/serio/i8042.c}: acesso ao controlador e ao
+        protocolo de comandos;
+  \item \code{drivers/input/keyboard/atkbd.c}: interpreta\c{c}\~ao de
+        scancodes e teclas modificadoras.
+\end{itemize}
+
+N\~ao h\'a IRQ1, fila de eventos, \code{input\_device}, \emph{keycode} Linux
+nem \code{evdev}. O driver faz \emph{polling} do buffer de sa\'ida do 8042 e
+devolve bytes ASCII diretamente ao shell.
+
+\section{Hardware: controlador 8042}
+
+O 8042 exp\~oe duas portas:
+
+\begin{table}[H]
+\centering
+\caption{Portas do controlador 8042.}
+\label{tab:ports8042}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Porta} & \textbf{Nome} & \textbf{Uso} \\
+\midrule
+\code{0x60} & Dados & Leitura de scancodes; escrita de dados ao teclado. \\
+\code{0x64} & Status/Comando & Leitura de status; escrita de comandos ao 8042. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+O registrador de status (\code{0x64}) tem os bits usados pelo driver:
+
+\begin{table}[H]
+\centering
+\caption{Bits de status do 8042.}
+\label{tab:status8042}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Bit} & \textbf{M\'ascara} & \textbf{Significado} \\
+\midrule
+0 & \code{0x01} & Buffer de sa\'ida cheio (h\'a dado para ler) \\
+1 & \code{0x02} & Buffer de entrada cheio (n\~ao enviar comando) \\
+5 & \code{0x20} & Dado veio do dispositivo auxiliar (mouse) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Inicializa\c{c}\~ao}
+
+A inicializa\c{c}\~ao \'e mais do que limpar o buffer. A BIOS ou o GRUB podem
+deixar o controlador em um estado em que o teclado envia scancodes do
+conjunto 2, enquanto o driver espera o conjunto 1, ou com a varredura
+desabilitada. O procedimento implementado \'e:
+
+\begin{table}[H]
+\centering
+\caption{Sequ\^encia de inicializa\c{c}\~ao do 8042.}
+\label{tab:kbdinit}
+\begin{tabular}{@{}clp{7.3cm}@{}}
+\toprule
+\textbf{\#} & \textbf{Comando} & \textbf{Efeito} \\
+\midrule
+1 & leituras de \code{0x60} & Descarta bytes pendentes no buffer de sa\'ida. \\
+2 & \code{0xAD} em \code{0x64} & Desabilita a porta do teclado. \\
+3 & \code{0x20} em \code{0x64} & Solicita leitura do \emph{configuration byte}. \\
+4 & leitura de \code{0x60} & Obt\'em o byte de configura\c{c}\~ao atual
+(ou usa \code{0x45} se n\~ao houver resposta). \\
+5 & ajuste & Liga tradu\c{c}\~ao (bit 6), desliga IRQ1 (bit 0) e liga o clock
+(limpa bit 4). \\
+6 & \code{0x60} em \code{0x64} & Prepara a escrita do novo byte de
+configura\c{c}\~ao. \\
+7 & byte em \code{0x60} & Envia o novo \emph{configuration byte}. \\
+8 & \code{0xAE} em \code{0x64} & Reabilita a porta do teclado. \\
+9 & \code{0xF4} em \code{0x60} & Envia ao teclado o comando \emph{enable
+scanning}. \\
+10 & leitura de \code{0x60} & Consome o ACK (\code{0xFA}), se presente. \\
+11 & limpeza & Descarta qualquer res\'iduo do buffer. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{nota}[Por que traduzir?]
+O teclado PS/2 moderno costuma falar o \emph{scan code set 2}, mas o
+controlador 8042 pode apresentar ao sistema o \emph{set 1} quando o bit de
+tradu\c{c}\~ao est\'a ligado. O Linux tamb\'em configura essa tradu\c{c}\~ao
+no i8042. Sem ela, as teclas chegam em c\'odigos diferentes dos esperados
+pela tabela do driver.
+\end{nota}
+
+As esperas usam at\'e 100.000 itera\c{c}\~oes, tanto para o buffer de entrada
+esvaziar quanto para o buffer de sa\'ida encher. Se o controlador n\~ao
+responder, a inicializa\c{c}\~ao continua em vez de travar.
+
+\section{Scancodes e tradu\c{c}\~ao para ASCII}
+
+O driver trabalha com o conjunto 1. A tabela \code{KEYMAP} tem 128 posi\c{c}\~oes
+e cobre letras, d\'igitos, espa\c{c}o e alguns s\'imbolos. Posi\c{c}\~oes n\~ao
+mapeadas valem zero e s\~ao ignoradas.
+
+\begin{table}[H]
+\centering
+\caption{Exemplos de scancodes do conjunto 1.}
+\label{tab:scancodes}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Tecla} & \textbf{Make} & \textbf{Break} & \textbf{Resultado} \\
+\midrule
+\code{A} & \code{0x1E} & \code{0x9E} & \code{a} / \code{A} com Shift \\
+\code{1} & \code{0x02} & \code{0x82} & \code{1} / \code{!} com Shift \\
+\code{Enter} & \code{0x1C} & \code{0x9C} & \code{\textbackslash n} \\
+\code{Backspace} & \code{0x0E} & \code{0x8E} & \code{0x08} \\
+\code{Tab} & \code{0x0F} & \code{0x8F} & \code{\textbackslash t} \\
+\code{Espa\c{c}o} & \code{0x39} & \code{0xB9} & espa\c{c}o \\
+\code{Shift esquerdo} & \code{0x2A} & \code{0xAA} & ativa/desativa Shift \\
+\code{Shift direito} & \code{0x36} & \code{0xB6} & ativa/desativa Shift \\
+\code{Tecla estendida} & \code{0xE0} & --- & prefixo; c\'odigo seguinte ignorado \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Shift}
+
+O estado de Shift \'e mantido em \code{static SHIFT: AtomicBool}. As teclas
+\code{0x2A} e \code{0x36} ligam o estado; os \emph{break codes} \code{0xAA}
+e \code{0xB6} desligam. A fun\c{c}\~ao \code{apply\_shift} transforma letras
+em mai\'usculas e aplica o s\'imbolo secund\'ario de d\'igitos e pontua\c{c}\~ao:
+
+\begin{lstlisting}[caption={Mapeamento com Shift.},label={lst:shift}]
+b'a'..=b'z' => byte - 32,
+b'1'..=b'9' => b"!@#$%^&*("[(byte - b'1') as usize],
+b'0' => b')',
+b'-' => b'_',
+b'=' => b'+',
+/* ... */
+\end{lstlisting}
+
+\subsection{Teclas estendidas}
+
+O prefixo \code{0xE0} liga a flag \code{EXTENDED}. O pr\'oximo scancode \'e
+descartado e a flag \'e limpa. Isso evita que setas, Insert, Delete, Home,
+End e teclas do teclado num\'erico sejam interpretadas como letras. A
+consequ\^encia \'e que essas teclas n\~ao t\^em fun\c{c}\~ao no shell.
+
+\subsection{Mouse}
+
+Dados do mouse compartilham o mesmo 8042. Se o bit 5 do status estiver
+ligado, o byte lido \'e descartado. Isso evita que movimentos do mouse
+apare\c{c}am como letras.
+
+\section{Fluxo de leitura}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  kstep/.style={draw=rinuxblue, fill=rinuxlight, rounded corners=2pt,
+               minimum width=5.1cm, minimum height=0.8cm,
+               align=center, font=\scriptsize},
+  dec/.style={draw=orange!70!black, fill=orange!8, diamond, aspect=2.2,
+              inner sep=1pt, align=center, font=\scriptsize},
+  arrow/.style={-{Latex[length=2mm]}, thick, rinuxblue},
+  node distance=0.38cm
+]
+\node[kstep] (status) {L\^e status (\code{0x64})};
+\node[dec, below=of status] (full) {bit 0 setado?};
+\node[kstep, below=of full] (read) {L\^e dado (\code{0x60})};
+\node[dec, below=of read] (mouse) {bit 5 (mouse)?};
+\node[dec, below=of mouse] (ext) {\code{0xE0} ou extended?};
+\node[dec, below=of ext] (break) {bit 7 (break)?};
+\node[kstep, below=of break] (key) {Traduz e retorna byte};
+\node[kstep, right=2.4cm of full] (none) {Retorna \code{None}};
+\draw[arrow] (status) -- (full);
+\draw[arrow] (full) -- node[right,font=\tiny]{sim} (read);
+\draw[arrow] (full.east) -- node[above,font=\tiny]{n\~ao} (none.west);
+\draw[arrow] (read) -- (mouse);
+\draw[arrow] (mouse) -- node[right,font=\tiny]{n\~ao} (ext);
+\draw[arrow] (ext) -- node[right,font=\tiny]{n\~ao} (break);
+\draw[arrow] (break) -- node[right,font=\tiny]{n\~ao} (key);
+\draw[arrow] (mouse.east) -- ++(0.9,0) |- (none.east);
+\draw[arrow] (ext.east) -- ++(0.5,0) |- (none.east);
+\draw[arrow] (break.east) -- ++(0.2,0) |- (none.east);
+\end{tikzpicture}
+\caption{Fluxo de \code{read\_char()}. Caminhos de descarte levam a \code{None}.}
+\label{fig:kbdflow}
+\end{figure}
+
+O shell chama \code{keyboard::read\_char()} repetidamente. Quando a fun\c{c}\~ao
+retorna \code{None}, o shell tenta a serial e, se tamb\'em n\~ao houver dado,
+executa \code{spin\_loop()}.
+
+\section{API e fun\c{c}\~oes internas}
+
+\begin{table}[H]
+\centering
+\caption{Fun\c{c}\~oes de \code{keyboard.rs}.}
+\label{tab:kbdapi}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Fun\c{c}\~ao} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\code{init()} & Configura tradu\c{c}\~ao, IRQ, clock e varredura do 8042. \\
+\code{read\_char()} & L\^e e traduz um scancode; retorna \code{Option<u8>}. \\
+\code{build\_keymap()} & Constr\'oi a tabela de 128 entradas em tempo de
+compila\c{c}\~ao. \\
+\code{apply\_shift(byte)} & Aplica o efeito de Shift a um caractere. \\
+\code{wait\_input\_clear()} & Espera o buffer de entrada do 8042 esvaziar. \\
+\code{wait\_output\_full()} & Espera um byte ficar dispon\'ivel na sa\'ida. \\
+\code{flush\_output()} & Descarta at\'e 64 bytes pendentes. \\
+\code{send\_command(cmd)} & Envia um comando ao 8042 (porta \code{0x64}). \\
+\code{send\_data(data)} & Envia um byte ao teclado (porta \code{0x60}). \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Limita\c{c}\~oes}
+
+\begin{itemize}
+  \item \textbf{Polling}: n\~ao h\'a IRQ1; o shell precisa consultar
+        constantemente. A CPU fica ocupada mesmo sem entrada.
+  \item \textbf{Sem Caps Lock, Num Lock e Scroll Lock}: os LEDs e os estados
+        n\~ao s\~ao tratados.
+  \item \textbf{Sem AltGr}: layouts que dependem de AltGr n\~ao produzem
+        caracteres adicionais.
+  \item \textbf{Sem teclas estendidas funcionais}: setas, Delete, Home, End,
+        Page Up/Down e teclado num\'erico s\~ao descartados.
+  \item \textbf{Sem layout ABNT2}: a tabela \'e baseada em US/QWERTY; a
+        posi\c{c}\~ao f\'isica das teclas e o conjunto de s\'imbolos podem
+        diferir.
+  \item \textbf{Sem \emph{key release} \'util}: al\'em de Shift, os
+        \emph{break codes} s\~ao ignorados; n\~ao h\'a detec\c{c}\~ao de tecla
+        pressionada para jogos ou atalhos.
+  \item \textbf{Sem tratamento de erros}: bytes de erro (\code{0x00},
+        \code{0xFF}, \code{0xEE}) n\~ao t\^em tratamento espec\'ifico.
+  \item \textbf{Depend\^encia de hardware}: assume 8042 compat\'ivel. Em
+        sistemas apenas USB-HID, o teclado pode n\~ao funcionar sem
+        \emph{legacy USB} habilitado na BIOS.
+\end{itemize}
