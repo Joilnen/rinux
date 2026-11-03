@@ -56,23 +56,23 @@ in Rust'' and the opposite conclusion that ``it has nothing to do with it''.
 \code{arch/x86/kernel/head\_64.S} & 686 & \code{boot.rs} (long mode) \\
 \code{arch/x86/kernel/cpu/common.c} & 2,688 & \code{boot.rs} (GDT) + \code{arch.rs} \\
 \code{arch/x86/mm/init\_64.c} & 1,557 & \code{boot.rs} (pages) \\
-\code{drivers/video/console/vgacon.c} & 1,226 & \code{vga.rs} \\
+\code{drivers/video/console/vgacon.c} & 1,226 & \code{vga.rs} + \code{tty.rs} \\
 \code{drivers/input/serio/i8042.c} & 1,664 & \code{keyboard.rs} \\
 \code{drivers/input/keyboard/atkbd.c} & 1,981 & \code{keyboard.rs} \\
 \code{drivers/tty/serial/8250/8250\_port.c} & 3,638 & \code{serial.rs} \\
-\code{kernel/printk/printk.c} & 5,188 & macros + \code{vga.rs} \\
+\code{kernel/printk/printk.c} & 5,188 & macros + \code{tty.rs} \\
 \code{kernel/panic.c} & 1,274 & \emph{panic handler} in \code{main.rs} \\
 \code{init/main.c} & 1,706 & \code{kernel\_main} in \code{main.rs} \\
 \midrule
 \textbf{Linux total (12 files)} & \textbf{22,352} & --- \\
-\textbf{Rust total (12 modules)} & \textbf{2,508} & --- \\
+\textbf{Rust total (14 modules)} & \textbf{3,223} & --- \\
 \bottomrule
 \end{longtable}
 
 The line ratio is:
 
 \[
-\frac{2{,}508}{22{,}352} \approx 11.22\%.
+\frac{3{,}223}{22{,}352} \approx 14.42\%.
 \]
 
 Relative to the complete Linux tree, which has approximately
@@ -80,11 +80,11 @@ Relative to the complete Linux tree, which has approximately
 the ratio is:
 
 \[
-\frac{2{,}508}{38{,}062{,}672} \approx 0.0066\%.
+\frac{3{,}223}{38{,}062{,}672} \approx 0.00847\%.
 \]
 
 \begin{atencao}[Lines of code do not measure similarity]
-The 12 Linux files do not have the same scope as the Rust modules.
+The 12 Linux files do not have the same scope as the 14 Rust modules.
 \code{vgacon.c}, for example, supports several architectures, virtual
 consoles, and graphics modes; \code{vga.rs} implements only 80x25 text.
 Moreover, a large part of the Linux lines consists of comments,
@@ -164,11 +164,10 @@ security, virtualization).
         spurious IRQs, \emph{softirq}, workqueues, and preemption are missing.
   \item \textbf{Memory/heap (15/100)}: there is a frame allocator and demand
         paging, but there is no heap, slab, page cache, or \code{vmalloc}.
-  \item \textbf{Processes (5/100)}: there is a ring 3 demo with TSS and
-        \code{int 0x80}, but there is no \code{task\_struct},
+  \item \textbf{Processes (5/100)}: there are ring 3 demos and a login with
+        TSS and \code{int 0x80}, but there is no \code{task\_struct},
         scheduler, context switch, separate address spaces,
-        signals, or
-        syscalls.
+        signals, or a larger syscall table.
   \item \textbf{FS/networking (0/100)}: there is no VFS, block layer, TCP/IP,
         netfilter, or device drivers.
 \end{itemize}
@@ -192,8 +191,8 @@ GDT & \code{gdt\_table}, \emph{per-CPU}, TSS & 7 descriptors, ring 3 and
 TSS/IST \\
 Paging & 4/5 levels, allocators, \code{vmalloc} & 4 levels,
 2 MiB \emph{huge pages} + 4 KiB leaves on demand \\
-Console & \code{vgacon}, VT, \code{fbcon}, \code{printk} & \code{vga.rs},
-80x25 text \\
+Console & \code{vgacon}, VT, \code{fbcon}, \code{printk} & \code{vga.rs}
+renderer + \code{tty.rs} with eight consoles \\
 Keyboard & i8042 + serio + atkbd + input & 8042 by polling (IRQ1 masked) \\
 Serial & 8250 + tty + termios & 16550 by polling \\
 Input & IRQ1/IRQ4, \emph{softirq}, workqueues & IRQ0 (timer) + polling in the
@@ -204,7 +203,7 @@ Memory & buddy, slab, \code{vmalloc}, page cache & Frame bitmap,
 demand paging; no heap \\
 Processes & CFS/EEVDF, namespaces, cgroups & Ring 3 demo; no scheduler \\
 Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} with
-\code{rax = 0} (exit) \\
+\code{exit/write/read/get\_tty} \\
 \bottomrule
 \end{tabularx}
 \end{table}

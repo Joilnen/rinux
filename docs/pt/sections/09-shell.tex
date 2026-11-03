@@ -20,12 +20,21 @@ pipes, redirecionamentos, vari\'aveis, aspas ou scripts. \'E um la\c{c}o que:
 \begin{lstlisting}[caption={Estrutura do la\c{c}o do shell.},label={lst:shellloop}]
 pub fn run() -> ! {
     loop {
-        crate::print!("rinux> ");
         let mut line = [0u8; LINE_MAX];
         let mut len = 0usize;
+        let mut console = tty::active();
+        crate::print!("rinux> ");
 
         loop {
-            let byte = match keyboard::read_char().or_else(serial::read_byte) {
+            tty::pump_input();
+            if tty::active() != console {
+                console = tty::active();
+                len = 0;
+                crate::print!("rinux> ");
+                continue;
+            }
+
+            let byte = match tty::read_byte() {
                 Some(byte) => byte,
                 None => { core::hint::spin_loop(); continue; }
             };
@@ -72,20 +81,22 @@ ignorados. N\~ao h\'a beep, mensagem de erro nem crescimento din\^amico.
 
 \subsection{Entrada e eco}
 
-A entrada vem de duas fontes, nesta ordem:
+A entrada \'e bombeada por \code{tty::pump\_input}, que drena o teclado PS/2 e
+a serial COM1 para a fila do console virtual ativo. Ele tamb\'em interpreta
+\code{Alt+F1}..\code{Alt+F8} como troca de console. O shell ent\~ao consome
+bytes do console ativo com \code{tty::read\_byte}.
 
-\begin{enumerate}
-  \item \code{keyboard::read\_char()}: teclado PS/2 na janela VGA;
-  \item \code{serial::read\_byte()}: terminal serial, quando dispon\'ivel.
-\end{enumerate}
-
-Se ambas retornarem \code{None}, o shell executa \code{spin\_loop()} e tenta
-novamente. N\~ao h\'a \emph{sleep}, j\'a que n\~ao existe temporizador.
+Se nenhum byte estiver dispon\'ivel, o shell executa \code{spin\_loop()} e
+tenta novamente. N\~ao h\'a \emph{sleep}, j\'a que a espera \'e feita por
+polling.
 
 Caracteres imprim\'iveis (0x20 a 0x7E) s\~ao armazenados no buffer e ecoados
 no console. Backspace (\code{0x08} ou \code{0x7F}) decrementa o tamanho e
-imprime \code{\textbackslash x08}, que o console VGA interpreta como apagar
+imprime \code{\textbackslash x08}, que a camada TTY interpreta como apagar
 a c\'elula anterior. Tab (\code{\textbackslash t}) \'e ignorado.
+
+Se o console ativo mudar durante a edi\c{c}\~ao, a linha parcial \'e
+descartada e o shell imprime um novo prompt no console selecionado.
 
 \section{Interpreta\c{c}\~ao}
 
@@ -130,9 +141,17 @@ sint\'atica.
 \textbf{Comando} & \textbf{Efeito} \\
 \midrule
 \code{help} & Lista os comandos dispon\'iveis. \\
-\code{clear} & Limpa a tela VGA e reposiciona o cursor. \\
+\code{clear} & Limpa o console virtual ativo com \code{ESC[2J ESC[H}. \\
 \code{echo <texto>} & Imprime o texto ap\'os o primeiro espa\c{c}o. \\
-\code{info} & Mostra informa\c{c}\~oes do kernel e do modelo de entrada. \\
+\code{info} & Mostra informa\c{c}\~oes do kernel, TTY e modelo de entrada. \\
+\code{tty} & Mostra o console virtual ativo. \\
+\code{tty [0..7]} & Troca para o console virtual indicado. \\
+\code{getty} & Roda o login em ring 3 no console ativo. \\
+\code{getty [0..7]} & Troca de console e roda o login nele. \\
+\code{demand} & Exercita o demand paging do kernel. \\
+\code{usertest} & Roda o demo de demand paging em ring 3. \\
+\code{userprot} & Tenta acessar o kernel a partir do ring 3. \\
+\code{mem} & Mostra estat\'isticas de frames, faults e bits U/S. \\
 \code{reboot} & Reinicia o PC via comando \code{0xFE} ao 8042. \\
 \code{halt} & Imprime uma mensagem e para a CPU com \code{cli; hlt}. \\
 \bottomrule
@@ -159,12 +178,16 @@ O comando \code{info} imprime:
 Kernel: Rust, no_std, x86_64
 Boot:   Multiboot2 (BIOS) -> modo longo
 Video:  VGA texto 80x25, buffer 0xB8000
-Entrada: teclado PS/2 e serial COM1 (polling, sem IRQ)
-Heap:   nenhum (apenas core, sem alocacao)
+TTY:    8 consoles virtuais, ativo = tty0 (Alt+F1..Alt+F8)
+Entrada: teclado PS/2 e serial COM1 (polling)
+IDT:    256 portas; excecoes + IRQ0 (timer ~100 Hz)
+Memoria: paginas de 4 KiB, demand paging e frames fisicos
+Usuario: ring 3 com GDT/TSS, protecao U/S e int 0x80
+Ticks do timer: 366
 \end{lstlisting}
 
-Essas informa\c{c}\~oes s\~ao est\'aticas; n\~ao h\'a leitura de CPU, mem\'oria
-ou tempo.
+A maioria das linhas \'e est\'atica; o n\'umero do console ativo e a contagem
+de ticks do timer s\~ao lidos no momento em que o comando roda.
 
 \section{Comandos especiais}
 

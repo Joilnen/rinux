@@ -9,17 +9,19 @@ the Multiboot2 protocol to transfer control to a small assembly-language
 long mode and jumps to the Rust code, linked in the higher half at
 \code{0xFFFFFFFF80000000}.
 
-The Rust code initializes, in this order, the VGA console, the COM1 serial
-port, the frame allocator, the GDT with ring 3/TSS, the PS/2 keyboard and the
-IDT with PIC/PIT. It then enables interrupts, prints a \emph{banner}, validates
-the Multiboot2 signature and enters the shell, which displays the prompt
-\code{rinux>} and processes commands read from the keyboard or from the serial
+The Rust code initializes, in this order, the VGA renderer, the COM1 serial
+port, the TTY layer with eight virtual consoles, the frame allocator, the GDT
+with ring 3/TSS, the PS/2 keyboard and the IDT with PIC/PIT. It then enables
+interrupts, prints a \emph{banner}, validates the Multiboot2 signature and
+enters the shell, which displays the prompt \code{rinux>} on the active
+console and processes commands read from the keyboard or from the serial
 port.
 
-The entire system fits in about 95 KiB of ELF and 2,508 lines of Rust
-(1,939 effective lines of code, without comments and blank lines). There is no
+The entire system fits in about 95 KiB of ELF and 3,223 lines of Rust
+(2,477 effective lines of code, without comments and blank lines). There is no
 dynamic heap allocation, scheduler or filesystem; there is an IDT, timer,
-\emph{demand paging} and ring 3 demos.
+\emph{demand paging}, eight virtual consoles, four system calls and a
+\code{getty}/login running in ring 3.
 
 \section{Features}
 
@@ -37,17 +39,23 @@ Memory & Static PML4/PDPT/PD, 1 GiB & Complete \\
 Memory & Kernel higher half & Complete \\
 Video & VGA text console 80$\times$25 & Complete \\
 Video & Scrolling, cursor, tab, backspace & Complete \\
+Video & Eight virtual consoles (\code{tty0}..\code{tty7}) & Complete \\
+Video & Alt+F1..Alt+F8 and \code{tty} switching & Complete \\
 Video & Graphics framebuffer / GOP & Absent \\
 Keyboard & PS/2 8042, set 1, polling & Complete (subset) \\
-Keyboard & Shift, Enter, Tab, Backspace & Complete \\
+Keyboard & Shift, Alt, Enter, Tab, Backspace & Complete \\
+Keyboard & Alt+F1..Alt+F8 console selection & Complete \\
 Keyboard & IRQ1, Caps Lock, AltGr, arrow keys & Absent \\
 Serial & COM1 16550, 38400 8N1 & Complete (subset) \\
 Serial & Input through the QEMU terminal & Complete \\
 Shell & \code{help}, \code{clear}, \code{echo} & Complete \\
-Shell & \code{info}, \code{reboot}, \code{halt} & Complete \\
+Shell & \code{info}, \code{tty}, \code{getty} & Complete \\
+Shell & \code{reboot}, \code{halt} & Complete \\
 System & Panic handler & Complete \\
 System & IDT, exceptions and IRQ0 (timer) & Complete (subset) \\
 System & GDT/TSS, ring 3 and U/S protection & Complete (demo) \\
+System & Syscalls \code{exit/write/read/get\_tty} & Complete (subset) \\
+User & \code{getty}/login in ring 3 & Complete (demo) \\
 Memory & Frames, 4 KiB pages and demand paging & Complete (subset) \\
 System & Heap, processes and scheduler & Absent \\
 \bottomrule
@@ -83,24 +91,25 @@ System & Heap, processes and scheduler & Absent \\
 \section{Directory structure}
 
 \begin{lstlisting}[style=shell]
-output/
+.
 |-- Cargo.toml              metadados e perfis de compilacao
 |-- Cargo.lock              lockfile (sem dependencias externas)
 |-- rust-toolchain.toml     canal stable + alvo x86_64-unknown-none
 |-- .cargo/config.toml      alvo padrao, linker e flags
 |-- linker.ld               layout do ELF (stub baixo + kernel alto)
 |-- Makefile                build do kernel, ISO e execucao no QEMU
-|-- scripts/rustc           wrapper que usa o rustc do rustup
 |-- boot/grub/grub.cfg      menu Multiboot2 e console VGA
 |-- src/
 |   |-- main.rs             entrada Rust, macros e panic handler
 |   |-- boot.rs             Multiboot2, GDT, paginacao e modo longo
 |   |-- arch.rs             portas de I/O, interrupcoes, halt e reboot
 |   |-- gdt.rs              GDT definitiva, TSS e pilhas de privilegio
-|   |-- idt.rs              IDT, stubs, PIC, PIT e syscall
+|   |-- idt.rs              IDT, stubs, PIC, PIT e porta int 0x80
 |   |-- paging.rs           frames, tabelas 4 KiB e demand paging
-|   |-- user.rs             entrada em ring 3 e demos de usuario
-|   |-- vga.rs              console VGA 80x25
+|   |-- user.rs             ring 3, demos e getty/login
+|   |-- syscall.rs          exit/write/read/get_tty
+|   |-- vga.rs              renderizador VGA 80x25
+|   |-- tty.rs              consoles virtuais tty0..tty7
 |   |-- keyboard.rs         teclado PS/2 (8042)
 |   |-- serial.rs           UART 16550 / COM1
 |   |-- shell.rs            prompt e comandos
@@ -123,25 +132,27 @@ output/
 \textbf{Module} & \textbf{Lines} & \textbf{Functions} & \textbf{Responsibility} \\
 \midrule
 \code{boot.rs}     & 202 & 0 & Boot stub and page tables \\
-\code{keyboard.rs} & 238 & 9 & PS/2 8042 driver \\
-\code{vga.rs}      & 217 & 15 & VGA text console \\
-\code{shell.rs}    & 187 & 7 & Command line and demos \\
-\code{main.rs}     & 111 & 2 & Rust entry point, macros, panic \\
-\code{serial.rs}   &  64 & 4 & UART 16550 / COM1 \\
+\code{keyboard.rs} & 271 & 10 & PS/2 8042 driver \\
+\code{vga.rs}      &  74 & 5 & VGA text renderer \\
+\code{tty.rs}      & 448 & 31 & Virtual consoles and queues \\
+\code{shell.rs}    & 245 & 9 & Command line and demos \\
+\code{main.rs}     & 119 & 2 & Rust entry point, macros, panic \\
+\code{serial.rs}   &  70 & 5 & UART 16550 / COM1 \\
+\code{syscall.rs}  & 129 & 3 & exit/write/read/get\_tty \\
 \code{arch.rs}     &  69 & 5 & I/O ports, \code{sti}, halt, reboot \\
 \code{sync.rs}     &  56 & 5 & Spinlock \\
-\code{gdt.rs}      & 159 & 6 & GDT, TSS and privilege stacks \\
-\code{idt.rs}      & 511 & 14 & IDT, PIC, PIT, exceptions and IRQs \\
-\code{paging.rs}   & 518 & 22 & Frames, tables and demand paging \\
-\code{user.rs}     & 176 & 7 & Ring 3 entry and demos \\
+\code{gdt.rs}      & 159 & 7 & GDT, TSS and privilege stacks \\
+\code{idt.rs}      & 504 & 14 & IDT, PIC, PIT, exceptions and IRQs \\
+\code{paging.rs}   & 559 & 23 & Frames, tables and demand paging \\
+\code{user.rs}     & 318 & 10 & Ring 3 entry, demos and getty \\
 \midrule
-\textbf{Total}     & \textbf{2,508} & \textbf{96} & 1,939 effective lines of code \\
+\textbf{Total}     & \textbf{3,223} & \textbf{129} & 2,477 effective lines of code \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{nota}[On the counting]
-The count includes 253 comment lines and 316 blank lines. The number
+The count includes 351 comment lines and 395 blank lines. The number
 of functions includes \code{impl} methods, \code{const} functions
 and trait functions (\code{Deref}, \code{DerefMut}, \code{Drop} and
 \code{fmt::Write}); it does not include \code{extern} declarations without a
@@ -159,9 +170,10 @@ body. \code{boot.rs} has no Rust functions because its logic is in
         GDT and enables long mode.
   \item The stub jumps to \code{kernel\_main(magic, info)} in the higher half.
   \item Rust clears the VGA screen, configures the serial port, initializes
-        the frame allocator and the GDT/TSS, initializes the keyboard and
-        installs the IDT with PIC/PIT.
-  \item Rust enables interrupts and the shell displays \code{rinux>},
-        processing commands until \code{halt}, \code{reboot} or a physical
-        reset.
+        the TTY layer with eight virtual consoles, initializes the frame
+        allocator and the GDT/TSS, initializes the keyboard and installs the
+        IDT with PIC/PIT.
+  \item Rust enables interrupts and the shell displays \code{rinux>} on the
+        active console, processing commands until \code{halt}, \code{reboot}
+        or a physical reset.
 \end{enumerate}

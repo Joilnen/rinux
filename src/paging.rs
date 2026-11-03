@@ -424,6 +424,47 @@ pub fn unmap_page(virt: u64) -> Result<(), &'static str> {
     Ok(())
 }
 
+/// Garante que todas as paginas de `[addr, addr+len)` estao mapeadas com
+/// U/S = 1. E usada pelas syscalls antes de ler/escrever buffers do usuario.
+///
+/// A primeira escrita/leitura do usuario normalmente passa pelo `#PF`, mas uma
+/// syscall em ring 0 nao gera page fault ao tocar uma pagina ausente da regiao
+/// de usuario: ela apenas acessaria memoria nao mapeada. Por isso mapeamos as
+/// paginas explicitamente aqui.
+pub fn ensure_user_range(addr: u64, len: u64) -> Result<(), &'static str> {
+    if len == 0 {
+        return Ok(());
+    }
+
+    let end = addr.checked_add(len).ok_or("intervalo de usuario invalido")?;
+    if addr < USER_BASE || end > USER_BASE + USER_REGION_SIZE {
+        return Err("ponteiro fora da regiao do usuario");
+    }
+
+    let mut page = addr & !(FRAME_SIZE - 1);
+    while page < end {
+        if page_flags(page).is_none() {
+            let frame = alloc_frame().ok_or("sem frames para o buffer do usuario")?;
+            let result = unsafe {
+                map_page(
+                    page,
+                    frame,
+                    PAGE_PRESENT | PAGE_WRITE | PAGE_USER,
+                    true,
+                )
+            };
+            if let Err(reason) = result {
+                free_frame(frame);
+                return Err(reason);
+            }
+            DEMAND_FAULTS.fetch_add(1, Ordering::Relaxed);
+        }
+        page += FRAME_SIZE;
+    }
+
+    Ok(())
+}
+
 /// Descarta as paginas de pilha/dados criadas sob demanda para o demo de
 /// usuario, permitindo que `usertest` gere page faults de novo.
 pub fn reset_user_demand() {

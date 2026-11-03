@@ -8,11 +8,14 @@
 //!   gdt       : GDT com segmentos de usuario e TSS
 //!   idt       : IDT, excecoes, PIC e timer (IRQ0)
 //!   paging    : alocador de frames, paginas de 4 KiB e demand paging
+//!   ramfs     : sistema de arquivos em memoria para o shell
 //!   user      : entrada em ring 3 e demos de protecao usuario/kernel
 //!   arch      : portas de I/O, halt e reboot
-//!   vga       : driver do console VGA em modo texto (80x25, 0xB8000)
+//!   vga       : driver de baixo nivel do console VGA em modo texto
+//!   tty       : oito consoles virtuais (tty0..tty7)
 //!   keyboard  : driver do teclado PS/2 (8042), por polling
 //!   serial    : COM1, usado para depuracao
+//!   syscall   : chamadas de sistema didaticas via int 0x80
 //!   shell     : terminal/linha de comando minima
 //!   sync      : spinlock usado pelo console
 
@@ -27,9 +30,12 @@ mod gdt;
 mod idt;
 mod keyboard;
 mod paging;
+mod ramfs;
 mod serial;
 mod shell;
 mod sync;
+mod syscall;
+mod tty;
 mod user;
 mod vga;
 
@@ -37,7 +43,7 @@ mod vga;
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {
-        $crate::vga::_print(format_args!($($arg)*))
+        $crate::tty::_print(format_args!($($arg)*))
     };
 }
 
@@ -64,16 +70,22 @@ pub extern "C" fn kernel_main(multiboot_magic: u32, multiboot_info: u32) -> ! {
     // 2. Serial (opcional, para depuracao em qemu -serial stdio).
     serial::init();
 
-    // 3. Alocador de frames fisicos, a partir do mapa do Multiboot2.
+    // 3. Camada TTY: oito consoles virtuais. tty0 fica ativo.
+    tty::init();
+
+    // 4. Alocador de frames fisicos, a partir do mapa do Multiboot2.
     paging::init(multiboot_magic, multiboot_info);
 
-    // 4. GDT de 64 bits com segmentos de usuario e TSS.
+    // 5. Ramfs didatico em memoria (sem heap) usado pelos applets do shell.
+    ramfs::init();
+
+    // 6. GDT de 64 bits com segmentos de usuario e TSS.
     gdt::init();
 
-    // 5. Teclado PS/2 (ainda por polling; IRQ1 fica mascarada).
+    // 7. Teclado PS/2 (ainda por polling; IRQ1 fica mascarada).
     keyboard::init();
 
-    // 6. IDT, PIC e timer. Depois disso as interrupcoes podem ser ligadas.
+    // 8. IDT, PIC e timer. Depois disso as interrupcoes podem ser ligadas.
     idt::init();
     arch::enable_interrupts();
 
@@ -81,7 +93,8 @@ pub extern "C" fn kernel_main(multiboot_magic: u32, multiboot_info: u32) -> ! {
     println!("==============================================================");
     println!("  Rust VGA Kernel - x86_64 / modo longo");
     println!("  Boot: Multiboot2 (BIOS)");
-    println!("  Video: VGA texto 80x25 @ 0xB8000");
+    println!("  Video: VGA texto 80x25 @ 0xB8000 (tty0..tty7)");
+    println!("  Console: 8 terminais virtuais, Alt+F1..Alt+F8");
     println!("  Memoria: paginas de 4 KiB + demand paging");
     println!("  Interrupcoes: IDT + PIC + timer IRQ0 (~100 Hz)");
     println!("==============================================================");

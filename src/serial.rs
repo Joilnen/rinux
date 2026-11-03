@@ -53,12 +53,18 @@ fn write_byte(byte: u8) {
     }
 }
 
-/// Escreve uma string na serial, convertendo \n em \r\n.
-pub fn write_str(text: &str) {
-    for byte in text.bytes() {
+/// Escreve bytes na serial, convertendo \n em \r\n.
+pub fn write_bytes(bytes: &[u8]) {
+    for &byte in bytes {
         if byte == b'\n' {
             write_byte(b'\r');
         }
         write_byte(byte);
     }
+}
+
+/// Escreve uma string na serial, convertendo \n em \r\n.
+#[allow(dead_code)]
+pub fn write_str(text: &str) {
+    write_bytes(text.as_bytes());
 }

@@ -36,13 +36,16 @@ T07 & Entrada PS/2: \code{echo ola} imprime \code{ola} & Passou \\
 T08 & Entrada serial: \code{echo serial ok} funciona & Passou \\
 T09 & Prompt retorna ap\'os cada comando & Passou \\
 T10 & \code{info} mostra as configura\c{c}\~oes do kernel & Passou \\
-T11 & \code{clear} limpa a tela & Passou \\
+T11 & \code{clear} envia \code{ESC[2J ESC[H} e limpa a tela & Passou \\
 T12 & \code{reboot} e \code{halt} encerram o fluxo & Verificado manualmente \\
 T13 & IDT instalada e timer IRQ0 incrementa \code{ticks} & Passou \\
 T14 & \code{demand} gera \code{\#PF} e mapeia a p\'agina do kernel & Passou \\
 T15 & \code{usertest} roda em ring 3, gera dois page faults e retorna & Passou \\
 T16 & \code{userprot} viola U/S e \'e encerrado pelo tratador & Passou \\
 T17 & \code{mem} mostra U/S = 1 para usu\'ario e 0 para o kernel & Passou \\
+T18 & \code{tty} reporta \code{tty0} e \code{tty 3} troca de console & Passou \\
+T19 & \code{getty} autentica \code{root}/\code{rinux} em ring 3 & Passou \\
+T20 & Senha n\~ao \'e ecoada; senha errada encerra com status 1 & Passou \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -76,9 +79,11 @@ aloca\c{c}\~ao feita pelo GRUB. O \code{magic} deve ser sempre
 rinux> help
 Comandos disponiveis:
   help          mostra esta ajuda
-  clear         limpa a tela
+  clear         limpa o console ativo
   echo <texto>  imprime o texto
   info          informacoes do kernel
+  tty [0..7]    mostra ou troca o console virtual
+  getty [0..7]  roda o login em ring 3 no console
   demand        testa demand paging no kernel
   usertest      roda um programa em ring 3 com page fault
   userprot      testa a protecao usuario/kernel
@@ -95,6 +100,18 @@ rinux> echo ola
 ola
 rinux>
 \end{lstlisting}
+
+\subsection{\code{clear} via ANSI}
+
+\begin{lstlisting}[style=shell,caption={Sequ\^encia de escape observada na COM1.},label={lst:testclear}]
+rinux> clear
+^[[2J^[[H
+rinux>
+\end{lstlisting}
+
+A nota\c{c}\~ao com circunflexo \'e como um monitor serial exibe o byte
+\code{0x1B}. No console VGA o comando apaga as 2.000 c\'elulas e devolve o
+cursor para \code{(0,0)}, sem imprimir os caracteres de escape como texto.
 
 \subsection{Entrada serial}
 
@@ -213,6 +230,10 @@ Resultados esperados:
         \code{\#PF}.
   \item[$\square$] \code{usertest} gera dois page faults e retorna ao shell.
   \item[$\square$] \code{userprot} \'e encerrado pela prote\c{c}\~ao U/S.
+  \item[$\square$] \code{tty 3} troca para \code{tty3} e \code{tty 0}
+        retorna ao \code{tty0}.
+  \item[$\square$] \code{getty} aceita \code{root}/\code{rinux} e volta ao
+        shell; senha errada encerra com status 1.
   \item[$\square$] \code{halt} para a CPU e \code{reboot} reinicia (quando o
         ambiente suporta).
   \item[$\square$] A documenta\c{c}\~ao LaTeX compila e gera o PDF.

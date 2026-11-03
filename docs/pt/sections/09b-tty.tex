@@ -1,0 +1,297 @@
+\chapter{Camada TTY, syscalls e getty}
+\label{cap:tty}
+
+\section{Do renderizador VGA aos consoles virtuais}
+
+At\'e aqui o driver VGA era dono tanto do conte\'udo da tela quanto da posi\c{c}\~ao
+do cursor. Para suportar v\'arios terminais como no Linux, o c\'odigo foi
+dividido em duas camadas:
+
+\begin{itemize}
+  \item \code{vga.rs} \'e um \emph{renderizador}. Ele conhece a matriz de
+        c\'elulas 80$\times$25 em \code{0xB8000}, os registradores CRTC do
+        cursor e nada sobre linhas de comando ou entrada;
+  \item \code{tty.rs} mant\'em oito consoles virtuais, \code{tty0} a
+        \code{tty7}. Cada console tem seu pr\'oprio buffer de c\'elulas,
+        cursor e fila de entrada.
+\end{itemize}
+
+Somente o console ativo \'e copiado para o framebuffer de hardware. Trocar de
+console \'e, portanto, uma c\'opia de buffer mais a atualiza\c{c}\~ao do cursor,
+a mesma id\'eia usada pela camada de terminal virtual (\code{vt}) do Linux.
+
+\begin{lstlisting}[caption={Estado de cada console em \code{tty.rs}.},label={lst:ttytty}]
+#[derive(Clone, Copy)]
+struct Tty {
+    cells: [u16; vga::CELLS],
+    row: usize,
+    column: usize,
+    input: [u8; INPUT_SIZE],
+    head: usize,
+    tail: usize,
+}
+
+static TTYS: SpinLock<[Tty; TTY_COUNT]> =
+    SpinLock::new([Tty::new(); TTY_COUNT]);
+static ACTIVE: AtomicUsize = AtomicUsize::new(0);
+\end{lstlisting}
+
+A fila de entrada \'e um pequeno buffer circular de 256 bytes. O
+\emph{produtor} \'e \code{pump\_input}, que drena o teclado PS/2 e a COM1; o
+\emph{consumidor} \'e o shell ou uma chamada de sistema lendo do console ativo.
+
+\section{Troca de console}
+
+O driver de teclado agora exp\~oe dois tipos de resultado:
+
+\begin{lstlisting}[caption={Tipo de resultado do teclado.},label={lst:keyenum}]
+pub enum Key {
+    Char(u8),
+    Console(usize),
+}
+\end{lstlisting}
+
+O driver acompanha Shift e Alt. Com Alt pressionado, os scancodes
+\code{0x3B}..\code{0x42} (F1..F8) viram \code{Key::Console(0..7)}. A camada
+TTY traduz isso em \code{switch(index)} e redesenha o buffer escolhido. A
+mesma opera\c{c}\~ao est\'a dispon\'ivel no shell:
+
+\begin{lstlisting}[style=shell,caption={Trocando de console pelo shell.},label={lst:ttyshell}]
+rinux> tty
+console ativo: tty0 (disponiveis: tty0..tty7)
+rinux> tty 3
+rinux> tty
+console ativo: tty3 (disponiveis: tty0..tty7)
+\end{lstlisting}
+
+Como o shell \'e um \'unico la\c{c}o s\'incrono, trocar de console durante a
+edi\c{c}\~ao de uma linha descarta a linha parcial e imprime um novo prompt no
+console novo. Essa \'e uma simplifica\c{c}\~ao deliberada: ainda n\~ao existe
+um \code{task\_struct} por terminal.
+
+\section{Sequ\^encias de escape ANSI/VT100}
+
+A sa\'ida n\~ao se limita a caracteres imprim\'iveis. Cada \code{Tty} mant\'em
+sua pr\'opria m\'aquina de estados, para que um programa use as mesmas
+sequ\^encias de escape de um terminal Linux sem saber qual console est\'a ativo:
+
+\begin{lstlisting}[caption={Estado de escape guardado em cada console.},label={lst:ttyescape}]
+enum EscapeState {
+    Ground, // texto normal
+    Start,  // recebeu ESC
+    Csi,    // recebeu ESC [ e le parametros
+}
+
+struct Tty {
+    // ...
+    escape: EscapeState,
+    csi_params: [u16; 4],
+    csi_count: usize,
+    csi_value: u16,
+    csi_digits: bool,
+}
+\end{lstlisting}
+
+\code{write\_byte} encaminha \code{0x1B} para a m\'aquina de estados. No estado
+CSI o interpretador aceita par\^ametros decimais separados por \code{;} e um
+byte final; marcadores privados como \code{?} e bytes intermedi\'arios s\~ao
+consumidos sem serem impressos:
+
+\begin{lstlisting}[caption={Despacho de ESC e CSI em \code{tty.rs}.},label={lst:ttywritebyte}]
+fn write_byte(&mut self, byte: u8) {
+    match self.escape {
+        EscapeState::Ground => {
+            if byte == 0x1B {
+                self.escape = EscapeState::Start;
+            } else {
+                self.write_plain(byte);
+            }
+        }
+        EscapeState::Start => {
+            if byte == b'[' {
+                self.escape = EscapeState::Csi;
+                self.csi_params = [0; 4];
+                self.csi_count = 0;
+                // ...
+            } else {
+                self.escape = EscapeState::Ground;
+            }
+        }
+        EscapeState::Csi => self.write_csi(byte),
+    }
+}
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{Sequ\^encias CSI suportadas.}
+\label{tab:ansi}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Sequ\^encia} & \textbf{Efeito} \\
+\midrule
+\code{ESC[2J}, \code{ESC[3J} & Apaga a tela inteira. \\
+\code{ESC[J} & Apaga do cursor at\'e o fim da tela. \\
+\code{ESC[K} & Apaga do cursor at\'e o fim da linha. \\
+\code{ESC[H}, \code{ESC[<linha>;<coluna>H} & Leva o cursor ao in\'icio ou a
+uma posi\c{c}\~ao base 1, limitada a 80$\times$25. \\
+\code{ESC[A}, \code{ESC[B}, \code{ESC[C}, \code{ESC[D} & Move o cursor para
+cima, baixo, direita ou esquerda (1 por padr\~ao, ou a quantidade dada). \\
+\code{ESC[...m} & SGR \'e interpretado e ignorado; cores ainda n\~ao existem. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+O comando \code{clear} agora \'e sa\'ida comum, n\~ao um caso especial do
+renderizador:
+
+\begin{lstlisting}[caption={Implementa\c{c}\~ao do comando \code{clear}.},label={lst:ttyclear}]
+pub fn clear() {
+    write_bytes(b"\x1b[2J\x1b[H");
+}
+\end{lstlisting}
+
+\code{ESC[2J} apaga as c\'elulas mas, seguindo o comportamento VT100, n\~ao
+move o cursor; a segunda sequ\^encia \code{ESC[H} o leva ao canto superior
+esquerdo. Como \code{clear} passa por \code{write\_bytes}, a sequ\^encia
+tamb\'em \'e espelhada na COM1, de modo que um terminal serial tamb\'em limpa.
+Cores SGR, tela alternativa, scrollback e visibilidade do cursor ainda est\~ao
+fora do escopo.
+
+\section{ABI das chamadas de sistema}
+
+A porta \code{0x80} j\'a existia para os demos em ring 3. Agora ela despacha
+para \code{syscall.rs}, com a conven\c{c}\~ao usual de registradores:
+
+\begin{table}[H]
+\centering
+\caption{Chamadas de sistema implementadas.}
+\label{tab:syscalls}
+\begin{tabularx}{\linewidth}{@{}clX@{}}
+\toprule
+\textbf{N\'umero} & \textbf{Nome} & \textbf{Argumentos e resultado} \\
+\midrule
+0 & \code{exit} & \code{rdi} = status; n\~ao retorna. \\
+1 & \code{write} & \code{rdi} = buffer, \code{rsi} = tamanho;
+devolve o n\'umero de bytes. \\
+2 & \code{read} & \code{rdi} = buffer, \code{rsi} = tamanho,
+\code{rdx} = flags (bit 0 desliga o eco); devolve os bytes lidos. \\
+3 & \code{get\_tty} & sem argumentos; devolve o \'indice do console ativo. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Valida\c{c}\~ao de ponteiros do usu\'ario}
+
+Uma chamada de sistema roda em ring 0 com as mesmas tabelas de p\'agina do
+usu\'ario. Tocar em um endere\c{c}o de usu\'ario n\~ao mapeado n\~ao geraria
+um page fault de usu\'ario; seria um acesso do kernel. Por isso \code{write}
+e \code{read} chamam \code{paging::ensure\_user\_range} antes de
+desreferenciar o buffer:
+
+\begin{lstlisting}[caption={Valida\c{c}\~ao e mapeamento sob demanda de um buffer do usu\'ario.},label={lst:ensureuser}]
+pub fn ensure_user_range(addr: u64, len: u64) -> Result<(), &'static str> {
+    let end = addr.checked_add(len).ok_or("intervalo invalido")?;
+    if addr < USER_BASE || end > USER_BASE + USER_REGION_SIZE {
+        return Err("ponteiro fora da regiao do usuario");
+    }
+    // Mapeia com U/S = 1 cada pagina ausente de [addr, end).
+    // ...
+    Ok(())
+}
+\end{lstlisting}
+
+A fun\c{c}\~ao rejeita intervalos fora da regi\~ao do usu\'ario e materializa
+cada p\'agina ausente com \code{PAGE\_USER | PAGE\_WRITE}. \'E o equivalente
+did\'atico dos cuidadosos auxiliares \code{copy\_from\_user}/\code{copy\_to\_user}
+do Linux.
+
+\subsection{Leitura bloqueante}
+
+A chamada \code{read} \'e s\'incrona. Enquanto n\~ao h\'a byte dispon\'ivel,
+ela chama \code{tty::pump\_input} e \code{spin\_loop}. A porta de interrup\c{c}\~ao
+limpa \code{IF}, portanto o timer n\~ao avança durante a espera na
+implementa\c{c}\~ao atual. Bytes imprim\'iveis s\~ao gravados no buffer do
+usu\'ario e ecoados quando a flag de sem-eco est\'a limpa; Backspace remove o
+\'ultimo byte; Enter termina a linha e devolve o caractere de nova linha.
+
+\section{getty e login em ring 3}
+
+O primeiro programa de usu\'ario de verdade \'e um \emph{getty}/login. Ele \'e
+escrito em assembly dentro de \code{user.rs}, em uma se\c{c}\~ao pr\'opria, e
+copiado como um blob independente de posi\c{c}\~ao para
+\code{paging::USER\_CODE}:
+
+\begin{lstlisting}[caption={Fluxo de login do programa em ring 3.},label={lst:gettyasm}]
+getty_start:
+    GETTY_WRITE getty_login_msg, getty_login_end   # write(2)
+    subq $128, %rsp                                # buffer na pilha
+    movq %rsp, %rdi                                # buf
+    movq $32, %rsi                                 # len
+    xorq %rdx, %rdx                                # echo
+    movq $2, %rax                                  # read
+    int $0x80
+    # compara "root" e pede "Password: "
+    # segundo read com flags = 1 (sem eco)
+    # compara "rinux" e escreve a mensagem final
+    # exit(0) ou exit(1)
+\end{lstlisting}
+
+Usar uma se\c{c}\~ao dedicada com c\'odigo e strings mant\'em todas as
+refer\^encias RIP-relativas v\'alidas depois da c\'opia. O buffer de leitura
+fica na pilha do usu\'ario, cuja p\'agina \'e mapeada sob demanda pela primeira
+chamada de sistema que a toca.
+
+As credenciais da demonstra\c{c}\~ao s\~ao:
+
+\begin{lstlisting}[style=shell,caption={Login bem-sucedido.},label={lst:gettyout}]
+rinux> getty
+[GETTY] iniciando login em tty0...
+rinux login: root
+Password:
+Bem-vindo ao rinux, root!
+[GETTY] login concluido, voltando ao shell
+\end{lstlisting}
+
+\code{getty n} primeiro troca para o console \code{n} e depois executa o
+programa nele. Em um teste automatizado pela serial, as credenciais devem ser
+enviadas somente depois que o prompt de login daquele console aparecer, pois a
+porta serial \'e um \'unico fluxo global.
+
+\section{Rela\c{c}\~ao com o Linux}
+
+\begin{table}[H]
+\centering
+\caption{Correspond\^encia com o subsistema TTY do Linux.}
+\label{tab:ttflinux}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Linux} & \textbf{Aqui} \\
+\midrule
+\code{drivers/tty/tty\_io.c} & \code{src/tty.rs}: filas de leitura/escrita. \\
+\code{drivers/tty/vt/vt.c} & \code{src/tty.rs}: consoles virtuais e troca. \\
+\code{drivers/video/console/vgacon.c} & \code{src/vga.rs}: renderizador de
+c\'elulas. \\
+\code{drivers/tty/n\_tty.c} & N\~ao implementado; as linhas s\~ao tratadas
+diretamente. \\
+\code{arch/x86/entry/syscalls/syscall\_64.tbl} & \code{src/syscall.rs}. \\
+\code{init/getty.c}, \code{login} & Blob ring 3 em \code{src/user.rs}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Limita\c{c}\~oes atuais}
+
+\begin{itemize}
+  \item Existe um shell, n\~ao um shell por terminal. Trocar de console move o
+        mesmo la\c{c}o para outro buffer.
+  \item O \code{getty} n\~ao \'e residente: ele roda uma vez, de forma
+        s\'incrona, e volta ao shell. Um sistema real mant\'em um
+        \code{getty} esperando em cada TTY.
+  \item A serial \'e um \'unico fluxo; o teclado \'e o que realmente distingue
+        os consoles no uso interativo.
+  \item N\~ao h\'a disciplina de linha: nem modo can\^onico, sinais, controle
+        de jobs, \code{Ctrl+C}, \code{Ctrl+D} ou ioctls de terminal.
+  \item \code{read} espera com interrup\c{c}\~oes desligadas; o timer congela
+        durante um prompt de login.
+\end{itemize}

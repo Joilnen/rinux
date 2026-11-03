@@ -2,7 +2,8 @@
 
 Kernel mínimo escrito em Rust (`#![no_std]`) que inicializa um PC padrão em
 BIOS/x86_64, entra em modo longo e abre um terminal em **modo texto VGA 80x25**
-com teclado PS/2 e alguns comandos de shell.
+com oito consoles virtuais (`tty0`..`tty7`), teclado PS/2, syscalls via
+`int 0x80` e um `getty`/login executando em ring 3.
 
 Este diretório é uma versão didática e reduzida dos módulos do Linux
 necessários para "sair do bootloader e abrir um console VGA". Não é um porte
@@ -23,10 +24,26 @@ reimplementa o caminho mínimo de boot, console e teclado.
   ou por exceção.
 - Console VGA em modo texto (80x25, buffer em `0xB8000`), com rolagem,
   cursor de hardware e cores.
-- Teclado PS/2 (controlador 8042) por polling, com Shift e Backspace.
-- Saída de depuração em COM1 (38400 8N1).
-- Shell mínimo: `help`, `clear`, `echo`, `info`, `demand`, `usertest`,
-  `userprot`, `mem`, `reboot`, `halt`.
+- Camada TTY com oito consoles virtuais (`tty0`..`tty7`), buffer e fila de
+  entrada por console; troca com `Alt+F1`..`Alt+F8` ou com o comando `tty`.
+- Interpretador ANSI/VT100 mínimo por console: `ESC[2J` limpa a tela,
+  `ESC[H` leva o cursor ao início, `ESC[K` apaga a linha e `ESC[A/B/C/D`
+  movem o cursor. O comando `clear` usa exatamente essas sequências.
+- Teclado PS/2 (controlador 8042) por polling, com Shift, Alt, Backspace e
+  detecção de `Alt+F1`..`Alt+F8`.
+- Syscalls didáticas por `int 0x80`: `exit`, `write`, `read` e `get_tty`, com
+  validação de ponteiros e materialização das páginas do usuário.
+- `getty`/login em ring 3 (`root`/`rinux`), usando `read` com eco e `read` sem
+  eco para a senha.
+- Saída de depuração em COM1 (38400 8N1), espelhando o console ativo.
+- Shell no estilo BusyBox, com parser de argumentos (aspas simples/duplas e
+  `\`) e uma tabela estática de applets: `help`, `echo`, `clear`, `pwd`, `cd`,
+  `ls`, `cat`, `mkdir`, `touch`, `write`, `rm`, `rmdir`, `cp`, `mv`, `tree`,
+  `uname`, `uptime`, `free`, `whoami`, `hostname`, `info`, `tty`, `getty`,
+  `demand`, `usertest`, `userprot`, `mem`, `reboot`, `halt`.
+- RamFS didático em memória: 48 nós, nomes de até 31 bytes e arquivos de até
+  1024 bytes, com criação, leitura, escrita, remoção e renomeação. Sem heap,
+  permissões, timestamps ou persistência.
 - Panic handler que imprime a mensagem no console e para a CPU.
 
 Testado em QEMU 11.1.3 (SeaBIOS): boot, tela VGA, teclado e comandos funcionam.
@@ -34,7 +51,7 @@ Testado em QEMU 11.1.3 (SeaBIOS): boot, tela VGA, teclado e comandos funcionam.
 ## Estrutura
 
 ```
-output/
+.
 ├── Cargo.toml
 ├── rust-toolchain.toml
 ├── .cargo/config.toml        # alvo x86_64-unknown-none + linker
@@ -45,15 +62,18 @@ output/
     ├── main.rs               # kernel_main, macros print!/println!, panic
     ├── boot.rs               # multiboot2, GDT inicial, paginação, modo longo
     ├── gdt.rs                # GDT definitiva, segmentos ring 3, TSS e IST
-    ├── idt.rs                # IDT, stubs de exceção/IRQ, PIC e PIT
-    ├── paging.rs             # frames, tabelas de 4 KiB e demand paging
-    ├── user.rs               # entrada em ring 3 e demos de proteção
+    ├── idt.rs                # IDT, stubs de exceção/IRQ, PIC, PIT e int 0x80
+    ├── paging.rs             # frames, tabelas de 4 KiB, demand paging e U/S
+    ├── user.rs               # ring 3, demos e getty/login
+    ├── syscall.rs            # exit/write/read/get_tty via int 0x80
     ├── arch.rs               # inb/outb, halt, reboot, sti
-    ├── vga.rs                # driver do console VGA (vgacon)
+    ├── vga.rs                # renderizador de baixo nível do VGA texto
+    ├── tty.rs                # consoles virtuais tty0..tty7 e filas de entrada
     ├── keyboard.rs           # driver do teclado PS/2 (atkbd/i8042)
     ├── serial.rs             # UART 16550 / COM1
-    ├── shell.rs              # prompt e comandos
-    └── sync.rs               # spinlock do console
+    ├── ramfs.rs              # sistema de arquivos em memória (sem heap)
+    ├── shell.rs              # parser de linha e tabela de applets
+    └── sync.rs               # spinlock do console e do ramfs
 ```
 
 ## Requisitos
@@ -77,7 +97,7 @@ rustup target add x86_64-unknown-none
 ## Compilar e executar
 
 ```sh
-cd output
+cd rinux
 make            # gera target/x86_64-unknown-none/release/vga-kernel e vga-kernel.iso
 make run        # abre o QEMU mostrando a tela VGA
 ```
@@ -126,18 +146,54 @@ confirme que a ISO está sendo escolhida como dispositivo de boot.
 
 ## Comandos do terminal
 
-| Comando         | Efeito                                      |
-|-----------------|---------------------------------------------|
-| `help`          | lista os comandos                           |
-| `clear`         | limpa a tela VGA                            |
-| `echo <texto>`  | imprime o texto                             |
-| `info`          | informações do kernel                       |
-| `demand`        | testa demand paging na região do kernel     |
-| `usertest`      | executa demo em ring 3 com page fault       |
-| `userprot`      | tenta acessar o kernel em ring 3 (deve falhar) |
-| `mem`           | frames, page faults e bits U/S              |
-| `reboot`        | reinicia o PC (reset via 8042)              |
-| `halt`          | para a CPU                                  |
+Os applets são digitados diretamente no prompt `rinux>`. A linha aceita aspas
+simples (`'...'`), aspas duplas (`"..."`) e `\` para escapar um caractere.
+Não há pipes (`|`), redirecionamento (`>`, `>>`, `<`) nem variáveis.
+
+| Comando                         | Efeito                                      |
+|---------------------------------|---------------------------------------------|
+| `help [comando]`                | lista os applets ou mostra a ajuda de um    |
+| `echo [-n] [texto...]`          | imprime o texto separado por espaços        |
+| `clear`                         | limpa a tela com `ESC[2J` e `ESC[H`         |
+| `pwd`                           | mostra o diretório corrente                 |
+| `cd [diretório]`                | troca o diretório corrente (padrão: `/`)    |
+| `ls [-l] [caminho]`             | lista arquivos e diretórios                 |
+| `cat [-n] <arquivo>...`         | mostra o conteúdo de arquivos               |
+| `mkdir <diretório>...`          | cria diretórios                             |
+| `touch <arquivo>...`            | cria arquivos vazios                        |
+| `write [-a] <arquivo> <texto...>` | grava ou anexa texto a um arquivo         |
+| `rm [-r] <caminho>...`          | remove arquivos e diretórios                |
+| `rmdir <diretório>...`          | remove diretórios vazios                    |
+| `cp <origem> <destino>`         | copia um arquivo                            |
+| `mv <origem> <destino>`         | move ou renomeia um arquivo/diretório       |
+| `tree [diretório]`              | mostra a árvore do ramfs                    |
+| `uname [-asnrm]`                | mostra informações do sistema               |
+| `uptime`                        | tempo desde o boot e ticks do timer         |
+| `free`                          | frames físicos livres e usados              |
+| `whoami`                        | mostra o usuário da sessão (`root`)         |
+| `hostname`                      | mostra o nome do host (`rinux`)             |
+| `info`                          | informações do kernel, console e ramfs      |
+| `tty`                           | mostra o console virtual ativo              |
+| `tty [0..7]`                    | troca para o console virtual indicado       |
+| `getty`                         | roda o login em ring 3 no console ativo     |
+| `getty [0..7]`                  | troca de console e roda o login nele        |
+| `demand`                        | testa demand paging na região do kernel     |
+| `usertest`                      | executa demo em ring 3 com page fault       |
+| `userprot`                      | tenta acessar o kernel em ring 3 (deve falhar) |
+| `mem`                           | frames, page faults e bits U/S              |
+| `reboot`                        | reinicia o PC (reset via 8042)              |
+| `halt`                          | para a CPU                                  |
+
+O ramfs começa com `/README`, `/etc/motd`, `/home/root/notes.txt` e os
+diretórios `/etc`, `/home` e `/home/root`. O diretório corrente é global
+porque ainda há um único laço de shell compartilhado por todos os consoles.
+
+Credenciais do `getty` de demonstração: usuário `root`, senha `rinux`.
+
+A troca de console também funciona pelo teclado com `Alt+F1`..`Alt+F8`
+(`Alt+F1` seleciona `tty0`). Como a entrada serial é um único fluxo, ao rodar
+`getty n` em um teste automatizado sem teclado, envie as credenciais somente
+depois que o prompt de login do console `n` aparecer.
 
 ## Documentação
 
@@ -178,8 +234,10 @@ BIOS (SeaBIOS)
                            └─ kernel_main() na metade alta
                                  ├─ vga::init()
                                  ├─ serial::init()
+                                 ├─ tty::init()      (tty0..tty7)
                                  ├─ paging::init()   (frames do Multiboot2)
-                                 ├─ gdt::init()      (ring 3 + TSS)
+                                 ├─ ramfs::init()    (árvore inicial)
+                                  ├─ gdt::init()      (ring 3 + TSS)
                                  ├─ keyboard::init()
                                  ├─ idt::init()      (PIC + PIT, IRQ0)
                                  ├─ sti
@@ -203,11 +261,14 @@ em 1 MiB (endereços baixos); o código Rust é ligado em
 | `arch/x86/mm/fault.c` (demand paging/proteção)   | `src/paging.rs`         |
 | `arch/x86/mm/init_64.c` (paginação)              | `src/boot.rs`, `src/paging.rs` |
 | `kernel/entry/common.c` (retorno ao usuário)     | `src/user.rs`           |
+| `drivers/tty/tty_io.c`, `drivers/tty/vt/vt.c`    | `src/tty.rs`            |
 | `drivers/video/console/vgacon.c`                 | `src/vga.rs`            |
 | `drivers/input/serio/i8042.c`                    | `src/keyboard.rs`       |
 | `drivers/input/keyboard/atkbd.c`                 | `src/keyboard.rs`       |
 | `drivers/tty/serial/8250/8250_port.c`            | `src/serial.rs`         |
-| `kernel/printk/printk.c`                         | macros + `src/vga.rs`   |
+| `fs/ramfs/inode.c` (ramfs didático)              | `src/ramfs.rs`          |
+| `arch/x86/entry/syscalls/syscall_64.tbl`         | `src/syscall.rs`        |
+| `kernel/printk/printk.c`                         | macros + `src/tty.rs`   |
 | `kernel/panic.c`                                 | panic handler em `main.rs` |
 | `init/main.c`                                    | `kernel_main` em `main.rs` |
 
@@ -218,8 +279,11 @@ em 1 MiB (endereços baixos); o código Rust é ligado em
 - Sem heap, processos, escalonador, sistema de arquivos ou rede.
 - O "processo" de usuário é um programa de máquina copiado para uma página e
   executado uma vez; não há `fork`, `exec` nem troca de contexto preemptiva.
-- A única chamada de sistema é `int 0x80` com `rax = 0` (sair); não há
-  validação de ponteiros nem cópia segura entre espaços de endereço.
+- Os oito consoles virtuais compartilham o mesmo shell: não há um `getty`
+  residente por terminal nem um escalonador para alternar entre eles.
+- As syscalls são `exit`, `write`, `read` e `get_tty`; não há cópia segura
+  como `copy_from_user`, apenas validação da região e materialização das
+  páginas do usuário antes do acesso.
 - Apenas o primeiro GiB é mapeado por identidade; o kernel usa a metade alta.
   As regiões de demand paging têm 2 MiB cada e ficam fora desse GiB.
 - Modo texto VGA depende de BIOS/CSM. Em PCs UEFI sem CSM, o vídeo VGA
@@ -228,9 +292,8 @@ em 1 MiB (endereços baixos); o código Rust é ligado em
 ## Próximos passos naturais
 
 1. Criar um escalonador simples e processos de verdade com espaços de endereço
-   separados.
-2. Implementar mais syscalls (`read`, `write`, `exit`) com validação de
-   ponteiros do usuário.
+   separados, permitindo um `getty` residente em cada `tty`.
+2. Adicionar `fork`, `exec` e um mini shell em modo usuário.
 3. Adicionar um alocador de heap (`alloc` + linked list allocator).
 4. Habilitar IRQ1 e transformar o teclado em entrada por interrupção.
 5. Implementar um driver de framebuffer (GOP/VBE) para PCs UEFI.

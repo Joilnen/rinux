@@ -13,7 +13,7 @@
 use core::arch::global_asm;
 use core::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 
-use crate::paging;
+use crate::{paging, tty};
 
 static ACTIVE: AtomicBool = AtomicBool::new(false);
 static EXIT_STATUS: AtomicI32 = AtomicI32::new(-1);
@@ -75,6 +75,110 @@ extern "C" {
     fn user_resume();
 }
 
+// Programa de getty/login em ring 3.
+//
+// O blob e copiado inteiro (codigo + strings) para `USER_CODE`, portanto as
+// referencias RIP-relativas continuam validas no endereco do usuario. O buffer
+// de leitura fica na pilha do usuario, que e materializada sob demanda.
+//
+// Syscalls usadas: 1 = write(buf,len), 2 = read(buf,len,flags), 0 = exit.
+global_asm!(
+    r#"
+    .section .text.getty, "ax"
+
+    .macro GETTY_WRITE start, end
+    lea \start(%rip), %rdi
+    lea \end(%rip), %rsi
+    sub %rdi, %rsi
+    mov $1, %rax
+    int $0x80
+    .endm
+
+    .global getty_start
+    .global getty_end
+
+getty_start:
+    GETTY_WRITE getty_login_msg, getty_login_end
+
+    # Reserva 128 bytes na pilha do usuario para o buffer.
+    subq $128, %rsp
+
+    # read(buffer, 32, echo)
+    movq %rsp, %rdi
+    movq $32, %rsi
+    xorq %rdx, %rdx
+    movq $2, %rax
+    int $0x80
+    movq %rax, %r12
+
+    # Confere "root".
+    cmpq $4, %r12
+    jb getty_bad
+    cmpl $0x746f6f72, (%rsp)
+    jne getty_bad
+
+    GETTY_WRITE getty_pass_msg, getty_pass_end
+
+    # read(buffer, 32, sem eco)
+    movq %rsp, %rdi
+    movq $32, %rsi
+    movq $1, %rdx
+    movq $2, %rax
+    int $0x80
+    movq %rax, %r13
+
+    # A senha nao foi ecoada; imprime a quebra de linha.
+    GETTY_WRITE getty_newline, getty_newline_end
+
+    # Confere "rinux".
+    cmpq $5, %r13
+    jb getty_bad
+    cmpl $0x756e6972, (%rsp)
+    jne getty_bad
+    cmpb $0x78, 4(%rsp)
+    jne getty_bad
+
+    GETTY_WRITE getty_ok_msg, getty_ok_end
+    xorq %rdi, %rdi
+    xorq %rax, %rax
+    int $0x80
+    jmp getty_halt
+
+getty_bad:
+    GETTY_WRITE getty_bad_msg, getty_bad_end
+    movq $1, %rdi
+    xorq %rax, %rax
+    int $0x80
+
+getty_halt:
+    jmp getty_halt
+
+getty_login_msg:
+    .ascii "rinux login: "
+getty_login_end:
+getty_pass_msg:
+    .ascii "Password: "
+getty_pass_end:
+getty_newline:
+    .ascii "\n"
+getty_newline_end:
+getty_ok_msg:
+    .ascii "Bem-vindo ao rinux, root!\n"
+getty_ok_end:
+getty_bad_msg:
+    .ascii "Login incorreto. Use root/rinux.\n"
+getty_bad_end:
+
+getty_end:
+"#,
+    options(att_syntax)
+);
+
+extern "C" {
+    static getty_start: u8;
+    static getty_end: u8;
+}
+
 pub enum Demo {
     /// Escreve na pagina `USER_DATA`, que ainda nao esta presente.
     Demand,
@@ -128,7 +232,8 @@ fn program(demo: Demo) -> Program {
         }
     }
 
-    // mov eax, 0 ; int 0x80 ; jmp $
+    // xor edi, edi ; mov eax, 0 ; int 0x80 ; jmp $
+    code.push(&[0x31, 0xFF]);
     code.push(&[0xB8, 0, 0, 0, 0, 0xCD, 0x80, 0xEB, 0xFE]);
     code
 }
@@ -159,6 +264,43 @@ pub fn run(demo: Demo) -> Result<i32, &'static str> {
     // pelo page fault (o codigo continua residente).
     paging::reset_user_demand();
 
+    ACTIVE.store(false, Ordering::SeqCst);
+    Ok(EXIT_STATUS.load(Ordering::SeqCst))
+}
+
+/// Executa o getty/login em ring 3 no console `console` (ou no console ativo).
+///
+/// O programa roda de forma sincrona, como os demais demos: o shell fica
+/// bloqueado ate o login terminar. Isso e suficiente para exercitar a camada
+/// TTY e as syscalls sem um escalonador de processos.
+pub fn run_getty(console: Option<usize>) -> Result<i32, &'static str> {
+    if ACTIVE.swap(true, Ordering::SeqCst) {
+        return Err("ja existe um programa de usuario ativo");
+    }
+
+    if let Some(index) = console {
+        if !tty::switch(index) {
+            ACTIVE.store(false, Ordering::SeqCst);
+            return Err("console virtual invalido");
+        }
+    }
+
+    let start = core::ptr::addr_of!(getty_start) as *const u8;
+    let end = core::ptr::addr_of!(getty_end) as *const u8;
+    let len = end as usize - start as usize;
+    let code = unsafe { core::slice::from_raw_parts(start, len) };
+
+    if let Err(reason) = paging::install_user_code(code) {
+        ACTIVE.store(false, Ordering::SeqCst);
+        return Err(reason);
+    }
+
+    EXIT_STATUS.store(-1, Ordering::SeqCst);
+    unsafe {
+        user_enter(paging::USER_CODE, paging::USER_STACK_TOP);
+    }
+
+    paging::reset_user_demand();
     ACTIVE.store(false, Ordering::SeqCst);
     Ok(EXIT_STATUS.load(Ordering::SeqCst))
 }

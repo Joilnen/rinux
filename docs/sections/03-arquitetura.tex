@@ -78,22 +78,26 @@ Lifetime & The shell never returns; \code{halt} and \code{reboot} end the flow. 
 \textbf{Module} & \textbf{Uses / is used by} \\
 \midrule
 \code{main.rs} & Declares all modules; calls \code{vga}, \code{serial},
-\code{paging}, \code{gdt}, \code{keyboard}, \code{idt}, \code{arch} and
-\code{shell}. \\
+\code{tty}, \code{paging}, \code{gdt}, \code{keyboard}, \code{idt},
+\code{arch} and \code{shell}; implements the printing macros. \\
 \code{boot.rs} & Assembly that calls \code{kernel\_main}; it is not called by
 Rust. \\
 \code{arch.rs} & I/O ports, \code{sti}, \code{halt} and \code{reboot};
 used by several modules. \\
 \code{gdt.rs} & GDT/TSS and stacks; uses only \code{core::arch}. \\
-\code{idt.rs} & Uses \code{arch}, \code{paging} and \code{user} to handle
-exceptions, IRQs and the \emph{syscall}. \\
+\code{idt.rs} & Uses \code{arch}, \code{paging}, \code{syscall} and
+\code{user} to handle exceptions, IRQs and the \emph{syscall}. \\
 \code{paging.rs} & Frames, tables and \emph{page faults}; uses only
 \code{core::arch}. \\
-\code{user.rs} & Builds the program, calls \code{paging} and returns to the kernel
-through \code{user\_resume}. \\
-\code{shell.rs} & Uses \code{keyboard}, \code{serial}, \code{vga},
-\code{idt}, \code{paging}, \code{user} and \code{arch}. \\
-\code{vga.rs} & Uses \code{sync}, \code{serial} and \code{arch}. \\
+\code{user.rs} & Builds the programs, calls \code{paging} and \code{tty} and
+returns to the kernel through \code{user\_resume}. \\
+\code{syscall.rs} & Implements \code{exit/write/read/get\_tty}; uses
+\code{paging}, \code{tty} and \code{user}. \\
+\code{shell.rs} & Uses \code{tty}, \code{idt}, \code{paging}, \code{user} and
+\code{arch}. \\
+\code{tty.rs} & Owns the eight consoles; uses \code{vga}, \code{keyboard},
+\code{serial} and \code{sync}. \\
+\code{vga.rs} & Low-level renderer; uses \code{arch}. \\
 \code{keyboard.rs} & Uses \code{arch} to access the 8042. \\
 \code{serial.rs} & Uses \code{arch} to access the UART. \\
 \code{sync.rs} & Console spinlock; uses only \code{core}. \\
@@ -124,7 +128,7 @@ exports the \code{print!} and \code{println!} macros.
 \node[stage, below=1.0cm of mb] (stub) {\_start\\32 bits @ 1 MiB};
 \node[stage, left=of stub] (paging) {PML4/PDPT/PD\\GDT + long mode};
 \node[stage, left=of paging] (main) {kernel\_main\\higher half};
-\node[stage, left=of main] (shell) {vga / serial / kbd\\shell};
+\node[stage, left=of main] (shell) {vga / tty / kbd\\shell};
 \draw[arrow] (bios) -- (eltorito);
 \draw[arrow] (eltorito) -- (grub);
 \draw[arrow] (grub) -- (mb);

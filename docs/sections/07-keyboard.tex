@@ -16,7 +16,8 @@ from two Linux subsystems:
 
 There is no IRQ1, event queue, \code{input\_device}, Linux \emph{keycode}, or
 \code{evdev}. The driver does \emph{polling} of the 8042 output buffer and
-returns ASCII bytes directly to the shell.
+returns either an ASCII character or a console switch request to the TTY
+layer.
 
 \section{Hardware: 8042 controller}
 
@@ -119,6 +120,9 @@ and are ignored.
 \code{Space} & \code{0x39} & \code{0xB9} & space \\
 \code{Left Shift} & \code{0x2A} & \code{0xAA} & enables/disables Shift \\
 \code{Right Shift} & \code{0x36} & \code{0xB6} & enables/disables Shift \\
+\code{Left Alt} & \code{0x38} & \code{0xB8} & enables/disables Alt \\
+\code{F1}..\code{F8} & \code{0x3B}..\code{0x42} & \code{0xBB}..\code{0xC2}
+& \code{Alt+F1}..\code{Alt+F8} selects \code{tty0}..\code{tty7} \\
 \code{Extended key} & \code{0xE0} & --- & prefix; next code ignored \\
 \bottomrule
 \end{tabular}
@@ -147,6 +151,21 @@ discarded and the flag is cleared. This prevents arrows, Insert, Delete, Home,
 End, and numeric keypad keys from being interpreted as letters. The
 consequence is that these keys have no function in the shell.
 
+\subsection{Alt and console selection}
+
+The Alt state is kept in \code{static ALT: AtomicBool}: scancode \code{0x38}
+sets it and the break code \code{0xB8} clears it. While Alt is held, the F1
+through F8 scancodes (\code{0x3B}..\code{0x42}) are not translated to ASCII.
+They produce \code{Key::Console(0..7)}, which the TTY layer uses to switch to
+\code{tty0}..\code{tty7}.
+
+\begin{lstlisting}[caption={Result of the keyboard driver.},label={lst:key}]
+pub enum Key {
+    Char(u8),
+    Console(usize),
+}
+\end{lstlisting}
+
 \subsection{Mouse}
 
 Mouse data shares the same 8042. If bit 5 of the status is on, the byte read
@@ -171,7 +190,8 @@ is discarded. This prevents mouse movements from appearing as letters.
 \node[dec, below=of read] (mouse) {bit 5 (mouse)?};
 \node[dec, below=of mouse] (ext) {\code{0xE0} or extended?};
 \node[dec, below=of ext] (break) {bit 7 (break)?};
-\node[kstep, below=of break] (key) {Translates and returns byte};
+\node[dec, below=of break] (alt) {Alt+F1..F8?};
+\node[kstep, below=of alt] (key) {Translates and returns \code{Key}};
 \node[kstep, right=2.4cm of full] (none) {Returns \code{None}};
 \draw[arrow] (status) -- (full);
 \draw[arrow] (full) -- node[right,font=\tiny]{yes} (read);
@@ -179,18 +199,23 @@ is discarded. This prevents mouse movements from appearing as letters.
 \draw[arrow] (read) -- (mouse);
 \draw[arrow] (mouse) -- node[right,font=\tiny]{no} (ext);
 \draw[arrow] (ext) -- node[right,font=\tiny]{no} (break);
-\draw[arrow] (break) -- node[right,font=\tiny]{no} (key);
+\draw[arrow] (break) -- node[right,font=\tiny]{no} (alt);
+\draw[arrow] (alt) -- node[right,font=\tiny]{no} (key);
+\draw[arrow] (alt.east) -- node[above,font=\tiny]{yes} ++(0.65,0)
+  node[right,font=\tiny]{\code{Console(n)}};
 \draw[arrow] (mouse.east) -- ++(0.9,0) |- (none.east);
 \draw[arrow] (ext.east) -- ++(0.5,0) |- (none.east);
 \draw[arrow] (break.east) -- ++(0.2,0) |- (none.east);
 \end{tikzpicture}
-\caption{Flow of \code{read\_char()}. Discard paths lead to \code{None}.}
+\caption{Flow of \code{read\_key()}. Discard paths lead to \code{None}.}
 \label{fig:kbdflow}
 \end{figure}
 
-The shell calls \code{keyboard::read\_char()} repeatedly. When the function
-returns \code{None}, the shell tries the serial port and, if there is no data
-there either, executes \code{spin\_loop()}.
+The TTY layer calls \code{keyboard::read\_key()} repeatedly inside
+\code{tty::pump\_input}. A \code{Key::Char} is pushed to the input queue of the
+active console; a \code{Key::Console(n)} switches the active console. The
+compatibility wrapper \code{read\_char()} discards console requests and
+returns only characters.
 
 \section{API and internal functions}
 
@@ -203,7 +228,9 @@ there either, executes \code{spin\_loop()}.
 \textbf{Function} & \textbf{Description} \\
 \midrule
 \code{init()} & Configures 8042 translation, IRQ, clock, and scanning. \\
-\code{read\_char()} & Reads and translates a scancode; returns \code{Option<u8>}. \\
+\code{read\_key()} & Reads and translates a scancode; returns
+\code{Option<Key>}. \\
+\code{read\_char()} & Compatibility wrapper; returns only \code{Key::Char}. \\
 \code{build\_keymap()} & Builds the 128-entry table at compile time. \\
 \code{apply\_shift(byte)} & Applies the effect of Shift to a character. \\
 \code{wait\_input\_clear()} & Waits for the 8042 input buffer to empty. \\
@@ -228,7 +255,7 @@ there either, executes \code{spin\_loop()}.
         Page Up/Down, and the numeric keypad are discarded.
   \item \textbf{No ABNT2 layout}: the table is based on US/QWERTY; the
         physical key positions and the symbol set may differ.
-  \item \textbf{No useful \emph{key release}}: apart from Shift, the
+  \item \textbf{No useful \emph{key release}}: apart from Shift and Alt, the
         \emph{break codes} are ignored; there is no key press detection for
         games or shortcuts.
   \item \textbf{No error handling}: error bytes (\code{0x00}, \code{0xFF},

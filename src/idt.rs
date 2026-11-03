@@ -480,14 +480,7 @@ fn user_fault(frame: &mut InterruptFrame) -> bool {
 }
 
 fn syscall(frame: &mut InterruptFrame) {
-    match frame.rax {
-        // syscall 0: sair do modo usuario
-        0 => user::abort(0),
-        number => {
-            crate::println!("[USER] syscall desconhecida: {}", number);
-            user::abort(number as i32);
-        }
-    }
+    crate::syscall::dispatch(frame);
 }
 
 fn fatal(frame: &InterruptFrame) -> ! {

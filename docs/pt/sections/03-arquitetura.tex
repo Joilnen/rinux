@@ -78,22 +78,26 @@ Tempo de vida & O shell nunca retorna; \code{halt} e \code{reboot} encerram o fl
 \textbf{M\'odulo} & \textbf{Usa / \'e usado por} \\
 \midrule
 \code{main.rs} & Declara todos os m\'odulos; chama \code{vga}, \code{serial},
-\code{paging}, \code{gdt}, \code{keyboard}, \code{idt}, \code{arch} e
-\code{shell}. \\
+\code{tty}, \code{paging}, \code{gdt}, \code{keyboard}, \code{idt},
+\code{arch} e \code{shell}; implementa as macros de impress\~ao. \\
 \code{boot.rs} & Assembly que chama \code{kernel\_main}; n\~ao \'e chamado por
 Rust. \\
 \code{arch.rs} & Portas de I/O, \code{sti}, \code{halt} e \code{reboot};
 usado por v\'arios m\'odulos. \\
 \code{gdt.rs} & GDT/TSS e pilhas; usa apenas \code{core::arch}. \\
-\code{idt.rs} & Usa \code{arch}, \code{paging} e \code{user} para tratar
-exce\c{c}\~oes, IRQs e a \emph{syscall}. \\
+\code{idt.rs} & Usa \code{arch}, \code{paging}, \code{syscall} e
+\code{user} para tratar exce\c{c}\~oes, IRQs e a \emph{syscall}. \\
 \code{paging.rs} & Frames, tabelas e \emph{page faults}; usa apenas
 \code{core::arch}. \\
-\code{user.rs} & Monta o programa, chama \code{paging} e retorna ao kernel
-por \code{user\_resume}. \\
-\code{shell.rs} & Usa \code{keyboard}, \code{serial}, \code{vga},
-\code{idt}, \code{paging}, \code{user} e \code{arch}. \\
-\code{vga.rs} & Usa \code{sync}, \code{serial} e \code{arch}. \\
+\code{user.rs} & Monta os programas, chama \code{paging} e \code{tty} e
+retorna ao kernel por \code{user\_resume}. \\
+\code{syscall.rs} & Implementa \code{exit/write/read/get\_tty}; usa
+\code{paging}, \code{tty} e \code{user}. \\
+\code{shell.rs} & Usa \code{tty}, \code{idt}, \code{paging}, \code{user} e
+\code{arch}. \\
+\code{tty.rs} & Mant\'em os oito consoles; usa \code{vga}, \code{keyboard},
+\code{serial} e \code{sync}. \\
+\code{vga.rs} & Renderizador de baixo n\'ivel; usa \code{arch}. \\
 \code{keyboard.rs} & Usa \code{arch} para acessar o 8042. \\
 \code{serial.rs} & Usa \code{arch} para acessar a UART. \\
 \code{sync.rs} & Spinlock do console; usa apenas \code{core}. \\
@@ -124,7 +128,7 @@ exporta as macros \code{print!} e \code{println!}.
 \node[stage, below=1.0cm of mb] (stub) {\_start\\32 bits @ 1 MiB};
 \node[stage, left=of stub] (paging) {PML4/PDPT/PD\\GDT + long mode};
 \node[stage, left=of paging] (main) {kernel\_main\\metade alta};
-\node[stage, left=of main] (shell) {vga / serial / kbd\\shell};
+\node[stage, left=of main] (shell) {vga / tty / kbd\\shell};
 \draw[arrow] (bios) -- (eltorito);
 \draw[arrow] (eltorito) -- (grub);
 \draw[arrow] (grub) -- (mb);

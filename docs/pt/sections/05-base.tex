@@ -104,7 +104,7 @@ funcionar em qualquer m\'odulo do crate sem importa\c{c}\~ao:
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {
-        $crate::vga::_print(format_args!($($arg)*))
+        $crate::tty::_print(format_args!($($arg)*))
     };
 }
 
@@ -118,8 +118,9 @@ macro_rules! println {
 \end{lstlisting}
 
 \code{format\_args!} cria uma descri\c{c}\~ao de formata\c{c}\~ao sem alocar;
-a implementa\c{c}\~ao de \code{fmt::Write} em \code{vga.rs} consome os
-fragmentos. N\~ao h\'a \code{format!} (que exigiria \code{alloc}).
+a implementa\c{c}\~ao de \code{fmt::Write} em \code{tty.rs} consome os
+fragmentos, anexa ao buffer do console ativo e espelha na serial.
+N\~ao h\'a \code{format!} (que exigiria \code{alloc}).
 
 \subsection{Panic handler}
 

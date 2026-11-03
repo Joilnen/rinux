@@ -36,13 +36,16 @@ T07 & PS/2 input: \code{echo ola} prints \code{ola} & Passed \\
 T08 & Serial input: \code{echo serial ok} works & Passed \\
 T09 & Prompt returns after each command & Passed \\
 T10 & \code{info} shows the kernel configurations & Passed \\
-T11 & \code{clear} clears the screen & Passed \\
+T11 & \code{clear} sends \code{ESC[2J ESC[H} and blanks the screen & Passed \\
 T12 & \code{reboot} and \code{halt} end the flow & Verified manually \\
 T13 & IDT installed and timer IRQ0 increments \code{ticks} & Passed \\
 T14 & \code{demand} raises \code{\#PF} and maps the kernel page & Passed \\
 T15 & \code{usertest} runs in ring 3, raises two page faults and returns & Passed \\
 T16 & \code{userprot} violates U/S and is terminated by the handler & Passed \\
 T17 & \code{mem} shows U/S = 1 for user and 0 for kernel & Passed \\
+T18 & \code{tty} reports \code{tty0} and \code{tty 3} switches console & Passed \\
+T19 & \code{getty} logs in with \code{root}/\code{rinux} in ring 3 & Passed \\
+T20 & Password is not echoed; a wrong password exits with status 1 & Passed \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -76,9 +79,11 @@ allocation made by GRUB. The \code{magic} must always be
 rinux> help
 Comandos disponiveis:
   help          mostra esta ajuda
-  clear         limpa a tela
+  clear         limpa o console ativo
   echo <texto>  imprime o texto
   info          informacoes do kernel
+  tty [0..7]    mostra ou troca o console virtual
+  getty [0..7]  roda o login em ring 3 no console
   demand        testa demand paging no kernel
   usertest      roda um programa em ring 3 com page fault
   userprot      testa a protecao usuario/kernel
@@ -95,6 +100,18 @@ rinux> echo ola
 ola
 rinux>
 \end{lstlisting}
+
+\subsection{\code{clear} via ANSI}
+
+\begin{lstlisting}[style=shell,caption={Escape sequence observed on COM1.},label={lst:testclear}]
+rinux> clear
+^[[2J^[[H
+rinux>
+\end{lstlisting}
+
+The caret notation is how a serial monitor displays the byte \code{0x1B}. On
+the VGA console the command blanks all 2,000 cells and returns the cursor to
+\code{(0,0)}, with no escape characters printed as text.
 
 \subsection{Serial input}
 
@@ -214,6 +231,10 @@ Expected results:
         \code{\#PF}.
   \item[$\square$] \code{usertest} raises two page faults and returns to the shell.
   \item[$\square$] \code{userprot} is terminated by the U/S protection.
+  \item[$\square$] \code{tty 3} switches to \code{tty3} and \code{tty 0}
+        returns to \code{tty0}.
+  \item[$\square$] \code{getty} accepts \code{root}/\code{rinux} and returns
+        to the shell; a wrong password exits with status 1.
   \item[$\square$] \code{halt} stops the CPU and \code{reboot} restarts (when the
         environment supports it).
   \item[$\square$] The LaTeX documentation compiles and generates the PDF.

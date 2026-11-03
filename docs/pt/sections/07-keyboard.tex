@@ -16,7 +16,7 @@ conceitos de dois subsistemas do Linux:
 
 N\~ao h\'a IRQ1, fila de eventos, \code{input\_device}, \emph{keycode} Linux
 nem \code{evdev}. O driver faz \emph{polling} do buffer de sa\'ida do 8042 e
-devolve bytes ASCII diretamente ao shell.
+devolve \`a camada TTY um caractere ASCII ou um pedido de troca de console.
 
 \section{Hardware: controlador 8042}
 
@@ -121,6 +121,9 @@ mapeadas valem zero e s\~ao ignoradas.
 \code{Espa\c{c}o} & \code{0x39} & \code{0xB9} & espa\c{c}o \\
 \code{Shift esquerdo} & \code{0x2A} & \code{0xAA} & ativa/desativa Shift \\
 \code{Shift direito} & \code{0x36} & \code{0xB6} & ativa/desativa Shift \\
+\code{Alt esquerdo} & \code{0x38} & \code{0xB8} & ativa/desativa Alt \\
+\code{F1}..\code{F8} & \code{0x3B}..\code{0x42} & \code{0xBB}..\code{0xC2}
+& \code{Alt+F1}..\code{Alt+F8} seleciona \code{tty0}..\code{tty7} \\
 \code{Tecla estendida} & \code{0xE0} & --- & prefixo; c\'odigo seguinte ignorado \\
 \bottomrule
 \end{tabular}
@@ -149,6 +152,21 @@ descartado e a flag \'e limpa. Isso evita que setas, Insert, Delete, Home,
 End e teclas do teclado num\'erico sejam interpretadas como letras. A
 consequ\^encia \'e que essas teclas n\~ao t\^em fun\c{c}\~ao no shell.
 
+\subsection{Alt e sele\c{c}\~ao de console}
+
+O estado de Alt \'e mantido em \code{static ALT: AtomicBool}: o scancode
+\code{0x38} liga o estado e o \emph{break code} \code{0xB8} desliga. Com Alt
+pressionado, os scancodes F1 a F8 (\code{0x3B}..\code{0x42}) n\~ao s\~ao
+traduzidos para ASCII. Eles produzem \code{Key::Console(0..7)}, que a camada
+TTY usa para trocar para \code{tty0}..\code{tty7}.
+
+\begin{lstlisting}[caption={Resultado do driver de teclado.},label={lst:key}]
+pub enum Key {
+    Char(u8),
+    Console(usize),
+}
+\end{lstlisting}
+
 \subsection{Mouse}
 
 Dados do mouse compartilham o mesmo 8042. Se o bit 5 do status estiver
@@ -174,7 +192,8 @@ apare\c{c}am como letras.
 \node[dec, below=of read] (mouse) {bit 5 (mouse)?};
 \node[dec, below=of mouse] (ext) {\code{0xE0} ou extended?};
 \node[dec, below=of ext] (break) {bit 7 (break)?};
-\node[kstep, below=of break] (key) {Traduz e retorna byte};
+\node[dec, below=of break] (alt) {Alt+F1..F8?};
+\node[kstep, below=of alt] (key) {Traduz e retorna \code{Key}};
 \node[kstep, right=2.4cm of full] (none) {Retorna \code{None}};
 \draw[arrow] (status) -- (full);
 \draw[arrow] (full) -- node[right,font=\tiny]{sim} (read);
@@ -182,18 +201,23 @@ apare\c{c}am como letras.
 \draw[arrow] (read) -- (mouse);
 \draw[arrow] (mouse) -- node[right,font=\tiny]{n\~ao} (ext);
 \draw[arrow] (ext) -- node[right,font=\tiny]{n\~ao} (break);
-\draw[arrow] (break) -- node[right,font=\tiny]{n\~ao} (key);
+\draw[arrow] (break) -- node[right,font=\tiny]{n\~ao} (alt);
+\draw[arrow] (alt) -- node[right,font=\tiny]{n\~ao} (key);
+\draw[arrow] (alt.east) -- node[above,font=\tiny]{sim} ++(0.65,0)
+  node[right,font=\tiny]{\code{Console(n)}};
 \draw[arrow] (mouse.east) -- ++(0.9,0) |- (none.east);
 \draw[arrow] (ext.east) -- ++(0.5,0) |- (none.east);
 \draw[arrow] (break.east) -- ++(0.2,0) |- (none.east);
 \end{tikzpicture}
-\caption{Fluxo de \code{read\_char()}. Caminhos de descarte levam a \code{None}.}
+\caption{Fluxo de \code{read\_key()}. Caminhos de descarte levam a \code{None}.}
 \label{fig:kbdflow}
 \end{figure}
 
-O shell chama \code{keyboard::read\_char()} repetidamente. Quando a fun\c{c}\~ao
-retorna \code{None}, o shell tenta a serial e, se tamb\'em n\~ao houver dado,
-executa \code{spin\_loop()}.
+A camada TTY chama \code{keyboard::read\_key()} repetidamente dentro de
+\code{tty::pump\_input}. Um \code{Key::Char} vai para a fila de entrada do
+console ativo; um \code{Key::Console(n)} troca o console ativo. O inv\'olucro
+de compatibilidade \code{read\_char()} descarta pedidos de console e devolve
+apenas caracteres.
 
 \section{API e fun\c{c}\~oes internas}
 
@@ -206,7 +230,9 @@ executa \code{spin\_loop()}.
 \textbf{Fun\c{c}\~ao} & \textbf{Descri\c{c}\~ao} \\
 \midrule
 \code{init()} & Configura tradu\c{c}\~ao, IRQ, clock e varredura do 8042. \\
-\code{read\_char()} & L\^e e traduz um scancode; retorna \code{Option<u8>}. \\
+\code{read\_key()} & L\^e e traduz um scancode; retorna \code{Option<Key>}. \\
+\code{read\_char()} & Inv\'olucro de compatibilidade; retorna s\'o
+\code{Key::Char}. \\
 \code{build\_keymap()} & Constr\'oi a tabela de 128 entradas em tempo de
 compila\c{c}\~ao. \\
 \code{apply\_shift(byte)} & Aplica o efeito de Shift a um caractere. \\
@@ -233,7 +259,7 @@ compila\c{c}\~ao. \\
   \item \textbf{Sem layout ABNT2}: a tabela \'e baseada em US/QWERTY; a
         posi\c{c}\~ao f\'isica das teclas e o conjunto de s\'imbolos podem
         diferir.
-  \item \textbf{Sem \emph{key release} \'util}: al\'em de Shift, os
+  \item \textbf{Sem \emph{key release} \'util}: al\'em de Shift e Alt, os
         \emph{break codes} s\~ao ignorados; n\~ao h\'a detec\c{c}\~ao de tecla
         pressionada para jogos ou atalhos.
   \item \textbf{Sem tratamento de erros}: bytes de erro (\code{0x00},

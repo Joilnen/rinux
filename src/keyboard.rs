@@ -19,7 +19,17 @@ const STATUS_INPUT_FULL: u8 = 0x02;
 const STATUS_MOUSE_DATA: u8 = 0x20;
 
 static SHIFT: AtomicBool = AtomicBool::new(false);
+static ALT: AtomicBool = AtomicBool::new(false);
 static EXTENDED: AtomicBool = AtomicBool::new(false);
+
+/// Resultado de uma tecla.
+#[derive(Clone, Copy)]
+pub enum Key {
+    /// Caractere ASCII (Enter vira `\n`, Backspace vira 0x08, Tab vira `\t`).
+    Char(u8),
+    /// Alt+F1..Alt+F8: pede a troca para o console virtual 0..7.
+    Console(usize),
+}
 
 /// Tabela de scancodes (conjunto 1) para ASCII sem Shift.
 const fn build_keymap() -> [u8; 128] {
@@ -181,8 +191,12 @@ pub fn init() {
     }
 }
 
-/// Le um caractere, se disponivel. Retorna `None` quando nao ha tecla.
-pub fn read_char() -> Option<u8> {
+/// Le uma tecla, se disponivel.
+///
+/// O driver continua por polling. A novidade em relacao ao terminal original e
+/// o estado das teclas modificadoras: Shift muda o caractere e Alt+F1..Alt+F8
+/// devolve `Key::Console`, usado pela camada TTY para trocar de console.
+pub fn read_key() -> Option<Key> {
     unsafe {
         let status = inb(KBD_STATUS);
 
@@ -210,6 +224,7 @@ pub fn read_char() -> Option<u8> {
         if scancode & 0x80 != 0 {
             match scancode {
                 0xAA | 0xB6 => SHIFT.store(false, Ordering::Relaxed),
+                0xB8 => ALT.store(false, Ordering::Relaxed),
                 _ => {}
             }
             return None;
@@ -220,19 +235,37 @@ pub fn read_char() -> Option<u8> {
                 SHIFT.store(true, Ordering::Relaxed);
                 None
             }
-            0x1C => Some(b'\n'), // Enter
-            0x0E => Some(0x08),  // Backspace
-            0x0F => Some(b'\t'), // Tab
+            0x38 => {
+                ALT.store(true, Ordering::Relaxed);
+                None
+            }
+            // Alt+F1..Alt+F8 -> console virtual 0..7.
+            0x3B..=0x42 if ALT.load(Ordering::Relaxed) => {
+                Some(Key::Console((scancode - 0x3B) as usize))
+            }
+            0x1C => Some(Key::Char(b'\n')), // Enter
+            0x0E => Some(Key::Char(0x08)),  // Backspace
+            0x0F => Some(Key::Char(b'\t')), // Tab
             _ => {
                 let key = KEYMAP[scancode as usize];
                 if key == 0 {
                     None
                 } else if SHIFT.load(Ordering::Relaxed) {
-                    Some(apply_shift(key))
+                    Some(Key::Char(apply_shift(key)))
                 } else {
-                    Some(key)
+                    Some(Key::Char(key))
                 }
             }
         }
+    }
+}
+
+/// Compatibilidade: le apenas caracteres, descartando pedidos de troca de
+/// console. O shell usa `read_key` diretamente.
+#[allow(dead_code)]
+pub fn read_char() -> Option<u8> {
+    match read_key() {
+        Some(Key::Char(byte)) => Some(byte),
+        _ => None,
     }
 }

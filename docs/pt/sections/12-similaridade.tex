@@ -58,23 +58,23 @@ ing\^enua de que ``\'e um Linux em Rust'' quanto a conclus\~ao oposta de que
 \code{arch/x86/kernel/head\_64.S} & 686 & \code{boot.rs} (modo longo) \\
 \code{arch/x86/kernel/cpu/common.c} & 2.688 & \code{boot.rs} (GDT) + \code{arch.rs} \\
 \code{arch/x86/mm/init\_64.c} & 1.557 & \code{boot.rs} (p\'aginas) \\
-\code{drivers/video/console/vgacon.c} & 1.226 & \code{vga.rs} \\
+\code{drivers/video/console/vgacon.c} & 1.226 & \code{vga.rs} + \code{tty.rs} \\
 \code{drivers/input/serio/i8042.c} & 1.664 & \code{keyboard.rs} \\
 \code{drivers/input/keyboard/atkbd.c} & 1.981 & \code{keyboard.rs} \\
 \code{drivers/tty/serial/8250/8250\_port.c} & 3.638 & \code{serial.rs} \\
-\code{kernel/printk/printk.c} & 5.188 & macros + \code{vga.rs} \\
+\code{kernel/printk/printk.c} & 5.188 & macros + \code{tty.rs} \\
 \code{kernel/panic.c} & 1.274 & \emph{panic handler} em \code{main.rs} \\
 \code{init/main.c} & 1.706 & \code{kernel\_main} em \code{main.rs} \\
 \midrule
 \textbf{Total Linux (12 arquivos)} & \textbf{22.352} & --- \\
-\textbf{Total Rust (12 m\'odulos)} & \textbf{2.508} & --- \\
+\textbf{Total Rust (14 m\'odulos)} & \textbf{3.223} & --- \\
 \bottomrule
 \end{longtable}
 
 A raz\~ao de linhas \'e:
 
 \[
-\frac{2.508}{22.352} \approx 11{,}22\%.
+\frac{3.223}{22.352} \approx 14{,}42\%.
 \]
 
 Em rela\c{c}\~ao \`a \'arvore Linux completa, que tem aproximadamente
@@ -82,11 +82,11 @@ Em rela\c{c}\~ao \`a \'arvore Linux completa, que tem aproximadamente
 raz\~ao \'e:
 
 \[
-\frac{2.508}{38.062.672} \approx 0{,}0066\%.
+\frac{3.223}{38.062.672} \approx 0{,}00847\%.
 \]
 
 \begin{atencao}[Linhas de c\'odigo n\~ao medem similaridade]
-Os 12 arquivos Linux n\~ao t\^em o mesmo escopo que os m\'odulos Rust. O
+Os 12 arquivos Linux n\~ao t\^em o mesmo escopo que os 14 m\'odulos Rust. O
 \code{vgacon.c}, por exemplo, suporta v\'arias arquiteturas, consoles
 virtuais e modos gr\'aficos; o \code{vga.rs} implementa apenas texto 80x25.
 Al\'em disso, grande parte das linhas Linux \'e coment\'ario, configura\c{c}\~ao
@@ -154,8 +154,9 @@ seguran\c{c}a, virtualiza\c{c}\~ao).
         paging; faltam buddy allocator, \code{vmalloc}, \code{mmap}, COW,
         swap, NUMA e prote\c{c}\~ao \code{NX}.
   \item \textbf{Console (25/100)}: o modo texto VGA e a rolagem s\~ao
-        an\'alogos ao \code{vgacon}, mas faltam console virtual, fontes,
-        Unicode, \emph{fbcon}, \code{printk} com n\'iveis e buffer de log.
+        an\'alogos ao \code{vgacon} e h\'a oito consoles virtuais com troca
+        por \code{Alt+F1}..\code{Alt+F8}; faltam fontes, Unicode,
+        \emph{fbcon}, \code{printk} com n\'iveis e buffer de log.
   \item \textbf{Teclado (18/100)}: o acesso ao 8042 e a tradu\c{c}\~ao de
         scancodes s\~ao semelhantes, mas faltam IRQ1, \emph{input core},
         \code{evdev}, LEDs, layouts e teclas estendidas.
@@ -167,11 +168,10 @@ seguran\c{c}a, virtualiza\c{c}\~ao).
         IRQs esp\'urias, \emph{softirq}, workqueues e preemp\c{c}\~ao.
   \item \textbf{Mem\'oria/heap (15/100)}: h\'a alocador de frames e demand
         paging, mas n\~ao h\'a heap, slab, page cache ou \code{vmalloc}.
-  \item \textbf{Processos (5/100)}: h\'a um demo em ring 3 com TSS e
-        \code{int 0x80}, mas n\~ao h\'a \code{task\_struct},
+  \item \textbf{Processos (5/100)}: h\'a demos em ring 3 e um login com TSS
+        e \code{int 0x80}, mas n\~ao h\'a \code{task\_struct},
         scheduler, context switch, espa\c{c}os de endere\c{c}o separados,
-        sinais ou
-        syscalls.
+        sinais ou uma tabela de syscalls maior.
   \item \textbf{FS/rede (0/100)}: n\~ao h\'a VFS, block layer, TCP/IP,
         netfilter ou drivers de dispositivos.
 \end{itemize}
@@ -196,8 +196,8 @@ GDT & \code{gdt\_table}, \emph{per-CPU}, TSS & 7 descritores, ring 3 e
 TSS/IST \\
 Pagina\c{c}\~ao & 4/5 n\'iveis, alocadores, \code{vmalloc} & 4 n\'iveis,
 2 MiB \emph{huge pages} + folhas 4 KiB sob demanda \\
-Console & \code{vgacon}, VT, \code{fbcon}, \code{printk} & \code{vga.rs},
-texto 80x25 \\
+Console & \code{vgacon}, VT, \code{fbcon}, \code{printk} & \code{vga.rs}
+renderizador + \code{tty.rs} com oito consoles \\
 Teclado & i8042 + serio + atkbd + input & 8042 por polling (IRQ1 mascarada) \\
 Serial & 8250 + tty + termios & 16550 por polling \\
 Entrada & IRQ1/IRQ4, \emph{softirq}, workqueues & IRQ0 (timer) + polling no
@@ -208,7 +208,7 @@ Mem\'oria & buddy, slab, \code{vmalloc}, page cache & Bitmap de frames,
 demand paging; sem heap \\
 Processos & CFS/EEVDF, namespaces, cgroups & Demo em ring 3; sem scheduler \\
 Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} com
-\code{rax = 0} (exit) \\
+\code{exit/write/read/get\_tty} \\
 \bottomrule
 \end{tabularx}
 \end{table}

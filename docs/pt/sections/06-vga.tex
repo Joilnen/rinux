@@ -1,12 +1,17 @@
-\chapter{Console VGA em modo texto}
+\chapter{Renderizador VGA e consoles virtuais}
 \label{cap:vga}
 
 \section{Vis\~ao geral}
 
-O driver \code{src/vga.rs} \'e o equivalente simplificado do \code{vgacon} do
-Linux. Ele opera no modo texto legado da VGA, no qual a tela \'e uma matriz
-de 80 colunas por 25 linhas armazenada a partir do endere\c{c}o f\'isico
-\code{0xB8000}. Cada c\'elula ocupa 16 bits.
+O m\'odulo \code{src/vga.rs} \'e o equivalente simplificado da parte de baixo
+n\'ivel do \code{vgacon} do Linux. Ele opera no modo texto legado da VGA, no
+qual a tela \'e uma matriz de 80 colunas por 25 linhas armazenada a partir do
+endere\c{c}o f\'isico \code{0xB8000}. Cada c\'elula ocupa 16 bits.
+
+O m\'odulo \'e deliberadamente apenas um \emph{renderizador}: ele copia uma
+matriz de c\'elulas para o framebuffer e posiciona o cursor de hardware. Os
+oito consoles virtuais, seus buffers e suas filas de entrada ficam em
+\code{src/tty.rs}, descritos no Cap\'itulo~\ref{cap:tty}.
 
 \begin{table}[H]
 \centering
@@ -32,18 +37,22 @@ do cursor \'e controlada pelos registradores da CRTC, acessados pelas portas
 
 \section{Estado do console}
 
-\begin{lstlisting}[caption={Estado mantido pelo console.},label={lst:consolestate}]
-struct Console {
-    column: usize,
+A matriz de c\'elulas e o cursor pertencem a cada \code{Tty} em \code{tty.rs}:
+
+\begin{lstlisting}[caption={Estado mantido por console virtual.},label={lst:consolestate}]
+struct Tty {
+    cells: [u16; vga::CELLS],
     row: usize,
-    color: u8,
+    column: usize,
+    input: [u8; INPUT_SIZE],
+    head: usize,
+    tail: usize,
 }
 \end{lstlisting}
 
-O estado \'e protegido por \code{static CONSOLE: SpinLock<Console>}. N\~ao
-h\'a buffer de \emph{scrollback}, nem mem\'oria separada da tela: cada
-altera\c{c}\~ao \'e escrita diretamente no \emph{framebuffer} com
-\code{write\_volatile}.
+O estado \'e protegido por \code{static TTYS: SpinLock<[Tty; 8]>}. Somente o
+console ativo \'e copiado para o framebuffer real com \code{vga::render}.
+N\~ao h\'a \emph{scrollback} al\'em das 80$\times$25 c\'elulas vis\'iveis.
 
 \section{Opera\c{c}\~oes}
 
@@ -52,26 +61,31 @@ altera\c{c}\~ao \'e escrita diretamente no \emph{framebuffer} com
 \code{vga::init()}:
 
 \begin{enumerate}
-  \item adquire o lock do console;
-  \item preenche as 2.000 c\'elulas com espa\c{c}o e atributo \code{0x07};
-  \item zera coluna e linha;
+  \item preenche as 2.000 c\'elulas de hardware com espa\c{c}o e atributo
+        \code{0x07};
   \item configura o cursor como uma linha inferior, escrevendo
         \code{0x0E} no registrador \code{0x0A} (cursor start) e
         \code{0x0F} no registrador \code{0x0B} (cursor end);
-  \item atualiza a posi\c{c}\~ao do cursor.
+  \item posiciona o cursor em (0,0).
 \end{enumerate}
 
+Os buffers TTY s\~ao limpos separadamente por \code{tty::init()}, que depois
+chama \code{vga::render} para o \code{tty0}.
+
 \subsection{Escrita de bytes}
+
+A interpreta\c{c}\~ao de caracteres de controle e imprim\'iveis acontece em
+\code{tty.rs}, no buffer do pr\'oprio console:
 
 \begin{lstlisting}[caption={Tratamento de caracteres de controle e imprim\'iveis.},label={lst:writebyte}]
 fn write_byte(&mut self, byte: u8) {
     match byte {
         b'\n' => self.newline(),
-        b'\r' => { self.column = 0; self.update_cursor(); }
+        b'\r' => self.column = 0,
         b'\t' => {
             let next = (self.column + 8) & !7;
-            if next >= BUFFER_WIDTH { self.newline(); }
-            else { self.column = next; self.update_cursor(); }
+            if next >= vga::BUFFER_WIDTH { self.newline(); }
+            else { self.column = next; }
         }
         0x08 => self.backspace(),
         0x20..=0x7E => self.write_char(byte as char),
@@ -91,28 +105,29 @@ individuais e n\~ao s\~ao decodificados.
 \begin{itemize}
   \item se a coluna estiver em 80, chama \code{newline()};
   \item calcula o \'indice \code{row * 80 + column};
-  \item grava \code{(ch as u16) | (color << 8)} com \code{write\_volatile};
+  \item grava \code{(ch as u16) | (color << 8)} no buffer do console;
   \item incrementa a coluna;
-  \item se a coluna chegou a 80, chama \code{newline()}; caso contr\'ario,
-        atualiza o cursor.
+  \item se a coluna chegou a 80, chama \code{newline()}.
 \end{itemize}
+
+O console ativo \'e copiado para o framebuffer por \code{vga::render} depois
+da escrita, que tamb\'em atualiza o cursor de hardware.
 
 \code{newline()} zera a coluna e incrementa a linha. Se a linha atual for a
 \'ultima (24), chama \code{scroll()}.
 
 \subsection{Rolagem}
 
-\code{scroll()} move cada c\'elula da linha $n$ para a linha $n-1$ e limpa a
-\'ultima linha. O algoritmo \'e $O(80 \times 24)$ por linha adicional e n\~ao
-usa mem\'oria tempor\'aria:
+\code{scroll()} move cada c\'elula da linha $n$ para a linha $n-1$ dentro do
+buffer do console e limpa a \'ultima linha. O algoritmo \'e
+$O(80 \times 24)$ por linha adicional e n\~ao usa mem\'oria tempor\'aria:
 
 \begin{lstlisting}[caption={N\'ucleo da rolagem.},label={lst:scroll}]
-for row in 1..BUFFER_HEIGHT {
-    for column in 0..BUFFER_WIDTH {
-        let src = row * BUFFER_WIDTH + column;
-        let dst = (row - 1) * BUFFER_WIDTH + column;
-        let cell = read_volatile(VGA_BUFFER.add(src));
-        write_volatile(VGA_BUFFER.add(dst), cell);
+for row in 1..vga::BUFFER_HEIGHT {
+    for column in 0..vga::BUFFER_WIDTH {
+        let src = row * vga::BUFFER_WIDTH + column;
+        let dst = (row - 1) * vga::BUFFER_WIDTH + column;
+        self.cells[dst] = self.cells[src];
     }
 }
 /* limpa a ultima linha */
@@ -154,10 +169,10 @@ O registrador \code{0x0E} recebe o byte alto e \code{0x0F} o byte baixo.
 ]
 \node[box] (macro) {\code{println!}};
 \node[box, right=of macro] (args) {\code{format\_args!}};
-\node[box, right=of args] (print) {\code{vga::\_print}};
-\node[box, right=of print] (writer) {\code{ConsoleWriter}};
-\node[box, below=0.8cm of writer] (serial) {\code{serial::write\_str}};
-\node[box, left=of serial] (vga) {\code{Console::write\_string}};
+\node[box, right=of args] (print) {\code{tty::\_print}};
+\node[box, right=of print] (writer) {\code{TtyWriter}};
+\node[box, below=0.8cm of writer] (serial) {\code{serial::write\_bytes}};
+\node[box, left=of serial] (vga) {\code{vga::render}};
 \node[box, left=of vga] (fb) {VGA \code{0xB8000}};
 \draw[arrow] (macro) -- (args);
 \draw[arrow] (args) -- (print);
@@ -166,13 +181,15 @@ O registrador \code{0x0E} recebe o byte alto e \code{0x0F} o byte baixo.
 \draw[arrow] (writer) -- (serial);
 \draw[arrow] (vga) -- (fb);
 \end{tikzpicture}
-\caption{Fluxo de uma chamada de impress\~ao: VGA e serial recebem o mesmo texto.}
+\caption{Fluxo de uma chamada de impress\~ao: o buffer do TTY ativo \'e
+renderizado e o mesmo texto \'e espelhado na serial.}
 \label{fig:printpipeline}
 \end{figure}
 
-\code{ConsoleWriter} implementa \code{fmt::Write}. Ele adquire o lock,
-escreve no VGA, libera o lock e s\'o ent\~ao escreve na serial. Isso evita
-manter o lock durante a espera pela UART.
+\code{TtyWriter} implementa \code{fmt::Write}. Ele anexa o texto ao buffer do
+console ativo, redesenha a tela quando esse console est\'a ativo e depois
+espelha os bytes na serial. O lock do TTY \'e liberado antes da espera pela
+UART.
 
 \section{API p\'ublica}
 
@@ -186,20 +203,19 @@ manter o lock durante a espera pela UART.
 \midrule
 \code{BUFFER\_WIDTH = 80} & Colunas da tela. \\
 \code{BUFFER\_HEIGHT = 25} & Linhas da tela. \\
-\code{init()} & Limpa a tela, configura forma e posi\c{c}\~ao do cursor. \\
-\code{clear()} & Limpa a tela (comando \code{clear}). \\
-\code{\_print(args)} & Ponto de entrada das macros; escreve VGA e serial. \\
-\code{Console::clear()} & Preenche o buffer e reposiciona o cursor. \\
-\code{Console::write\_byte()} & Interpreta controles e caracteres. \\
-\code{Console::write\_char()} & Grava uma c\'elula e avan\c{c}a a coluna. \\
-\code{Console::write\_string()} & Itera sobre os bytes de uma \code{\&str}. \\
-\code{Console::newline()} & Avan\c{c}a linha, com rolagem se necess\'ario. \\
-\code{Console::backspace()} & Retrocede e apaga uma c\'elula. \\
-\code{Console::scroll()} & Move o conte\'udo uma linha para cima. \\
-\code{Console::update\_cursor()} & Escreve a posi\c{c}\~ao na CRTC. \\
+\code{CELLS = 2000} & N\'umero de c\'elulas de texto. \\
+\code{blank\_cell()} & Devolve um espa\c{c}o com o atributo padr\~ao. \\
+\code{init()} & Limpa o hardware e configura a forma do cursor. \\
+\code{clear\_hardware()} & Preenche o framebuffer com c\'elulas vazias. \\
+\code{render(cells,row,column)} & Copia um buffer de console e posiciona o cursor. \\
+\code{set\_cursor(row,column)} & Escreve a posi\c{c}\~ao na CRTC. \\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+As opera\c{c}\~oes de mais alto n\'ivel --- \code{\_print}, \code{write\_to},
+\code{read\_byte}, \code{pump\_input} e \code{switch} --- pertencem a
+\code{tty.rs} e est\~ao listadas no Cap\'itulo~\ref{cap:tty}.
 
 \section{Exemplo de uso}
 
@@ -216,13 +232,13 @@ uma linha completa. O terceiro envia o caractere de backspace para apagar o
 \section{Limita\c{c}\~oes e observa\c{c}\~oes}
 
 \begin{itemize}
-  \item \textbf{Somente VGA texto}: n\~ao h\'a framebuffer gr\'afico, VBE,
-        GOP ou console virtual (VT). Em UEFI sem CSM, \code{0xB8000} pode
-        n\~ao existir.
+  \item \textbf{Somente VGA texto}: n\~ao h\'a framebuffer gr\'afico, VBE
+        nem GOP. Em UEFI sem CSM, \code{0xB8000} pode n\~ao existir. Existem
+        consoles virtuais, mas todos usam o mesmo modo texto.
   \item \textbf{ASCII apenas}: n\~ao h\'a decodifica\c{c}\~ao UTF-8 nem
         fonte bitmap pr\'opria; a fonte vem da VGA.
-  \item \textbf{Sem atributos din\^amicos}: \code{color} existe no estado,
-        mas n\~ao h\'a API p\'ublica para alter\'a-lo.
+  \item \textbf{Sem atributos din\^amicos}: a cor padr\~ao \'e fixa e n\~ao
+        h\'a API p\'ublica para alter\'a-la.
   \item \textbf{Sem sincroniza\c{c}\~ao com o retra\c{c}o vertical}: escritas
         podem causar \emph{tearing} ocasional, irrelevante para texto.
   \item \textbf{Sem prote\c{c}\~ao de mem\'oria}: \code{0xB8000} \'e acessado

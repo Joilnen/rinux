@@ -1,0 +1,78 @@
+\babel@toc {brazilian}{}\relax 
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {1.1}{\ignorespaces Resumo do estado da vers\~ao documentada.}}{10}{table.caption.4}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Funcionalidades implementadas e seu estado.}}{12}{table.caption.5}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces M\'etricas dos m\'odulos Rust (contagem por linhas f\'isicas).}}{13}{table.caption.6}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Caracter\'isticas do modelo de execu\c {c}\~ao.}}{16}{table.caption.8}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Depend\^encias principais entre m\'odulos.}}{16}{table.caption.9}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Decis\~oes arquiteturais e justificativas.}}{17}{table.caption.11}%
+\contentsline {table}{\numberline {3.4}{\ignorespaces Ordem de inicializa\c {c}\~ao em \texttt {kernel\_main}.}}{18}{table.caption.12}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Campos do cabe\c {c}alho Multiboot2 implementado.}}{19}{table.caption.13}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Descritores da GDT de 64 bits.}}{21}{table.caption.15}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Configura\c {c}\~ao dos registradores de controle.}}{22}{table.caption.16}%
+\contentsline {table}{\numberline {4.4}{\ignorespaces Se\c {c}\~oes do ELF de refer\^encia (endere\c {c}os virtuais).}}{23}{table.caption.17}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Contrato de \texttt {kernel\_main}.}}{25}{table.caption.18}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces API de \texttt {arch}.}}{26}{table.caption.19}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {6.1}{\ignorespaces Formato de uma c\'elula de texto VGA.}}{29}{table.caption.20}%
+\contentsline {table}{\numberline {6.2}{\ignorespaces Fun\c {c}\~oes e constantes de \texttt {vga.rs}.}}{32}{table.caption.22}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {7.1}{\ignorespaces Portas do controlador 8042.}}{33}{table.caption.23}%
+\contentsline {table}{\numberline {7.2}{\ignorespaces Bits de status do 8042.}}{33}{table.caption.24}%
+\contentsline {table}{\numberline {7.3}{\ignorespaces Sequ\^encia de inicializa\c {c}\~ao do 8042.}}{34}{table.caption.25}%
+\contentsline {table}{\numberline {7.4}{\ignorespaces Exemplos de scancodes do conjunto 1.}}{34}{table.caption.26}%
+\contentsline {table}{\numberline {7.5}{\ignorespaces Fun\c {c}\~oes de \texttt {keyboard.rs}.}}{36}{table.caption.28}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {8.1}{\ignorespaces Registradores da UART 16550 (COM1).}}{38}{table.caption.29}%
+\contentsline {table}{\numberline {8.2}{\ignorespaces Bits do Line Status Register (LSR).}}{38}{table.caption.30}%
+\contentsline {table}{\numberline {8.3}{\ignorespaces Sequ\^encia de inicializa\c {c}\~ao da COM1.}}{39}{table.caption.31}%
+\contentsline {table}{\numberline {8.4}{\ignorespaces API de \texttt {serial.rs}.}}{40}{table.caption.32}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {9.1}{\ignorespaces Comandos implementados.}}{44}{table.caption.33}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {10.1}{\ignorespaces Descritores da GDT definitiva.}}{46}{table.caption.34}%
+\contentsline {table}{\numberline {10.2}{\ignorespaces Regi\~oes de demand paging.}}{48}{table.caption.35}%
+\contentsline {table}{\numberline {10.3}{\ignorespaces Comandos que exercitam a nova infraestrutura.}}{49}{table.caption.36}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {11.1}{\ignorespaces Sequ\^encias CSI suportadas.}}{53}{table.caption.37}%
+\contentsline {table}{\numberline {11.2}{\ignorespaces Chamadas de sistema implementadas.}}{53}{table.caption.38}%
+\contentsline {table}{\numberline {11.3}{\ignorespaces Correspond\^encia com o subsistema TTY do Linux.}}{55}{table.caption.39}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {12.1}{\ignorespaces Flags de compila\c {c}\~ao e liga\c {c}\~ao.}}{57}{table.caption.40}%
+\contentsline {table}{\numberline {12.2}{\ignorespaces Alvos do Makefile.}}{58}{table.caption.41}%
+\contentsline {table}{\numberline {12.3}{\ignorespaces Artefatos gerados na compila\c {c}\~ao de refer\^encia.}}{59}{table.caption.42}%
+\contentsline {table}{\numberline {12.4}{\ignorespaces Problemas comuns e solu\c {c}\~oes.}}{61}{table.caption.43}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {13.1}{\ignorespaces Matriz de testes executados.}}{62}{table.caption.44}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {14.1}{\ignorespaces Arquivos Linux an\'alogos e m\'odulos Rust correspondentes.}}{67}{table.14.1}%
+\contentsline {table}{\numberline {14.2}{\ignorespaces Pontua\c {c}\~ao de similaridade funcional e arquitetural.}}{68}{table.caption.45}%
+\contentsline {table}{\numberline {14.3}{\ignorespaces Compara\c {c}\~ao de mecanismos de hardware e arquitetura.}}{70}{table.caption.46}%
+\contentsline {table}{\numberline {14.4}{\ignorespaces Resumo das diferentes medidas de similaridade.}}{71}{table.caption.47}%
+\contentsline {table}{\numberline {14.5}{\ignorespaces Diferen\c {c}as essenciais entre o projeto e o Linux.}}{72}{table.caption.48}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {15.1}{\ignorespaces Limita\c {c}\~oes por \'area e consequ\^encias.}}{73}{table.caption.49}%
+\contentsline {table}{\numberline {15.2}{\ignorespaces Riscos e mitiga\c {c}\~oes atuais.}}{74}{table.caption.50}%
+\contentsline {table}{\numberline {15.3}{\ignorespaces Roadmap priorizado.}}{74}{table.caption.51}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {A.1}{\ignorespaces Fun\c {c}\~oes de \texttt {main.rs}.}}{76}{table.A.1}%
+\contentsline {table}{\numberline {A.2}{\ignorespaces Fun\c {c}\~oes de \texttt {arch.rs}.}}{76}{table.A.2}%
+\contentsline {table}{\numberline {A.3}{\ignorespaces Fun\c {c}\~oes de \texttt {sync.rs}.}}{76}{table.A.3}%
+\contentsline {table}{\numberline {A.4}{\ignorespaces Fun\c {c}\~oes de \texttt {vga.rs}.}}{77}{table.A.4}%
+\contentsline {table}{\numberline {A.5}{\ignorespaces Fun\c {c}\~oes de \texttt {tty.rs}.}}{77}{table.A.5}%
+\contentsline {table}{\numberline {A.6}{\ignorespaces Fun\c {c}\~oes de \texttt {keyboard.rs}.}}{78}{table.A.6}%
+\contentsline {table}{\numberline {A.7}{\ignorespaces Fun\c {c}\~oes de \texttt {serial.rs}.}}{79}{table.A.7}%
+\contentsline {table}{\numberline {A.8}{\ignorespaces Fun\c {c}\~oes de \texttt {shell.rs}.}}{79}{table.A.8}%
+\contentsline {table}{\numberline {A.9}{\ignorespaces Fun\c {c}\~oes de \texttt {gdt.rs}.}}{80}{table.A.9}%
+\contentsline {table}{\numberline {A.10}{\ignorespaces Fun\c {c}\~oes de \texttt {idt.rs}.}}{80}{table.A.10}%
+\contentsline {table}{\numberline {A.11}{\ignorespaces Fun\c {c}\~oes de \texttt {paging.rs}.}}{81}{table.A.11}%
+\contentsline {table}{\numberline {A.12}{\ignorespaces Fun\c {c}\~oes de \texttt {user.rs}.}}{82}{table.A.12}%
+\contentsline {table}{\numberline {A.13}{\ignorespaces Fun\c {c}\~oes de \texttt {syscall.rs}.}}{82}{table.A.13}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {B.1}{\ignorespaces Portas de I/O usadas pelo kernel.}}{83}{table.caption.52}%
+\contentsline {table}{\numberline {B.2}{\ignorespaces Regi\~oes de mem\'oria relevantes.}}{83}{table.caption.53}%
+\addvspace {10\p@ }

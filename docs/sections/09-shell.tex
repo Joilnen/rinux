@@ -20,12 +20,21 @@ redirections, variables, quotes, or scripts. It is a loop that:
 \begin{lstlisting}[caption={Structure of the shell loop.},label={lst:shellloop}]
 pub fn run() -> ! {
     loop {
-        crate::print!("rinux> ");
         let mut line = [0u8; LINE_MAX];
         let mut len = 0usize;
+        let mut console = tty::active();
+        crate::print!("rinux> ");
 
         loop {
-            let byte = match keyboard::read_char().or_else(serial::read_byte) {
+            tty::pump_input();
+            if tty::active() != console {
+                console = tty::active();
+                len = 0;
+                crate::print!("rinux> ");
+                continue;
+            }
+
+            let byte = match tty::read_byte() {
                 Some(byte) => byte,
                 None => { core::hint::spin_loop(); continue; }
             };
@@ -72,20 +81,21 @@ beep, error message, or dynamic growth.
 
 \subsection{Input and echo}
 
-Input comes from two sources, in this order:
+Input is pumped by \code{tty::pump\_input}, which drains the PS/2 keyboard and
+the COM1 serial port into the input queue of the active virtual console. It
+also interprets \code{Alt+F1}..\code{Alt+F8} as console switches. The shell
+then consumes bytes from the active console with \code{tty::read\_byte}.
 
-\begin{enumerate}
-  \item \code{keyboard::read\_char()}: PS/2 keyboard in the VGA window;
-  \item \code{serial::read\_byte()}: serial terminal, when available.
-\end{enumerate}
-
-If both return \code{None}, the shell executes \code{spin\_loop()} and tries
-again. There is no \emph{sleep}, since no timer exists.
+If no byte is available, the shell executes \code{spin\_loop()} and tries
+again. There is no \emph{sleep}, since the wait is implemented by polling.
 
 Printable characters (0x20 to 0x7E) are stored in the buffer and echoed to
 the console. Backspace (\code{0x08} or \code{0x7F}) decrements the length and
-prints \code{\textbackslash x08}, which the VGA console interprets as erasing
+prints \code{\textbackslash x08}, which the TTY layer interprets as erasing
 the previous cell. Tab (\code{\textbackslash t}) is ignored.
+
+When the active console changes during line editing, the partial line is
+discarded and the shell prints a new prompt on the selected console.
 
 \section{Parsing}
 
@@ -129,9 +139,17 @@ dispatch table, argument \emph{parsing}, or syntax analysis.
 \textbf{Command} & \textbf{Effect} \\
 \midrule
 \code{help} & Lists the available commands. \\
-\code{clear} & Clears the VGA screen and repositions the cursor. \\
+\code{clear} & Clears the active virtual console with \code{ESC[2J ESC[H}. \\
 \code{echo <texto>} & Prints the text after the first space. \\
-\code{info} & Shows kernel and input model information. \\
+\code{info} & Shows kernel, TTY and input model information. \\
+\code{tty} & Shows the active virtual console. \\
+\code{tty [0..7]} & Switches to the selected virtual console. \\
+\code{getty} & Runs the ring 3 login on the active console. \\
+\code{getty [0..7]} & Switches console and runs the login there. \\
+\code{demand} & Exercises kernel demand paging. \\
+\code{usertest} & Runs the ring 3 demand paging demo. \\
+\code{userprot} & Attempts a kernel access from ring 3. \\
+\code{mem} & Shows frame, fault and U/S statistics. \\
 \code{reboot} & Restarts the PC via command \code{0xFE} to the 8042. \\
 \code{halt} & Prints a message and stops the CPU with \code{cli; hlt}. \\
 \bottomrule
@@ -157,11 +175,16 @@ The \code{info} command prints:
 Kernel: Rust, no_std, x86_64
 Boot:   Multiboot2 (BIOS) -> modo longo
 Video:  VGA texto 80x25, buffer 0xB8000
-Entrada: teclado PS/2 e serial COM1 (polling, sem IRQ)
-Heap:   nenhum (apenas core, sem alocacao)
+TTY:    8 consoles virtuais, ativo = tty0 (Alt+F1..Alt+F8)
+Entrada: teclado PS/2 e serial COM1 (polling)
+IDT:    256 portas; excecoes + IRQ0 (timer ~100 Hz)
+Memoria: paginas de 4 KiB, demand paging e frames fisicos
+Usuario: ring 3 com GDT/TSS, protecao U/S e int 0x80
+Ticks do timer: 366
 \end{lstlisting}
 
-This information is static; there is no reading of CPU, memory, or time.
+Most lines are static; the active console number and the timer tick count are
+read at the moment the command runs.
 
 \section{Special commands}
 

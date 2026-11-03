@@ -16,8 +16,8 @@ do teclado continua mascarada; n\~ao h\'a APIC, SMP nem preemp\c{c}\~ao. \\
 Mem\'oria & Alocador de frames e p\'aginas de 4 KiB sob demanda. Sem heap;
 n\~ao h\'a \code{Vec}, \code{String} nem buffers din\^amicos. \\
 Processos & Sem scheduler, context switch ou espa\c{c}os de endere\c{c}o
-separados. O demo em ring 3 n\~ao \'e um processo; a \'unica syscall \'e
-\code{exit}. \\
+separados. Os programas em ring 3 n\~ao s\~ao processos; h\'a apenas quatro
+syscalls (\code{exit/write/read/get\_tty}). \\
 Armazenamento & Sem VFS, block layer, FAT, ext2 ou qualquer sistema de
 arquivos. A ISO \'e s\'o o meio de boot. \\
 Rede & Sem pilha TCP/IP, netdevice ou drivers de rede. \\
@@ -29,8 +29,9 @@ Serial & Apenas COM1, polling, sem IRQ, DMA ou controle de fluxo. \\
 Concorr\^encia & Uma CPU; o timer incrementa \emph{ticks} mas n\~ao
 preempta. O spinlock n\~ao desabilita interrup\c{c}\~oes. \\
 Seguran\c{c}a & U/S separa usu\'ario e kernel, mas n\~ao h\'a ASLR, NX,
-SMEP/SMAP, \emph{stack canary}, valida\c{c}\~ao de ponteiros de usu\'ario nem
-espa\c{c}os de endere\c{c}o por processo. \\
+SMEP/SMAP, \emph{stack canary} nem espa\c{c}os de endere\c{c}o por processo.
+Ponteiros do usu\'ario s\~ao validados por intervalo, mas n\~ao h\'a um
+auxiliar no estilo \code{copy\_from\_user}. \\
 Robustez & IDT evita \emph{triple fault} na maioria dos casos; n\~ao h\'a
 recupera\c{c}\~ao de falhas, watchdog ou logs persistentes. \\
 Portabilidade & C\'odigo espec\'ifico para x86\_64 BIOS; n\~ao compila para
@@ -81,14 +82,14 @@ adicionar complexidade.
 \textbf{Prior.} & \textbf{Item} & \textbf{Objetivo} \\
 \midrule
 1 & Processos e syscalls & \code{task\_struct}, scheduler round-robin,
-espa\c{c}os de endere\c{c}o separados e mais chamadas de sistema. \\
+espa\c{c}os de endere\c{c}o separados e uma tabela de syscalls maior. \\
 2 & Robustez de IRQ e teclado & IRQ1 com buffer de scancodes, \code{irqsave}
 no console e trata\-mento de IRQs esp\'urias. \\
 3 & Heap simples & \code{alloc} + alocador de blocos; habilitar
 \code{Vec}/\code{String}. \\
 4 & Framebuffer GOP/VBE & Suporte a UEFI e modos gr\'aficos; fonte bitmap. \\
-5 & Console virtual e log & M\'ultiplos terminais, \emph{scrollback},
-n\'iveis de log. \\
+5 & Disciplina de linha TTY & Modo can\^onico, sinais, controle de jobs,
+\code{Ctrl+C}/\code{Ctrl+D} e um \code{getty} por console. \\
 6 & Driver de teclado completo & USB-HID, Caps Lock, AltGr, layout ABNT2,
 teclas estendidas. \\
 7 & Endurecimento de mem\'oria & NX, SMEP/SMAP, valida\c{c}\~ao de ponteiros

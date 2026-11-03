@@ -1,16 +1,17 @@
-\babel@toc {brazilian}{}\relax 
+\babel@toc {english}{}\relax 
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {3.1}{\ignorespaces Camadas do Rust VGA Kernel.}}{14}{figure.caption.7}%
-\contentsline {figure}{\numberline {3.2}{\ignorespaces Cadeia de boot completa.}}{16}{figure.caption.10}%
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Layers of the Rust VGA Kernel.}}{15}{figure.caption.7}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Complete boot chain.}}{17}{figure.caption.10}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {4.1}{\ignorespaces Estrutura de pagina\c {c}\~ao: uma \'unica PDPT e uma \'unica PD servem tanto \`a identidade baixa quanto \`a metade alta.}}{19}{figure.caption.14}%
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Paging structure: a single PDPT and a single PD serve both the low identity and the higher half.}}{20}{figure.caption.14}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {6.1}{\ignorespaces Fluxo de uma chamada de impress\~ao: VGA e serial recebem o mesmo texto.}}{30}{figure.caption.21}%
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Flow of a print call: the active TTY buffer is rendered and the same text is mirrored to the serial port.}}{30}{figure.caption.21}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {7.1}{\ignorespaces Fluxo de \texttt {read\_char()}. Caminhos de descarte levam a \texttt {None}.}}{34}{figure.caption.27}%
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Flow of \texttt {read\_key()}. Discard paths lead to \texttt {None}.}}{35}{figure.caption.27}%
+\addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }

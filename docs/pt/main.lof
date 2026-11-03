@@ -1,0 +1,24 @@
+\babel@toc {brazilian}{}\relax 
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Camadas do Rust VGA Kernel.}}{15}{figure.caption.7}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Cadeia de boot completa.}}{17}{figure.caption.10}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Estrutura de pagina\c {c}\~ao: uma \'unica PDPT e uma \'unica PD servem tanto \`a identidade baixa quanto \`a metade alta.}}{20}{figure.caption.14}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Fluxo de uma chamada de impress\~ao: o buffer do TTY ativo \'e renderizado e o mesmo texto \'e espelhado na serial.}}{31}{figure.caption.21}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Fluxo de \texttt {read\_key()}. Caminhos de descarte levam a \texttt {None}.}}{36}{figure.caption.27}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }

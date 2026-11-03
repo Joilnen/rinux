@@ -3,7 +3,7 @@
 \chapter{Function Catalog}
 \label{ap:funcoes}
 
-This section lists the 96 functions of the Rust code, grouped by
+This section lists the 129 functions of the Rust code, grouped by
 module. The \emph{stub} \code{\_start} is not a Rust function and
 appears separately in Chapter~\ref{cap:boot}. \code{extern} declarations
 without a body, such as \code{gdt\_reload\_cs}, \code{user\_enter} and
@@ -78,7 +78,7 @@ Releases the lock with \code{Release} ordering. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{vga.rs} (15 functions)}
+\section{\code{vga.rs} (5 functions)}
 
 \begin{longtable}{@{}p{6.1cm}p{8.4cm}@{}}
 \caption{Functions of \code{vga.rs}.}\\
@@ -92,39 +92,96 @@ Releases the lock with \code{Release} ordering. \\
 \endhead
 \code{blank\_cell() -> u16} &
 Space cell with the default attribute; \code{const fn}. \\
-\code{Console::new() -> Console} &
-Initializes column, row and color in a \code{const} context. \\
-\code{Console::clear(\&mut self)} &
-Fills the 2,000 cells and repositions the cursor. \\
-\code{Console::write\_byte(\&mut self, byte: u8)} &
-Interprets \code{\textbackslash n}, \code{\textbackslash r},
-\code{\textbackslash t}, backspace and printable ASCII. \\
-\code{Console::write\_char(\&mut self, ch: char)} &
+\code{init()} &
+Clears the hardware and configures the cursor shape. \\
+\code{clear\_hardware()} &
+Fills the 2,000 framebuffer cells with blank cells. \\
+\code{render(cells, row, column)} &
+Copies a console buffer to \code{0xB8000} and positions the cursor. \\
+\code{set\_cursor(row, column)} &
+Writes the position to the CRTC registers. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{tty.rs} (31 functions)}
+
+\begin{longtable}{@{}p{6.0cm}p{8.5cm}@{}}
+\caption{Functions of \code{tty.rs}.}\\
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\code{Tty::new() -> Tty} &
+Initializes an empty console; \code{const fn}. \\
+\code{Tty::clear(\&mut self)} &
+Fills the console cells with blanks and resets the cursor. \\
+\code{Tty::push\_input(\&mut self, byte: u8)} &
+Appends a byte to the console input queue. \\
+\code{Tty::pop\_input(\&mut self) -> Option<u8>} &
+Removes one byte from the queue. \\
+\code{Tty::write\_bytes(\&mut self, bytes: \&[u8])} &
+Writes a slice to the console buffer. \\
+\code{Tty::write\_byte(\&mut self, byte: u8)} &
+Dispatches plain text and ANSI escape sequences. \\
+\code{Tty::write\_plain(\&mut self, byte: u8)} &
+Interprets controls, backspace and printable ASCII. \\
+\code{Tty::write\_csi(\&mut self, byte: u8)} &
+Accumulates CSI parameters and calls the final dispatcher. \\
+\code{Tty::push\_csi\_param(\&mut self)} &
+Stores one decimal parameter of a CSI sequence. \\
+\code{Tty::csi\_param(\&self, index, default) -> u16} &
+Returns a parameter or its default value. \\
+\code{Tty::csi\_count\_param(\&self, index) -> usize} &
+Returns a count parameter, treating zero as one. \\
+\code{Tty::execute\_csi(\&mut self, final\_byte: u8)} &
+Executes CUP, cursor movement and erase commands. \\
+\code{Tty::erase\_display(\&mut self, mode: u16)} &
+Implements ED (\code{ESC[J}, \code{ESC[2J}). \\
+\code{Tty::erase\_line(\&mut self, mode: u16)} &
+Implements EL (\code{ESC[K}). \\
+\code{Tty::blank\_row(\&mut self, row: usize)} &
+Fills one row with blank cells. \\
+\code{Tty::write\_char(\&mut self, ch: char)} &
 Writes one cell and advances the column. \\
-\code{Console::write\_string(\&mut self, text: \&str)} &
-Iterates over the bytes of a string. \\
-\code{Console::newline(\&mut self)} &
+\code{Tty::newline(\&mut self)} &
 Advances the line, scrolling at the last one. \\
-\code{Console::backspace(\&mut self)} &
+\code{Tty::backspace(\&mut self)} &
 Moves back one position and erases the cell. \\
-\code{Console::scroll(\&mut self)} &
+\code{Tty::scroll(\&mut self)} &
 Moves the content up by one line. \\
-\code{Console::update\_cursor(\&self)} &
-Writes the position to the CRTC. \\
-\code{<Console as fmt::Write>::write\_str(\&mut self, text: \&str) -> fmt::Result} &
-\code{fmt::Write} implementation for the console. \\
-\code{vga::init()} &
-Clears the screen and sets up the hardware cursor. \\
-\code{vga::clear()} &
-Clears the screen from the \code{clear} command. \\
-\code{<ConsoleWriter as fmt::Write>::write\_str(\&mut self, text: \&str) -> fmt::Result} &
-Writes to VGA (with lock) and then to serial. \\
-\code{vga::\_print(args: fmt::Arguments<'\_>)} &
+\code{init()} &
+Clears the eight consoles and renders \code{tty0}. \\
+\code{active() -> usize} &
+Returns the index of the active console. \\
+\code{switch(index: usize) -> bool} &
+Changes the active console and redraws it. \\
+\code{clear()} &
+Writes \code{ESC[2J ESC[H} to the active console. \\
+\code{write\_bytes(bytes: \&[u8])} &
+Writes to the active console and renders it. \\
+\code{write\_to(index: usize, bytes: \&[u8])} &
+Writes to a specific console without changing the active one. \\
+\code{read\_byte() -> Option<u8>} &
+Pops a byte from the active console queue. \\
+\code{read\_byte\_from(index: usize) -> Option<u8>} &
+Pops a byte from a specific console queue. \\
+\code{pump\_input()} &
+Drains the keyboard and serial into the active console; handles
+\code{Alt+F1}..\code{Alt+F8}. \\
+\code{push\_input(byte: u8)} &
+Internal helper that queues a byte per console. \\
+\code{<TtyWriter as fmt::Write>::write\_str} &
+Appends formatted text to the active console and mirrors it to serial. \\
+\code{\_print(args: fmt::Arguments<'\_>)} &
 Entry point of the \code{print!}/\code{println!} macros. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{keyboard.rs} (9 functions)}
+\section{\code{keyboard.rs} (10 functions)}
 
 \begin{longtable}{@{}p{5.3cm}p{9.2cm}@{}}
 \caption{Functions of \code{keyboard.rs}.}\\
@@ -152,12 +209,14 @@ Sends a command to the 8042. \code{unsafe}. \\
 Sends data to the keyboard. \code{unsafe}. \\
 \code{init()} &
 Configures translation, IRQ, clock and scanning. \\
+\code{read\_key() -> Option<Key>} &
+Reads and translates a scancode; returns a character or console request. \\
 \code{read\_char() -> Option<u8>} &
-Reads and translates a scancode; returns \code{None} if there is no key. \\
+Compatibility wrapper that returns only \code{Key::Char}. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{serial.rs} (4 functions)}
+\section{\code{serial.rs} (5 functions)}
 
 \begin{longtable}{@{}p{4.8cm}p{9.7cm}@{}}
 \caption{Functions of \code{serial.rs}.}\\
@@ -175,12 +234,14 @@ Configures COM1 at 38400 8N1 and detects presence. \\
 Non-blocking read of one byte. \\
 \code{write\_byte(byte: u8)} &
 Sends one byte, waiting for the THR. Internal. \\
+\code{write\_bytes(bytes: \&[u8])} &
+Sends bytes with \code{\textbackslash n} to CRLF conversion. \\
 \code{write\_str(text: \&str)} &
-Sends a string with \code{\textbackslash n} to CRLF conversion. \\
+Wrapper around \code{write\_bytes} for strings. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{shell.rs} (7 functions)}
+\section{\code{shell.rs} (9 functions)}
 
 \begin{longtable}{@{}p{4.8cm}p{9.7cm}@{}}
 \caption{Functions of \code{shell.rs}.}\\
@@ -200,6 +261,10 @@ Removes ASCII spaces from both ends. \\
 Converts bytes into \code{\&str} or an error text. \\
 \code{execute(line: \&[u8])} &
 Compares and executes the command. \\
+\code{parse\_console(arg: \&[u8]) -> Option<usize>} &
+Parses a single-digit console index for \code{tty} and \code{getty}. \\
+\code{getty\_demo(console: Option<usize>)} &
+Runs the ring 3 login on the selected or active console. \\
 \code{demand\_demo()} &
 Writes to the kernel demand paging region and prints the value. \\
 \code{user\_demo(protection: bool)} &
@@ -209,7 +274,7 @@ Shows frames, page faults, ticks and the U/S flags of the pages. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{gdt.rs} (6 functions)}
+\section{\code{gdt.rs} (7 functions)}
 
 \begin{longtable}{@{}p{6.0cm}p{8.5cm}@{}}
 \caption{Functions of \code{gdt.rs}.}\\
@@ -223,6 +288,8 @@ Shows frames, page faults, ticks and the U/S flags of the pages. \\
 \endhead
 \code{stack\_top<const N: usize>(stack: *mut Stack<N>) -> u64} &
 Computes the top of a static stack. \\
+\code{gdt\_reload\_cs()} &
+Reloads \code{CS} after loading the new GDT. \\
 \code{user\_kernel\_stack\_top() -> u64} &
 Top of the 16 KiB stack used for interrupts coming from ring 3. \\
 \code{double\_fault\_stack\_top() -> u64} &
@@ -235,7 +302,6 @@ Builds the two 8-byte entries of the TSS descriptor. \\
 Loads the definitive GDT, the TSS and the privilege stacks. \\
 \bottomrule
 \end{longtable}
-
 \section{\code{idt.rs} (14 functions)}
 
 \begin{longtable}{@{}p{6.2cm}p{8.3cm}@{}}
@@ -275,14 +341,13 @@ Handles \code{\#GP}; terminates the user or halts the kernel. \\
 \code{user\_fault(frame: \&mut InterruptFrame) -> bool} &
 Checks whether the fault came from ring 3 with an active program. \\
 \code{syscall(frame: \&mut InterruptFrame)} &
-Implements the didactic \emph{syscall} \code{int \$0x80} (\code{rax = 0}:
-\emph{exit}). \\
+Forwards \code{int \$0x80} to \code{syscall::dispatch}. \\
 \code{fatal(frame: \&InterruptFrame) -> !} &
 Prints the fault diagnosis and halts the CPU. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{paging.rs} (22 functions)}
+\section{\code{paging.rs} (23 functions)}
 
 \begin{longtable}{@{}p{6.2cm}p{8.3cm}@{}}
 \caption{Functions of \code{paging.rs}.}\\
@@ -328,6 +393,8 @@ Maps a 4 KiB page and invalidates the TLB. \code{unsafe}. \\
 Returns the final entry that translates an address, without creating tables. \\
 \code{unmap\_page(virt: u64) -> Result<(), \&'static str>} &
 Removes a mapping and frees the physical frame. \\
+\code{ensure\_user\_range(addr, len) -> Result<(), \&'static str>} &
+Validates a user interval and materializes missing pages with U/S = 1. \\
 \code{reset\_user\_demand()} &
 Undoes the stack/data pages of the user demo. \\
 \code{paging\_page(address: u64) -> u64} &
@@ -341,7 +408,7 @@ Copies the program to \code{USER\_CODE}, creating the resident page. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{user.rs} (7 functions)}
+\section{\code{user.rs} (10 functions)}
 
 \begin{longtable}{@{}p{6.0cm}p{8.5cm}@{}}
 \caption{Functions of \code{user.rs}.}\\
@@ -365,8 +432,31 @@ Builds the machine code of the \code{Demand} and \code{Protection} demos. \\
 Indicates whether a user program is running. \\
 \code{run(demo: Demo) -> Result<i32, \&'static str>} &
 Installs the code, enters ring 3 and returns the exit status. \\
+\code{run\_getty(console: Option<usize>) -> Result<i32, \&'static str>} &
+Switches to the requested console, runs the login blob and returns its status. \\
 \code{abort(status: i32) -> !} &
 Called by exceptions/\emph{syscall}; stores the status and resumes the kernel. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{syscall.rs} (3 functions)}
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Functions of \code{syscall.rs}.}\\
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\code{dispatch(frame: \&mut InterruptFrame)} &
+Dispatches \code{exit}, \code{write}, \code{read} and \code{get\_tty}. \\
+\code{sys\_write(frame: \&mut InterruptFrame)} &
+Validates the user buffer, writes to the active console and returns the length. \\
+\code{sys\_read(frame: \&mut InterruptFrame)} &
+Validates the buffer and reads a line from the console, with optional echo. \\
 \bottomrule
 \end{longtable}
 

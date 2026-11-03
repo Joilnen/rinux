@@ -104,7 +104,7 @@ they work in any module of the crate without imports:
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {
-        $crate::vga::_print(format_args!($($arg)*))
+        $crate::tty::_print(format_args!($($arg)*))
     };
 }
 
@@ -118,8 +118,9 @@ macro_rules! println {
 \end{lstlisting}
 
 \code{format\_args!} creates a formatting description without allocating;
-the \code{fmt::Write} implementation in \code{vga.rs} consumes the
-fragments. There is no \code{format!} (which would require \code{alloc}).
+the \code{fmt::Write} implementation in \code{tty.rs} consumes the fragments,
+appends them to the active console buffer and mirrors them to the serial port.
+There is no \code{format!} (which would require \code{alloc}).
 
 \subsection{Panic handler}
 
