@@ -1,0 +1,315 @@
+\chapter{Mem\'oria virtual, demand paging e interrup\c{c}\~oes}
+\label{cap:memoria-usuario}
+
+Este cap\'itulo documenta os m\'odulos \code{gdt.rs}, \code{idt.rs},
+\code{paging.rs} e \code{user.rs}, adicionados depois do console e do shell.
+O objetivo \'e sair do modelo ``ring 0, interrup\c{c}\~oes desligadas e
+mem\'oria est\'atica'' para um kernel capaz de:
+
+\begin{itemize}
+  \item receber exce\c{c}\~oes e IRQs por uma IDT;
+  \item receber o timer do PIT em IRQ0;
+  \item alocar frames f\'isicos de 4 KiB;
+  \item materializar p\'aginas somente quando a CPU gera \code{\#PF};
+  \item executar c\'odigo em ring 3 com uma barreira real entre usu\'ario e
+        kernel.
+\end{itemize}
+
+\section{Ordem de inicializa\c{c}\~ao}
+
+A sequ\^encia em \code{kernel\_main} passou a ser:
+
+\begin{enumerate}
+  \item \code{vga::init()} e \code{serial::init()};
+  \item \code{paging::init(magic, info)} --- libera os frames dispon\'iveis
+        descritos pelo Multiboot2;
+  \item \code{gdt::init()} --- GDT definitiva, segmentos ring 3 e TSS;
+  \item \code{keyboard::init()} --- teclado PS/2 por \emph{polling};
+  \item \code{idt::init()} --- IDT, remapeamento do PIC e PIT;
+  \item \code{sti} e entrada no shell.
+\end{enumerate}
+
+A IDT s\'o \'e instalada depois que a GDT tem a TSS, pois a porta de
+\emph{double fault} usa uma pilha IST. O timer s\'o \'e desmascarado depois
+que a IDT est\'a pronta.
+
+\section{GDT, TSS e pilhas de privil\'egio}
+
+A GDT do stub de boot cont\'em apenas descritores ring 0. Para entrar em
+ring 3, \code{gdt.rs} monta uma tabela com sete entradas:
+
+\begin{table}[H]
+\centering
+\caption{Descritores da GDT definitiva.}
+\label{tab:gdt-usuario}
+\begin{tabular}{@{}rll@{}}
+\toprule
+\textbf{Selector} & \textbf{Conte\'udo} & \textbf{DPL} \\
+\midrule
+\code{0x08} & c\'odigo 64 bits & 0 \\
+\code{0x10} & dados & 0 \\
+\code{0x18} & dados & 3 \\
+\code{0x20} & c\'odigo 64 bits & 3 \\
+\code{0x28} & TSS (duas entradas) & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A TSS \'e obrigat\'oria para a troca autom\'atica de pilha. Quando a CPU
+passa de ring 3 para ring 0 por interrup\c{c}\~ao ou exce\c{c}\~ao, ela l\^e
+\code{rsp0} da TSS e continua a empilhar nessa pilha. O kernel reserva:
+
+\begin{itemize}
+  \item \code{USER\_KERNEL\_STACK}: 16 KiB para interrup\c{c}\~oes vindas do
+        usu\'ario;
+  \item \code{DOUBLE\_FAULT\_STACK}: 8 KiB como \code{IST1}, para que um
+        \code{\#DF} n\~ao tente usar uma pilha possivelmente corrompida.
+\end{itemize}
+
+O campo \code{iomap\_base} aponta para o fim da TSS, desativando o bitmap de
+I/O. Assim, instru\c{c}\~oes \code{in}/\code{out} em ring 3 geram \code{\#GP}.
+
+\section{IDT, stubs e normaliza\c{c}\~ao do erro}
+
+A IDT tem 256 portas de 16 bytes. As 32 primeiras s\~ao exce\c{c}\~oes; as
+16 seguintes s\~ao as IRQs do PIC remapeadas para \code{0x20..0x2F}; a porta
+\code{0x80} \'e uma \emph{syscall} did\'atica com DPL = 3.
+
+O problema cl\'assico \'e que a CPU empilha um c\'odigo de erro apenas em
+algumas exce\c{c}\~oes (8, 10--14, 17, 21, 29 e 30). Se cada \emph{stub}
+tratasse a pilha de forma diferente, o layout visto pelo Rust mudaria. Para
+uniformizar, \code{idt.rs} gera stubs em assembly:
+
+\begin{lstlisting}[caption={Stubs que normalizam o c\'odigo de erro.},label={lst:isrstubs}]
+.macro isr_no_err n
+.global isr_stub_\n
+isr_stub_\n:
+    pushq $0          # erro sintetico
+    pushq $\n         # numero do vetor
+    jmp isr_common
+.endm
+
+.macro isr_err n
+.global isr_stub_\n
+isr_stub_\n:
+    pushq $\n         # erro real ja empilhado pela CPU
+    jmp isr_common
+.endm
+\end{lstlisting}
+
+O \emph{stub} comum salva os registradores de uso geral, preserva
+\code{xmm0..xmm15} e \code{MXCSR}, alinha a pilha para chamar
+\code{interrupt\_dispatch} e, no retorno, restaura tudo e executa
+\code{iretq}. O frame visto pelo Rust \'e:
+
+\begin{lstlisting}[caption={Layout de \code{InterruptFrame} ap\'os o stub comum.},label={lst:frame}]
+#[repr(C)]
+pub struct InterruptFrame {
+    pub r15: u64, /* ... r8 */
+    pub rdi: u64, /* ... rax */
+    pub vector: u64,
+    pub error: u64,
+    pub rip: u64,
+    pub cs: u64,
+    pub rflags: u64,
+    pub rsp: u64,   // so existe se veio de ring 3
+    pub ss: u64,    // so existe se veio de ring 3
+}
+\end{lstlisting}
+
+O vetor 14 chama o tratador de \emph{page fault}; o vetor 13 trata
+\code{\#GP}; o vetor 0x80 encerra o programa de usu\'ario; o vetor 32
+incrementa o contador de \emph{ticks} e envia EOI ao PIC.
+
+\section{PIC e PIT}
+
+O PIC 8259 \'e remapeado para n\~ao colidir com as exce\c{c}\~oes:
+
+\begin{lstlisting}[caption={Remapeamento do PIC e inicializa\c{c}\~ao do PIT.},label={lst:picpit}]
+outb(0x20, 0x11); outb(0xA0, 0x11);  // ICW1
+outb(0x21, 0x20); outb(0xA1, 0x28);  // ICW2: vetores 0x20/0x28
+outb(0x21, 0x04); outb(0xA1, 0x02);  // ICW3
+outb(0x21, 0x01); outb(0xA1, 0x01);  // ICW4
+
+let divisor = 11_931;                // 1,193182 MHz / 100 Hz
+outb(0x43, 0x36);
+outb(0x40, divisor as u8);
+outb(0x40, (divisor >> 8) as u8);
+
+outb(0x21, 0xFE);                    // so IRQ0
+outb(0xA1, 0xFF);
+\end{lstlisting}
+
+A IRQ1 continua mascarada porque \code{keyboard.rs} l\^e o 8042 por
+\emph{polling}. Habilit\'a-la exigiria um buffer de scancodes e coordenar o
+acesso ao controlador.
+
+\section{Alocador de frames f\'isicos}
+
+\code{paging::init} percorre as tags Multiboot2. A tag 6 (mapa de mem\'oria)
+fornece entradas de 24 bytes com base, tamanho e tipo. O alocador come\c{c}a
+com todos os 262.144 frames do primeiro GiB marcados como usados e libera
+somente as faixas do tipo 1 (RAM dispon\'ivel).
+
+O bitmap tem 32 KiB:
+
+\begin{lstlisting}[caption={Bitmap de frames e aloca\c{c}\~ao.},label={lst:bitmap}]
+static mut FRAME_BITMAP: [u8; 32 * 1024] = [0xFF; 32 * 1024];
+
+pub fn alloc_frame() -> Option<u64> {
+    /* procura um bit zero, marca como usado e zera os 4096 bytes */
+}
+\end{lstlisting}
+
+O primeiro MiB e o fim do kernel (s\'imbolo \code{\_\_kernel\_end} do
+\emph{linker script}) ficam sempre reservados. A estrutura Multiboot2 tamb\'em
+\'e reservada depois que as faixas dispon\'iveis s\~ao liberadas.
+
+Como o stub mapeia o primeiro GiB por identidade, escrever no endere\c{c}o
+f\'isico do frame \'e equivalente a escrever no endere\c{c}o virtual baixo.
+Isso permite zerar frames sem precisar de um mapa direto adicional.
+
+\section{Demand paging e prote\c{c}\~ao U/S}
+
+Cada entrada de tabela tem bits de presen\c{c}a (P), escrita (W) e
+usu\'ario (U/S). O x86\_64 exige U/S = 1 em \emph{todos} os n\'iveis
+(PML4, PDPT, PD e PT) para permitir um acesso em ring 3. O kernel usa isso
+para criar duas regi\~oes:
+
+\begin{table}[H]
+\centering
+\caption{Regi\~oes de demand paging.}
+\label{tab:demand}
+\begin{tabularx}{\linewidth}{@{}lrrX@{}}
+\toprule
+\textbf{Regi\~ao} & \textbf{Base} & \textbf{Tamanho} & \textbf{U/S das folhas} \\
+\midrule
+Usu\'ario & \code{0x0000008000000000} & 2 MiB & 1 \\
+Kernel   & \code{0xFFFFFFFFC0000000} & 2 MiB & 0 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Nenhuma folha dessas regi\~oes existe no boot. Quando o \code{\#PF} ocorre,
+o tratador l\^e \code{CR2} e o c\'odigo de erro e decide:
+
+\begin{enumerate}
+  \item se o endere\c{c}o pertence \`a regi\~ao de usu\'ario e a p\'agina
+        n\~ao est\'a presente, aloca um frame e mapeia com
+        \code{P|W|U/S}; as tabelas intermedi\'arias tamb\'em recebem U/S = 1;
+  \item se pertence \`a regi\~ao do kernel e o bit U/S do erro \'e zero,
+        mapeia com \code{P|W} e U/S = 0;
+  \item se um usu\'ario tentar a regi\~ao do kernel, o erro tem U/S = 1 e o
+        tratador recusa o mapeamento; o programa de usu\'ario \'e encerrado;
+  \item se o endere\c{c}o est\'a fora das duas regi\~oes, a falha \'e fatal
+        para o kernel ou encerra o usu\'ario.
+\end{enumerate}
+
+\begin{nota}[Por que o kernel n\~ao pode ``abrir'' uma tabela do supervisor]
+Mapear uma p\'agina de usu\'ario n\~ao consiste apenas em ligar U/S na folha.
+Se qualquer n\'ivel intermedi\'ario for supervisor, o hardware nega o acesso.
+Al\'em disso, transformar uma tabela do kernel em tabela de usu\'ario poderia
+expor outros mapeamentos. Por isso \code{next\_table} recusa uma tabela
+supervisor no caminho de uma p\'agina de usu\'ario.
+\end{nota}
+
+\section{Modo usu\'ario e retorno ao kernel}
+
+\code{user.rs} monta um pequeno programa de m\'aquina em um buffer e o copia
+para a p\'agina \code{USER\_CODE}, que \'e residente. A pilha e a p\'agina de
+dados ficam sob demanda:
+
+\begin{enumerate}
+  \item o programa faz \code{push}/\code{pop}, gerando \code{\#PF} na pilha;
+  \item escreve em \code{USER\_DATA}, gerando outro \code{\#PF};
+  \item executa \code{int \$0x80} com \code{rax = 0}.
+\end{enumerate}
+
+O comando \code{userprot} usa outro programa: ele tenta ler
+\code{0xFFFFFFFF80000000} (in\'icio do kernel). A p\'agina existe, mas tem
+U/S = 0; o erro de \emph{page fault} tem P = 1 e U/S = 1. O tratador
+reconhece a viola\c{c}\~ao, imprime os dados e n\~ao devolve o controle ao
+programa.
+
+A entrada em ring 3 \'e feita por \code{iretq}, que carrega CS/SS de DPL 3,
+RIP, RSP e RFLAGS. A volta n\~ao usa o caminho normal do \code{iretq}:
+
+\begin{itemize}
+  \item \code{user\_enter} salva os registradores callee-saved e o RSP do
+        kernel em \code{user\_saved\_rsp};
+  \item uma exce\c{c}\~ao ou \code{int \$0x80} cai no \emph{stub} comum em
+        ring 0;
+  \item \code{user::abort} grava o status e chama \code{user\_resume}, que
+        restaura o RSP salvo, recarrega os segmentos do kernel e retorna para
+        a chamada de \code{user\_enter}.
+\end{itemize}
+
+Esse mecanismo \'e um \emph{longjmp} controlado. Ele evita ter de reconstruir
+o frame de interrup\c{c}\~ao para voltar a ring 0 e mant\'em o shell simples.
+
+\section{Comandos e evid\^encias}
+
+\begin{table}[H]
+\centering
+\caption{Comandos que exercitam a nova infraestrutura.}
+\label{tab:comandos-memoria}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Comando} & \textbf{Efeito} \\
+\midrule
+\code{demand} & escreve na regi\~ao de demand paging do kernel; o primeiro
+acesso gera \code{\#PF} \\
+\code{usertest} & entra em ring 3, gera \code{\#PF} na pilha e nos dados e
+sai por \code{int \$0x80} \\
+\code{userprot} & entra em ring 3 e tenta ler o kernel; a prote\c{c}\~ao U/S
+encerra o programa \\
+\code{mem} & mostra frames alocados/livres, \emph{page faults}, \emph{ticks}
+e os bits U/S de uma p\'agina de usu\'ario e do kernel \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Uma execu\c{c}\~ao t\'ipica em QEMU:
+
+\begin{lstlisting}[style=shell,caption={Sa\'ida dos comandos de mem\'oria e ring 3.},label={lst:testdemand}]
+rinux> demand
+[PF] demanda atendida: 0xffffffffc0000000 (kernel, erro=0x2)
+[DEMAND] 0xffffffffc0000000 = 0xdeadbeefcafe1234 (page faults: 1)
+rinux> usertest
+[USER] entrando em ring 3 (demand paging)...
+[PF] demanda atendida: 0x0000008000007ff8 (usuario, erro=0x6)
+[PF] demanda atendida: 0x0000008000002000 (usuario, erro=0x6)
+[USER] voltou ao kernel; page faults nesta execucao: 2
+rinux> userprot
+[USER] entrando em ring 3 (teste de protecao)...
+[USER] page fault em 0xffffffff80000000: endereco fora das regioes de demand paging (erro=0x5, rip=0x000000800000100a)
+[USER] programa encerrado com status 1
+rinux> mem
+Frames fisicos (4 KiB):
+  alocados : 7
+  livres   : 32217
+  page faults atendidos: 3
+  ticks do timer       : 372
+  USER_CODE  flags=0x203067 (U/S=1)
+  KERNEL_VMA flags=0xe3 (U/S=0)
+\end{lstlisting}
+
+O erro \code{0x6} (P = 0, W = 1, U/S = 1) confirma uma escrita de usu\'ario em
+p\'agina ausente; o erro \code{0x5} (P = 1, U/S = 1, sem W) confirma uma
+leitura de usu\'ario em p\'agina presente e supervisor.
+
+\section{Limita\c{c}\~oes desta implementa\c{c}\~ao}
+
+\begin{itemize}
+  \item n\~ao h\'a espa\c{c}os de endere\c{c}o separados por processo: o
+        programa de usu\'ario usa a mesma PML4 do kernel;
+  \item n\~ao h\'a escalonador nem troca de contexto; o timer apenas conta
+        \emph{ticks};
+  \item a \'unica \emph{syscall} \'e \code{exit} (\code{rax = 0}); n\~ao
+        h\'a valida\c{c}\~ao de ponteiros de usu\'ario;
+  \item SMEP/SMAP e NX ainda n\~ao est\~ao habilitados; a separa\c{c}\~ao
+        depende apenas de U/S;
+  \item o teclado continua em \emph{polling} e IRQ1 permanece mascarada;
+  \item as regi\~oes de demand paging t\^em tamanho fixo de 2 MiB e ficam
+        fora do primeiro GiB mapeado por identidade.
+\end{itemize}

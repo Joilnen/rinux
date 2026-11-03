@@ -1,21 +1,21 @@
-\chapter{Build, imagem e execu\c{c}\~ao}
+\chapter{Build, image and execution}
 \label{cap:build}
 
-\section{Toolchain e alvo}
+\section{Toolchain and target}
 
-O projeto compila para \code{x86\_64-unknown-none}, alvo oficial de Rust para
-bare metal x86\_64. Esse alvo:
+The project compiles for \code{x86\_64-unknown-none}, the official Rust target
+for bare metal x86\_64. This target:
 
 \begin{itemize}
-  \item n\~ao possui \code{std}, \code{alloc} nem \emph{runtime};
-  \item usa o modelo de c\'odigo \emph{kernel}, que assume endere\c{c}os no
-        ter\c{c}o superior do espa\c{c}o de endere\c{c}amento;
-  \item produz c\'odigo posicional apenas quando necess\'ario, com
+  \item has no \code{std}, no \code{alloc} and no \emph{runtime};
+  \item uses the \emph{kernel} code model, which assumes addresses in the
+        upper third of the address space;
+  \item produces position-independent code only when necessary, with
         \code{relocation-model=static}.
 \end{itemize}
 
-O arquivo \code{rust-toolchain.toml} fixa o canal \code{stable} e solicita o
-alvo:
+The \code{rust-toolchain.toml} file pins the \code{stable} channel and requests
+the target:
 
 \begin{lstlisting}[caption={\code{rust-toolchain.toml}.},label={lst:toolchain}]
 [toolchain]
@@ -23,7 +23,7 @@ channel = "stable"
 targets = ["x86_64-unknown-none"]
 \end{lstlisting}
 
-\section{Configura\c{c}\~ao do Cargo}
+\section{Cargo configuration}
 
 \begin{lstlisting}[caption={\code{.cargo/config.toml}.},label={lst:cargoconfig}]
 [build]
@@ -39,13 +39,12 @@ rustflags = [
 ]
 \end{lstlisting}
 
-A op\c{c}\~ao \code{rustc} aponta para o \emph{wrapper} \code{scripts/rustc}
-do projeto. Ele existe porque, em distribui\c{c}\~oes como Arch Linux, o
-\code{cargo} e o \code{rustc} encontrados primeiro no \code{PATH} s\~ao os do
-sistema, que n\~ao possuem o alvo \code{x86\_64-unknown-none}. O wrapper
-executa:
+The \code{rustc} option points to the project's \code{scripts/rustc}
+\emph{wrapper}. It exists because, in distributions such as Arch Linux, the
+\code{cargo} and \code{rustc} found first in \code{PATH} are the system ones,
+which do not have the \code{x86\_64-unknown-none} target. The wrapper runs:
 
-\begin{lstlisting}[style=shell,caption={Conte\'udo de \code{scripts/rustc}.},label={lst:rustcwrapper}]
+\begin{lstlisting}[style=shell,caption={Contents of \code{scripts/rustc}.},label={lst:rustcwrapper}]
 #!/bin/sh
 if command -v rustup >/dev/null 2>&1; then
     exec rustup run stable rustc "$@"
@@ -53,30 +52,30 @@ fi
 exec rustc "$@"
 \end{lstlisting}
 
-Assim, um \code{cargo build} comum usa o compilador do \code{rustup} mesmo
-quando o \code{cargo} \'e o do sistema. Se o \code{rustup} n\~ao estiver
-instalado, o wrapper recai no \code{rustc} do \code{PATH}. O caminho
-\code{scripts/rustc} \'e relativo ao diret\'orio do projeto, de modo que
-n\~ao depende do nome do usu\'ario nem de \code{\$HOME}.
+Thus, an ordinary \code{cargo build} uses the \code{rustup} compiler even
+when \code{cargo} is the system one. If \code{rustup} is not installed, the
+wrapper falls back to the \code{rustc} in \code{PATH}. The
+\code{scripts/rustc} path is relative to the project directory, so it does
+not depend on the user name or on \code{\$HOME}.
 
 \begin{table}[H]
 \centering
-\caption{Flags de compila\c{c}\~ao e liga\c{c}\~ao.}
+\caption{Compilation and linking flags.}
 \label{tab:flags}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{Flag} & \textbf{Efeito} \\
+\textbf{Flag} & \textbf{Effect} \\
 \midrule
-\code{relocation-model=static} & Evita \emph{PIC}/GOT; o kernel \'e ligado em
-endere\c{c}o fixo. \\
-\code{linker=ld.lld} & Usa o linker LLVM, compat\'ivel com o script. \\
-\code{-Tlinker.ld} & Aplica o layout de mem\'oria do projeto. \\
-\code{--gc-sections} & Remove se\c{c}\~oes n\~ao referenciadas. \\
+\code{relocation-model=static} & Avoids \emph{PIC}/GOT; the kernel is linked at
+a fixed address. \\
+\code{linker=ld.lld} & Uses the LLVM linker, compatible with the script. \\
+\code{-Tlinker.ld} & Applies the project's memory layout. \\
+\code{--gc-sections} & Removes unreferenced sections. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Perfis de compila\c{c}\~ao}
+\section{Build profiles}
 
 \begin{lstlisting}[caption={\code{Cargo.toml}.},label={lst:cargo}]
 [package]
@@ -98,13 +97,13 @@ lto = true
 codegen-units = 1
 \end{lstlisting}
 
-O perfil \code{release} \'e usado na ISO. \code{panic=abort} \'e obrigat\'orio
-para um kernel sem \emph{unwinding}; \code{lto} e \code{codegen-units=1}
-permitem otimiza\c{c}\~oes entre m\'odulos e reduzem o tamanho.
+The \code{release} profile is used in the ISO. \code{panic=abort} is mandatory
+for a kernel without \emph{unwinding}; \code{lto} and \code{codegen-units=1}
+enable cross-module optimizations and reduce size.
 
 \section{Makefile}
 
-\begin{lstlisting}[caption={Alvos principais do \code{Makefile}.},label={lst:makefile}]
+\begin{lstlisting}[caption={Main targets of the \code{Makefile}.},label={lst:makefile}]
 TARGET  := x86_64-unknown-none
 KERNEL  := target/$(TARGET)/release/vga-kernel
 ISO     := vga-kernel.iso
@@ -137,64 +136,64 @@ clean:
 	rm -rf build $(ISO)
 \end{lstlisting}
 
-\begin{nota}[Compatibilidade com o sistema]
-Em algumas distribui\c{c}\~oes, \code{/usr/bin/cargo} e \code{/usr/bin/rustc}
-n\~ao s\~ao os do \code{rustup} e n\~ao t\^em o alvo
-\code{x86\_64-unknown-none}. H\'a duas prote\c{c}\~oes independentes:
+\begin{nota}[System compatibility]
+In some distributions, \code{/usr/bin/cargo} and \code{/usr/bin/rustc}
+are not the \code{rustup} ones and do not have the
+\code{x86\_64-unknown-none} target. There are two independent safeguards:
 
 \begin{itemize}
-  \item o \code{.cargo/config.toml} aponta \code{rustc} para
-        \code{scripts/rustc}, que usa o \code{rustup};
-  \item o \code{Makefile} detecta \code{rustup}, chama
-        \code{rustup run stable cargo} e exporta \code{RUSTC}.
+  \item \code{.cargo/config.toml} points \code{rustc} to
+        \code{scripts/rustc}, which uses \code{rustup};
+  \item the \code{Makefile} detects \code{rustup}, calls
+        \code{rustup run stable cargo} and exports \code{RUSTC}.
 \end{itemize}
 
-Com isso, tanto \code{cargo build} quanto \code{make} funcionam mesmo que o
-\code{cargo} do sistema seja o primeiro do \code{PATH}.
+As a result, both \code{cargo build} and \code{make} work even if the system
+\code{cargo} is the first one in \code{PATH}.
 \end{nota}
 
-\subsection{Compila\c{c}\~ao direta com Cargo}
+\subsection{Direct compilation with Cargo}
 
-Antes do ajuste, \code{cargo build} usava o alvo do \emph{host}
-(\code{x86\_64-unknown-linux-gnu}); o linker tentava produzir um execut\'avel
-Linux e falhava com \code{duplicate symbol: \_start}, porque o stub do kernel
-e o \code{Scrt1.o} da libc definem \code{\_start}. Al\'em disso, o
-\code{rustc} do sistema n\~ao tinha o alvo \code{x86\_64-unknown-none}.
+Before the adjustment, \code{cargo build} used the \emph{host} target
+(\code{x86\_64-unknown-linux-gnu}); the linker tried to produce a Linux
+executable and failed with \code{duplicate symbol: \_start}, because the kernel
+stub and the libc \code{Scrt1.o} both define \code{\_start}. In addition, the
+system \code{rustc} did not have the \code{x86\_64-unknown-none} target.
 
-Agora o alvo padr\~ao vem do \code{.cargo/config.toml} e o compilador vem do
-wrapper. Os comandos usuais funcionam sem vari\'aveis de ambiente:
+Now the default target comes from \code{.cargo/config.toml} and the compiler
+comes from the wrapper. The usual commands work without environment variables:
 
-\begin{lstlisting}[style=shell,caption={Compila\c{c}\~ao direta com Cargo.},label={lst:cargodirect}]
+\begin{lstlisting}[style=shell,caption={Direct compilation with Cargo.},label={lst:cargodirect}]
 cargo build              # ELF de depuracao em target/x86_64-unknown-none/debug/
 cargo build --release    # ELF otimizado usado na ISO
 cargo clean              # remove target/
 \end{lstlisting}
 
-N\~ao \'e necess\'ario passar \code{--target}: ele j\'a est\'a fixado no
-arquivo de configura\c{c}\~ao. O bin\'ario resultante \'e um ELF64
-\code{EXEC} para \code{x86-64}, com ponto de entrada
-\code{0x100018}, e n\~ao um execut\'avel Linux.
+There is no need to pass \code{--target}: it is already fixed in the
+configuration file. The resulting binary is an ELF64
+\code{EXEC} for \code{x86-64}, with entry point
+\code{0x100018}, and not a Linux executable.
 
-\subsection{Alvos}
+\subsection{Targets}
 
 \begin{table}[H]
 \centering
-\caption{Alvos do Makefile.}
+\caption{Makefile targets.}
 \label{tab:maketargets}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{Alvo} & \textbf{A\c{c}\~ao} \\
+\textbf{Target} & \textbf{Action} \\
 \midrule
-\code{make} / \code{make all} & Compila o kernel e gera a ISO. \\
-\code{make kernel} & Compila apenas o ELF release. \\
-\code{make iso} & Compila e empacota a ISO com GRUB. \\
-\code{make run} & Gera a ISO e inicia o QEMU com VGA e serial no stdio. \\
-\code{make clean} & Remove \code{target/}, \code{build/} e a ISO. \\
+\code{make} / \code{make all} & Compiles the kernel and generates the ISO. \\
+\code{make kernel} & Compiles only the release ELF. \\
+\code{make iso} & Compiles and packages the ISO with GRUB. \\
+\code{make run} & Generates the ISO and starts QEMU with VGA and serial on stdio. \\
+\code{make clean} & Removes \code{target/}, \code{build/} and the ISO. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Configura\c{c}\~ao do GRUB}
+\section{GRUB configuration}
 
 \begin{lstlisting}[caption={\code{boot/grub/grub.cfg}.},label={lst:grubcfg}]
 set timeout=0
@@ -212,20 +211,20 @@ menuentry "Rust VGA Kernel (x86_64)" {
 \end{lstlisting}
 
 \begin{itemize}
-  \item \code{terminal\_output console} mant\'em o GRUB no modo texto VGA,
-        garantindo que o kernel encontre \code{0xB8000} como esperado.
-  \item \code{gfxpayload=text} impede que o GRUB selecione um modo gr\'afico
-        linear.
-  \item \code{insmod multiboot2} carrega o m\'odulo do protocolo.
-  \item \code{multiboot2} instrui o GRUB a carregar o ELF e passar a
-        assinatura e a estrutura de informa\c{c}\~oes.
+  \item \code{terminal\_output console} keeps GRUB in VGA text mode,
+        ensuring that the kernel finds \code{0xB8000} as expected.
+  \item \code{gfxpayload=text} prevents GRUB from selecting a linear
+        graphics mode.
+  \item \code{insmod multiboot2} loads the protocol module.
+  \item \code{multiboot2} instructs GRUB to load the ELF and pass the
+        signature and the information structure.
 \end{itemize}
 
 \section{ISO}
 
-O alvo \code{iso} monta uma \'arvore tempor\'aria:
+The \code{iso} target assembles a temporary tree:
 
-\begin{lstlisting}[style=shell,caption={Conte\'udo da \'arvore da ISO.},label={lst:isotree}]
+\begin{lstlisting}[style=shell,caption={Contents of the ISO tree.},label={lst:isotree}]
 build/iso/
 |-- boot/
 |   |-- grub/
@@ -234,67 +233,67 @@ build/iso/
 `-- (arquivos auxiliares gerados pelo grub-mkrescue)
 \end{lstlisting}
 
-\code{grub-mkrescue} cria uma imagem El Torito com o GRUB para BIOS
-(\code{i386-pc}) e tamb\'em pode incluir suporte a EFI, dependendo dos
-m\'odulos instalados. O projeto usa apenas o caminho BIOS.
+\code{grub-mkrescue} creates an El Torito image with GRUB for BIOS
+(\code{i386-pc}) and can also include EFI support, depending on the
+installed modules. The project uses only the BIOS path.
 
-Observa\c{c}\~oes da compila\c{c}\~ao de refer\^encia:
+Notes from the reference build:
 
 \begin{table}[H]
 \centering
-\caption{Artefatos gerados na compila\c{c}\~ao de refer\^encia.}
+\caption{Artifacts generated in the reference build.}
 \label{tab:artefatos}
 \begin{tabular}{@{}ll@{}}
 \toprule
-\textbf{Artefato} & \textbf{Valor observado} \\
+\textbf{Artifact} & \textbf{Observed value} \\
 \midrule
 ELF & \code{target/x86\_64-unknown-none/release/vga-kernel} \\
-Tamanho do ELF & aproximadamente 48 KiB \\
+ELF size & approximately 48 KiB \\
 ISO & \code{vga-kernel.iso} \\
-Tamanho da ISO & aproximadamente 33,8 MB \\
-Setores da ISO & 16.517 setores de 2.048 bytes \\
-Sistema de arquivos & ISO 9660 com Rock Ridge \\
+ISO size & approximately 33.8 MB \\
+ISO sectors & 16,517 sectors of 2,048 bytes \\
+File system & ISO 9660 with Rock Ridge \\
 Boot & El Torito, \code{boot\_hybrid.img} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{Execu\c{c}\~ao}
+\section{Execution}
 
 \subsection{\code{make run}}
 
-\begin{lstlisting}[style=shell,caption={Execu\c{c}\~ao padr\~ao.},label={lst:makerun}]
+\begin{lstlisting}[style=shell,caption={Default execution.},label={lst:makerun}]
 make run
 # equivale a:
 qemu-system-x86_64 -cdrom vga-kernel.iso -boot order=d -m 128M -serial stdio
 \end{lstlisting}
 
-A janela do QEMU mostra a tela VGA. O terminal de onde o comando foi
-executado recebe a mesma sa\'ida pela serial e pode enviar comandos.
+The QEMU window shows the VGA screen. The terminal from which the command was
+run receives the same output over the serial port and can send commands.
 
-\subsection{Execu\c{c}\~ao sem interface gr\'afica}
+\subsection{Headless execution}
 
-Para testes automatizados, use \code{-display none} e sockets:
+For automated tests, use \code{-display none} and sockets:
 
-\begin{lstlisting}[style=shell,caption={QEMU headless com sockets de serial e monitor.},label={lst:qemuheadless}]
+\begin{lstlisting}[style=shell,caption={Headless QEMU with serial and monitor sockets.},label={lst:qemuheadless}]
 qemu-system-x86_64 -cdrom vga-kernel.iso -boot order=d -m 128M \
   -display none \
   -serial unix:/tmp/vga-serial.sock,server=on,wait=off \
   -monitor unix:/tmp/vga-mon.sock,server=on,wait=off
 \end{lstlisting}
 
-O monitor permite inspecionar a mem\'oria VGA:
+The monitor allows inspecting the VGA memory:
 
-\begin{lstlisting}[style=shell,caption={Dump da mem\'oria de texto VGA pelo monitor.},label={lst:vgadump}]
+\begin{lstlisting}[style=shell,caption={Dump of VGA text memory through the monitor.},label={lst:vgadump}]
 xp /4000bx 0xb8000
 \end{lstlisting}
 
-Cada c\'elula tem dois bytes: caractere e atributo. Um script pode reconstruir
-as 25 linhas e verificar o conte\'udo.
+Each cell has two bytes: character and attribute. A script can reconstruct
+the 25 lines and check the contents.
 
-\subsection{Valida\c{c}\~ao do ELF e da ISO}
+\subsection{ELF and ISO validation}
 
-\begin{lstlisting}[style=shell,caption={Verifica\c{c}\~oes \'uteis.},label={lst:validacoes}]
+\begin{lstlisting}[style=shell,caption={Useful checks.},label={lst:validacoes}]
 grub-file --is-x86-multiboot2 target/x86_64-unknown-none/release/vga-kernel
 file vga-kernel.iso
 xorriso -indev vga-kernel.iso -report_el_torito plain
@@ -302,47 +301,48 @@ readelf -h target/x86_64-unknown-none/release/vga-kernel
 readelf -S target/x86_64-unknown-none/release/vga-kernel
 \end{lstlisting}
 
-\section{Solu\c{c}\~ao de problemas}
+\section{Troubleshooting}
 
 \begin{table}[H]
 \centering
-\caption{Problemas comuns e solu\c{c}\~oes.}
+\caption{Common problems and solutions.}
 \label{tab:troubleshooting}
 \begin{tabularx}{\linewidth}{@{}p{4.5cm}X@{}}
 \toprule
-\textbf{Sintoma} & \textbf{Causa prov\'avel / solu\c{c}\~ao} \\
+\textbf{Symptom} & \textbf{Probable cause / solution} \\
 \midrule
-\code{can't find crate for `core'} & Cargo/rustc do sistema sem o alvo.
-Use \code{rustup target add x86\_64-unknown-none} e
+\code{can't find crate for `core'} & System Cargo/rustc without the target.
+Use \code{rustup target add x86\_64-unknown-none} and
 \code{rustup run stable cargo}. \\
-\code{linker `ld.lld' not found} & Instale \code{lld} ou ajuste
+\code{linker `ld.lld' not found} & Install \code{lld} or adjust
 \code{-C linker}. \\
-\code{grub-mkrescue: command not found} & Instale \code{grub} e
+\code{grub-mkrescue: command not found} & Install \code{grub} and
 \code{libisoburn}/\code{xorriso}. \\
-QEMU tenta o disco e falha & Use \code{-boot order=d}. \\
-Tela preta ap\'os o GRUB & Verifique se \code{gfxpayload=text} est\'a no
-\code{grub.cfg} e se o ELF \'e Multiboot2 v\'alido. \\
-Teclado n\~ao responde & Verifique \emph{legacy USB}/PS/2 na BIOS; teste a
-serial. \\
-Comandos aparecem na serial mas n\~ao no VGA & O modo texto VGA pode n\~ao
-estar dispon\'ivel (UEFI sem CSM). \\
-\code{make run} n\~ao abre janela & Falta servidor gr\'afico; use
-\code{-display none} ou \code{-nographic}. \\
+QEMU tries the disk and fails & Use \code{-boot order=d}. \\
+Black screen after GRUB & Check that \code{gfxpayload=text} is in
+\code{grub.cfg} and that the ELF is valid Multiboot2. \\
+Keyboard does not respond & Check \emph{legacy USB}/PS/2 in the BIOS; test the
+serial port. \\
+Commands appear on serial but not on VGA & VGA text mode may not be
+available (UEFI without CSM). \\
+\code{make run} does not open a window & No graphical server; use
+\code{-display none} or \code{-nographic}. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Reprodutibilidade}
+\section{Reproducibility}
 
-O build n\~ao depende de crates externos, mas depende de vers\~oes de Rust,
-LLVM, GRUB e xorriso. Para maior reprodutibilidade, recomenda-se registrar:
+The build does not depend on external crates, but it does depend on Rust,
+LLVM, GRUB and xorriso versions. For greater reproducibility, it is
+recommended to record:
 
 \begin{itemize}
-  \item a vers\~ao do Rust (\code{rustc --version});
-  \item a vers\~ao do QEMU (\code{qemu-system-x86\_64 --version});
-  \item a vers\~ao do GRUB (\code{grub-mkrescue --version});
-  \item o hash do commit do projeto.
+  \item the Rust version (\code{rustc --version});
+  \item the QEMU version (\code{qemu-system-x86\_64 --version});
+  \item the GRUB version (\code{grub-mkrescue --version});
+  \item the project commit hash.
 \end{itemize}
 
-O \code{Cargo.lock} existe, mas n\~ao cont\'em depend\^encias externas; ele
-apenas registra o pr\'oprio pacote.
+\code{Cargo.lock} exists, but it does not contain external dependencies; it
+only records the package itself.

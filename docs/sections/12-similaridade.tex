@@ -1,308 +1,304 @@
-\chapter{Similaridade com o kernel Linux}
+\chapter{Similarity with the Linux kernel}
 \label{cap:similaridade}
 
-\section{O que significa ``similaridade''}
+\section{What ``similarity'' means}
 
-Comparar este projeto com o Linux exige separar tr\^es perguntas diferentes:
+Comparing this project with Linux requires separating three different questions:
 
 \begin{enumerate}
-  \item \textbf{Similaridade funcional}: quais servi\c{c}os do Linux existem
-        aqui e com que profundidade?
-  \item \textbf{Similaridade arquitetural}: as solu\c{c}\~oes de boot,
-        mem\'oria e drivers usam os mesmos conceitos e mecanismos de
-        hardware?
-  \item \textbf{Similaridade de c\'odigo}: houve c\'opia, tradu\c{c}\~ao
-        linha a linha ou reutiliza\c{c}\~ao de algoritmos?
+  \item \textbf{Functional similarity}: which Linux services exist
+        here, and with what depth?
+  \item \textbf{Architectural similarity}: do the boot, memory, and driver
+        solutions use the same concepts and hardware mechanisms?
+  \item \textbf{Code similarity}: was there copying, line-by-line
+        translation, or reuse of algorithms?
 \end{enumerate}
 
-As respostas s\~ao bastante diferentes. O projeto \'e conceitualmente
-pr\'oximo do Linux no caminho de boot e no uso de VGA/PS/2, mas cobre uma
-fra\c{c}\~ao min\'uscula do kernel completo. N\~ao h\'a c\'odigo copiado: a
-implementa\c{c}\~ao \'e independente e escrita em Rust.
+The answers are quite different. The project is conceptually close to Linux
+on the boot path and in its use of VGA/PS/2, but it covers a tiny fraction of
+the complete kernel. There is no copied code: the implementation is
+independent and written in Rust.
 
-\section{Metodologia}
+\section{Methodology}
 
-A compara\c{c}\~ao usa como refer\^encia a \'arvore Linux 7.3.1 presente em
-\code{linux-7.3.1/}. Foram coletadas:
+The comparison uses as reference the Linux 7.3.1 tree present in
+\code{linux-7.3.1/}. The following were collected:
 
 \begin{itemize}
-  \item linhas f\'isicas dos 12 arquivos Linux mais pr\'oximos;
-  \item linhas f\'isicas dos 12 m\'odulos Rust;
-  \item funcionalidades presentes, ausentes e parciais;
-  \item mecanismos de hardware usados (Multiboot2, GDT, PAE, long mode,
-        VGA texto, 8042, UART 16550);
-  \item presen\c{c}a ou aus\^encia de subsistemas maiores (IDT, alocador,
-        scheduler, syscalls, FS, rede).
+  \item physical lines of the 12 closest Linux files;
+  \item physical lines of the 12 Rust modules;
+  \item features present, missing, and partial;
+  \item hardware mechanisms used (Multiboot2, GDT, PAE, long mode,
+        VGA text, 8042, UART 16550);
+  \item presence or absence of larger subsystems (IDT, allocator,
+        scheduler, syscalls, FS, networking).
 \end{itemize}
 
-A pontua\c{c}\~ao \'e uma estimativa fundamentada, n\~ao uma m\'etrica formal.
-Ela serve para comunicar ordem de grandeza e evitar tanto a conclus\~ao
-ing\^enua de que ``\'e um Linux em Rust'' quanto a conclus\~ao oposta de que
-``n\~ao tem nada a ver''.
+The score is a grounded estimate, not a formal metric. It serves to convey
+order of magnitude and to avoid both the naive conclusion that ``it is Linux
+in Rust'' and the opposite conclusion that ``it has nothing to do with it''.
 
-\section{Correspond\^encia de arquivos}
+\section{File mapping}
 
 \begin{longtable}{@{}p{7.2cm}r p{4.3cm}@{}}
-\caption{Arquivos Linux an\'alogos e m\'odulos Rust correspondentes.}
+\caption{Analogous Linux files and corresponding Rust modules.}
 \label{tab:correspondencia}\\
 \toprule
-\textbf{Arquivo Linux 7.3.1} & \textbf{Linhas} & \textbf{Equivalente Rust} \\
+\textbf{Linux 7.3.1 file} & \textbf{Lines} & \textbf{Rust equivalent} \\
 \midrule
 \endfirsthead
 \toprule
-\textbf{Arquivo Linux 7.3.1} & \textbf{Linhas} & \textbf{Equivalente Rust} \\
+\textbf{Linux 7.3.1 file} & \textbf{Lines} & \textbf{Rust equivalent} \\
 \midrule
 \endhead
-\code{arch/x86/boot/header.S} & 619 & \code{boot.rs} (cabe\c{c}alho) \\
+\code{arch/x86/boot/header.S} & 619 & \code{boot.rs} (header) \\
 \code{arch/x86/boot/pm.c} & 125 & \code{boot.rs} (stub) \\
-\code{arch/x86/kernel/head\_64.S} & 686 & \code{boot.rs} (modo longo) \\
-\code{arch/x86/kernel/cpu/common.c} & 2.688 & \code{boot.rs} (GDT) + \code{arch.rs} \\
-\code{arch/x86/mm/init\_64.c} & 1.557 & \code{boot.rs} (p\'aginas) \\
-\code{drivers/video/console/vgacon.c} & 1.226 & \code{vga.rs} \\
-\code{drivers/input/serio/i8042.c} & 1.664 & \code{keyboard.rs} \\
-\code{drivers/input/keyboard/atkbd.c} & 1.981 & \code{keyboard.rs} \\
-\code{drivers/tty/serial/8250/8250\_port.c} & 3.638 & \code{serial.rs} \\
-\code{kernel/printk/printk.c} & 5.188 & macros + \code{vga.rs} \\
-\code{kernel/panic.c} & 1.274 & \emph{panic handler} em \code{main.rs} \\
-\code{init/main.c} & 1.706 & \code{kernel\_main} em \code{main.rs} \\
+\code{arch/x86/kernel/head\_64.S} & 686 & \code{boot.rs} (long mode) \\
+\code{arch/x86/kernel/cpu/common.c} & 2,688 & \code{boot.rs} (GDT) + \code{arch.rs} \\
+\code{arch/x86/mm/init\_64.c} & 1,557 & \code{boot.rs} (pages) \\
+\code{drivers/video/console/vgacon.c} & 1,226 & \code{vga.rs} \\
+\code{drivers/input/serio/i8042.c} & 1,664 & \code{keyboard.rs} \\
+\code{drivers/input/keyboard/atkbd.c} & 1,981 & \code{keyboard.rs} \\
+\code{drivers/tty/serial/8250/8250\_port.c} & 3,638 & \code{serial.rs} \\
+\code{kernel/printk/printk.c} & 5,188 & macros + \code{vga.rs} \\
+\code{kernel/panic.c} & 1,274 & \emph{panic handler} in \code{main.rs} \\
+\code{init/main.c} & 1,706 & \code{kernel\_main} in \code{main.rs} \\
 \midrule
-\textbf{Total Linux (12 arquivos)} & \textbf{22.352} & --- \\
-\textbf{Total Rust (12 m\'odulos)} & \textbf{2.508} & --- \\
+\textbf{Linux total (12 files)} & \textbf{22,352} & --- \\
+\textbf{Rust total (12 modules)} & \textbf{2,508} & --- \\
 \bottomrule
 \end{longtable}
 
-A raz\~ao de linhas \'e:
+The line ratio is:
 
 \[
-\frac{2.508}{22.352} \approx 11{,}22\%.
+\frac{2{,}508}{22{,}352} \approx 11.22\%.
 \]
 
-Em rela\c{c}\~ao \`a \'arvore Linux completa, que tem aproximadamente
-38.062.672 linhas de \code{.c}, \code{.h} e \code{.S} na vers\~ao usada, a
-raz\~ao \'e:
+Relative to the complete Linux tree, which has approximately
+38,062,672 lines of \code{.c}, \code{.h}, and \code{.S} in the version used,
+the ratio is:
 
 \[
-\frac{2.508}{38.062.672} \approx 0{,}0066\%.
+\frac{2{,}508}{38{,}062{,}672} \approx 0.0066\%.
 \]
 
-\begin{atencao}[Linhas de c\'odigo n\~ao medem similaridade]
-Os 12 arquivos Linux n\~ao t\^em o mesmo escopo que os m\'odulos Rust. O
-\code{vgacon.c}, por exemplo, suporta v\'arias arquiteturas, consoles
-virtuais e modos gr\'aficos; o \code{vga.rs} implementa apenas texto 80x25.
-Al\'em disso, grande parte das linhas Linux \'e coment\'ario, configura\c{c}\~ao
-e tratamento de casos de hardware. A compara\c{c}\~ao de LOC serve apenas como
-ordem de grandeza.
+\begin{atencao}[Lines of code do not measure similarity]
+The 12 Linux files do not have the same scope as the Rust modules.
+\code{vgacon.c}, for example, supports several architectures, virtual
+consoles, and graphics modes; \code{vga.rs} implements only 80x25 text.
+Moreover, a large part of the Linux lines consists of comments,
+configuration, and handling of hardware cases. The LOC comparison serves
+only as an order of magnitude.
 \end{atencao}
 
-\section{Similaridade funcional por dimens\~ao}
+\section{Functional similarity by dimension}
 
-A tabela abaixo distribui 100 pontos entre dez dimens\~oes e atribui uma nota
-de 0 a 100 para o quanto o projeto cobre da dimens\~ao correspondente no
-Linux. A \'ultima coluna \'e a contribui\c{c}\~ao ponderada.
+The table below distributes 100 points among ten dimensions and assigns a
+score from 0 to 100 for how much of the project covers the corresponding
+Linux dimension. The last column is the weighted contribution.
 
 \begin{table}[H]
 \centering
-\caption{Pontua\c{c}\~ao de similaridade funcional e arquitetural.}
+\caption{Functional and architectural similarity score.}
 \label{tab:score}
 \begin{tabular}{@{}lcrrr@{}}
 \toprule
-\textbf{Dimens\~ao} & \textbf{Peso} & \textbf{Linux} & \textbf{Projeto} & \textbf{Contrib.} \\
+\textbf{Dimension} & \textbf{Weight} & \textbf{Linux} & \textbf{Project} & \textbf{Contrib.} \\
 \midrule
-Boot e protocolo de firmware & 10 & 100 & 30 & 3,00 \\
-Transi\c{c}\~ao de modo e GDT & 8 & 100 & 35 & 2,80 \\
-Pagina\c{c}\~ao e MMU & 12 & 100 & 25 & 3,00 \\
-Console e v\'ideo & 15 & 100 & 25 & 3,75 \\
-Teclado e entrada & 12 & 100 & 18 & 2,16 \\
-Serial e tty & 5 & 100 & 20 & 1,00 \\
-Interrup\c{c}\~oes e exce\c{c}\~oes & 12 & 100 & 30 & 3,60 \\
-Mem\'oria f\'isica e heap & 8 & 100 & 15 & 1,20 \\
-Processos, scheduler e syscalls & 12 & 100 & 5 & 0,60 \\
-Arquivos, rede e outros drivers & 6 & 100 & 0 & 0,00 \\
+Boot and firmware protocol & 10 & 100 & 30 & 3.00 \\
+Mode transition and GDT & 8 & 100 & 35 & 2.80 \\
+Paging and MMU & 12 & 100 & 25 & 3.00 \\
+Console and video & 15 & 100 & 25 & 3.75 \\
+Keyboard and input & 12 & 100 & 18 & 2.16 \\
+Serial and tty & 5 & 100 & 20 & 1.00 \\
+Interrupts and exceptions & 12 & 100 & 30 & 3.60 \\
+Physical memory and heap & 8 & 100 & 15 & 1.20 \\
+Processes, scheduler, and syscalls & 12 & 100 & 5 & 0.60 \\
+Files, networking, and other drivers & 6 & 100 & 0 & 0.00 \\
 \midrule
-\textbf{Total} & \textbf{100} & --- & --- & \textbf{21,11} \\
+\textbf{Total} & \textbf{100} & --- & --- & \textbf{21.11} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-O \'indice ponderado \'e \textbf{21,1\%}. Ele deve ser lido como:
+The weighted index is \textbf{21.1\%}. It should be read as:
 
 \begin{quote}
-``Dentro das dez dimens\~oes escolhidas, o projeto reproduz cerca de 21,1\%
-do que o Linux oferece, com peso maior para boot, console e teclado.''
+``Within the ten chosen dimensions, the project reproduces about 21.1\% of
+what Linux offers, with greater weight on boot, console, and keyboard.''
 \end{quote}
 
-N\~ao significa que 21,1\% do c\'odigo do Linux foi reimplementado. Em
-n\'umero de subsistemas e servi\c{c}os, a fra\c{c}\~ao \'e muito menor: o
-projeto n\~ao tem, por exemplo, nenhum dos servi\c{c}os que ocupam a maior
-parte do kernel (scheduler, mem\'oria virtual completa, VFS, rede, drivers,
-seguran\c{c}a, virtualiza\c{c}\~ao).
+It does not mean that 21.1\% of the Linux code was reimplemented. In
+number of subsystems and services, the fraction is much smaller: the
+project does not have, for example, any of the services that occupy most
+of the kernel (scheduler, complete virtual memory, VFS, networking, drivers,
+security, virtualization).
 
-\subsection{Leitura por dimens\~ao}
+\subsection{Reading by dimension}
 
 \begin{itemize}
-  \item \textbf{Boot (30/100)}: o projeto usa Multiboot2 e GRUB, enquanto o
-        Linux usa o protocolo de boot pr\'oprio, setup em tempo real,
-        descompress\~ao e stubs EFI. O conceito de ``carregar um ELF e
-        transferir o controle'' \'e o mesmo; a implementa\c{c}\~ao \'e bem
-        mais simples.
-  \item \textbf{Modo longo e GDT (35/100)}: a sequ\^encia PAE $\rightarrow$
-        LME $\rightarrow$ PG \'e a mesma do \code{head\_64.S}; h\'a GDT com
-        ring 3 e TSS, mas faltam \emph{per-CPU}, \emph{stack canary},
-        \emph{paravirt} e tratamento de CPUs secund\'arias.
-  \item \textbf{Pagina\c{c}\~ao (25/100)}: h\'a \emph{huge pages} de 2 MiB no
-        boot, alocador de frames por bitmap, tabelas de 4 KiB e demand
-        paging; faltam buddy allocator, \code{vmalloc}, \code{mmap}, COW,
-        swap, NUMA e prote\c{c}\~ao \code{NX}.
-  \item \textbf{Console (25/100)}: o modo texto VGA e a rolagem s\~ao
-        an\'alogos ao \code{vgacon}, mas faltam console virtual, fontes,
-        Unicode, \emph{fbcon}, \code{printk} com n\'iveis e buffer de log.
-  \item \textbf{Teclado (18/100)}: o acesso ao 8042 e a tradu\c{c}\~ao de
-        scancodes s\~ao semelhantes, mas faltam IRQ1, \emph{input core},
-        \code{evdev}, LEDs, layouts e teclas estendidas.
-  \item \textbf{Serial (20/100)}: a programa\c{c}\~ao b\'asica da 16550 \'e
-        parecida, mas faltam \emph{tty layer}, \emph{termios}, IRQs, FIFO
-        de entrada, DMA e controle de fluxo.
-  \item \textbf{Interrup\c{c}\~oes (30/100)}: h\'a IDT, \emph{stubs} para
-        exce\c{c}\~oes, PIC remapeado e PIT em IRQ0; faltam APIC, IRQ1,
-        IRQs esp\'urias, \emph{softirq}, workqueues e preemp\c{c}\~ao.
-  \item \textbf{Mem\'oria/heap (15/100)}: h\'a alocador de frames e demand
-        paging, mas n\~ao h\'a heap, slab, page cache ou \code{vmalloc}.
-  \item \textbf{Processos (5/100)}: h\'a um demo em ring 3 com TSS e
-        \code{int 0x80}, mas n\~ao h\'a \code{task\_struct},
-        scheduler, context switch, espa\c{c}os de endere\c{c}o separados,
-        sinais ou
+  \item \textbf{Boot (30/100)}: the project uses Multiboot2 and GRUB, whereas
+        Linux uses its own boot protocol, real-time setup, decompression, and
+        EFI stubs. The concept of ``load an ELF and transfer control'' is the
+        same; the implementation is much simpler.
+  \item \textbf{Long mode and GDT (35/100)}: the sequence PAE $\rightarrow$
+        LME $\rightarrow$ PG is the same as in \code{head\_64.S}; there is a
+        GDT with ring 3 and TSS, but \emph{per-CPU}, \emph{stack canary},
+        \emph{paravirt}, and secondary CPU handling are missing.
+  \item \textbf{Paging (25/100)}: there are 2 MiB \emph{huge pages} at
+        boot, a bitmap frame allocator, 4 KiB tables, and demand
+        paging; the buddy allocator, \code{vmalloc}, \code{mmap}, COW,
+        swap, NUMA, and \code{NX} protection are missing.
+  \item \textbf{Console (25/100)}: VGA text mode and scrolling are
+        analogous to \code{vgacon}, but virtual console, fonts,
+        Unicode, \emph{fbcon}, \code{printk} with levels, and log buffer are missing.
+  \item \textbf{Keyboard (18/100)}: access to the 8042 and scancode
+        translation are similar, but IRQ1, \emph{input core},
+        \code{evdev}, LEDs, layouts, and extended keys are missing.
+  \item \textbf{Serial (20/100)}: the basic programming of the 16550 is
+        similar, but the \emph{tty layer}, \emph{termios}, IRQs, input
+        FIFO, DMA, and flow control are missing.
+  \item \textbf{Interrupts (30/100)}: there is an IDT, \emph{stubs} for
+        exceptions, a remapped PIC, and the PIT on IRQ0; APIC, IRQ1,
+        spurious IRQs, \emph{softirq}, workqueues, and preemption are missing.
+  \item \textbf{Memory/heap (15/100)}: there is a frame allocator and demand
+        paging, but there is no heap, slab, page cache, or \code{vmalloc}.
+  \item \textbf{Processes (5/100)}: there is a ring 3 demo with TSS and
+        \code{int 0x80}, but there is no \code{task\_struct},
+        scheduler, context switch, separate address spaces,
+        signals, or
         syscalls.
-  \item \textbf{FS/rede (0/100)}: n\~ao h\'a VFS, block layer, TCP/IP,
-        netfilter ou drivers de dispositivos.
+  \item \textbf{FS/networking (0/100)}: there is no VFS, block layer, TCP/IP,
+        netfilter, or device drivers.
 \end{itemize}
 
-\section{Similaridade arquitetural}
+\section{Architectural similarity}
 
-A tabela a seguir compara mecanismos concretos, independentemente do tamanho
-do c\'odigo.
+The following table compares concrete mechanisms, regardless of code size.
 
 \begin{table}[H]
 \centering
-\caption{Compara\c{c}\~ao de mecanismos de hardware e arquitetura.}
+\caption{Comparison of hardware mechanisms and architecture.}
 \label{tab:mecanismos}
 \begin{tabularx}{\linewidth}{@{}p{3.6cm}p{4.7cm}X@{}}
 \toprule
-\textbf{Mecanismo} & \textbf{Linux 7.3.1} & \textbf{Rust VGA Kernel} \\
+\textbf{Mechanism} & \textbf{Linux 7.3.1} & \textbf{Rust VGA Kernel} \\
 \midrule
-Carregamento & Protocolo Linux + setup + descompress\~ao & Multiboot2 via GRUB \\
-Entrada inicial & \code{startup\_32}/\code{startup\_64} & \code{\_start} em assembly \\
-Modo longo & PAE + LME + \code{CR0.PG} & Mesma sequ\^encia, simplificada \\
-GDT & \code{gdt\_table}, \emph{per-CPU}, TSS & 7 descritores, ring 3 e
+Loading & Linux protocol + setup + decompression & Multiboot2 via GRUB \\
+Initial entry & \code{startup\_32}/\code{startup\_64} & \code{\_start} in assembly \\
+Long mode & PAE + LME + \code{CR0.PG} & Same sequence, simplified \\
+GDT & \code{gdt\_table}, \emph{per-CPU}, TSS & 7 descriptors, ring 3 and
 TSS/IST \\
-Pagina\c{c}\~ao & 4/5 n\'iveis, alocadores, \code{vmalloc} & 4 n\'iveis,
-2 MiB \emph{huge pages} + folhas 4 KiB sob demanda \\
+Paging & 4/5 levels, allocators, \code{vmalloc} & 4 levels,
+2 MiB \emph{huge pages} + 4 KiB leaves on demand \\
 Console & \code{vgacon}, VT, \code{fbcon}, \code{printk} & \code{vga.rs},
-texto 80x25 \\
-Teclado & i8042 + serio + atkbd + input & 8042 por polling (IRQ1 mascarada) \\
-Serial & 8250 + tty + termios & 16550 por polling \\
-Entrada & IRQ1/IRQ4, \emph{softirq}, workqueues & IRQ0 (timer) + polling no
+80x25 text \\
+Keyboard & i8042 + serio + atkbd + input & 8042 by polling (IRQ1 masked) \\
+Serial & 8250 + tty + termios & 16550 by polling \\
+Input & IRQ1/IRQ4, \emph{softirq}, workqueues & IRQ0 (timer) + polling in the
 shell + \code{int 0x80} \\
-Tempo & PIT/APIC, \code{jiffies}, timers & PIT a ~100 Hz, contador de
-\emph{ticks} \\
-Mem\'oria & buddy, slab, \code{vmalloc}, page cache & Bitmap de frames,
-demand paging; sem heap \\
-Processos & CFS/EEVDF, namespaces, cgroups & Demo em ring 3; sem scheduler \\
-Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} com
+Time & PIT/APIC, \code{jiffies}, timers & PIT at ~100 Hz, tick
+counter \\
+Memory & buddy, slab, \code{vmalloc}, page cache & Frame bitmap,
+demand paging; no heap \\
+Processes & CFS/EEVDF, namespaces, cgroups & Ring 3 demo; no scheduler \\
+Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} with
 \code{rax = 0} (exit) \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Similaridade de c\'odigo}
+\section{Code similarity}
 
 \begin{itemize}
-  \item \textbf{C\'opia de c\'odigo}: nenhuma. O projeto foi escrito em Rust
-        e n\~ao cont\'em trechos traduzidos do C ou do assembly do Linux.
-  \item \textbf{Algoritmos}: as sequ\^encias de inicializa\c{c}\~ao do 8042,
-        UART e modo longo seguem a documenta\c{c}\~ao de hardware e padr\~oes
-        consolidados, que o Linux tamb\'em segue. Isso \'e converg\^encia
-        t\'ecnica, n\~ao c\'opia.
-  \item \textbf{Constantes}: valores como \code{0x3F8}, \code{0x60},
-        \code{0x64}, \code{0x3D4}, \code{0xB8000} e os bits de \code{CR0},
-        \code{CR4} e \code{EFER} s\~ao definidos pelo hardware e aparecem em
-        qualquer driver, inclusive no Linux.
-  \item \textbf{Licen\c{c}a}: o projeto se declara MIT/Apache-2.0. Se
-        trechos GPL-2.0 do Linux fossem copiados, a licen\c{c}a precisaria
-        ser compat\'ivel com GPL. Como a implementa\c{c}\~ao \'e
-        independente, n\~ao h\'a essa obriga\c{c}\~ao.
+  \item \textbf{Code copying}: none. The project was written in Rust
+        and contains no translated excerpts from Linux C or assembly.
+  \item \textbf{Algorithms}: the initialization sequences of the 8042,
+        UART, and long mode follow the hardware documentation and consolidated
+        patterns, which Linux also follows. This is technical
+        convergence, not copying.
+  \item \textbf{Constants}: values such as \code{0x3F8}, \code{0x60},
+        \code{0x64}, \code{0x3D4}, \code{0xB8000} and the bits of \code{CR0},
+        \code{CR4}, and \code{EFER} are defined by the hardware and appear in
+        any driver, including Linux.
+  \item \textbf{License}: the project declares itself MIT/Apache-2.0. If
+        GPL-2.0 excerpts from Linux were copied, the license would need to be
+        compatible with GPL. Since the implementation is
+        independent, there is no such obligation.
 \end{itemize}
 
-\section{Similaridade global}
+\section{Overall similarity}
 
 \begin{table}[H]
 \centering
-\caption{Resumo das diferentes medidas de similaridade.}
+\caption{Summary of the different similarity measures.}
 \label{tab:resumo-similaridade}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{Medida} & \textbf{Resultado} \\
+\textbf{Measure} & \textbf{Result} \\
 \midrule
-C\'odigo copiado & 0\% (implementa\c{c}\~ao independente) \\
-Linhas vs.\ 12 arquivos an\'alogos & $\approx 11{,}22\%$ \\
-Linhas vs.\ \'arvore Linux completa & $\approx 0{,}0066\%$ \\
-Similaridade funcional ponderada (10 dimens\~oes) & $\approx 21{,}1\%$ \\
-Cobertura de subsistemas do kernel completo & muito baixa; ordem de 1\% \\
-Similaridade conceitual no boot & alta (mesmos mecanismos x86) \\
-Similaridade conceitual em drivers & m\'edia/baixa (subconjunto por polling) \\
-Similaridade conceitual em servi\c{c}os & nula (sem MM, scheduler, FS, rede) \\
+Copied code & 0\% (independent implementation) \\
+Lines vs.\ 12 analogous files & $\approx 11.22\%$ \\
+Lines vs.\ complete Linux tree & $\approx 0.0066\%$ \\
+Weighted functional similarity (10 dimensions) & $\approx 21.1\%$ \\
+Coverage of complete kernel subsystems & very low; on the order of 1\% \\
+Conceptual similarity in boot & high (same x86 mechanisms) \\
+Conceptual similarity in drivers & medium/low (polling subset) \\
+Conceptual similarity in services & none (no MM, scheduler, FS, networking) \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\subsection{Classifica\c{c}\~ao}
+\subsection{Classification}
 
-Em uma escala qualitativa:
+On a qualitative scale:
 
 \begin{itemize}
-  \item \textbf{Relacionamento com o Linux}: ``inspirado nos mesmos
-        conceitos e no mesmo hardware'', n\~ao ``porte'' nem ``clone''.
-  \item \textbf{Similaridade global}: \textbf{baixa}.
-  \item \textbf{Valor did\'atico}: alto para entender boot, modo longo,
-        VGA, PS/2 e serial; baixo para entender o Linux como sistema
-        operacional completo.
-  \item \textbf{Nota de 0 a 10 para ``quanto do Linux foi reimplementado''}:
-        aproximadamente \textbf{2,1/10} na pontua\c{c}\~ao ponderada; menos de
-        \textbf{0,1/10} se o crit\'erio for o kernel completo em
-        funcionalidades.
+  \item \textbf{Relationship with Linux}: ``inspired by the same
+        concepts and the same hardware'', neither a ``port'' nor a ``clone''.
+  \item \textbf{Overall similarity}: \textbf{low}.
+  \item \textbf{Educational value}: high for understanding boot, long mode,
+        VGA, PS/2, and serial; low for understanding Linux as a complete
+        operating system.
+  \item \textbf{Score from 0 to 10 for ``how much of Linux was reimplemented''}:
+        approximately \textbf{2.1/10} on the weighted score; less than
+        \textbf{0.1/10} if the criterion is the complete kernel in
+        terms of features.
 \end{itemize}
 
-\begin{nota}[Como usar esta an\'alise]
-Se o objetivo for estudar o Linux, este projeto serve como ``mapa do
-caminho inicial'': ele mostra, em c\'odigo pequeno, o que acontece antes de
-o kernel Linux come\c{c}ar a usar seus subsistemas. Se o objetivo for
-substituir o Linux, o projeto est\'a a v\'arias ordens de grandeza de
-dist\^ancia: faltam escalonador, espa\c{c}os de endere\c{c}o por processo,
-heap, sistema de arquivos, drivers e endurecimento de seguran\c{c}a.
+\begin{nota}[How to use this analysis]
+If the goal is to study Linux, this project serves as a ``map of the initial
+path'': it shows, in a small amount of code, what happens before the Linux
+kernel begins to use its subsystems. If the goal is to replace Linux, the
+project is several orders of magnitude away: it lacks a scheduler,
+per-process address spaces, heap, filesystem, drivers, and security
+hardening.
 \end{nota}
 
-\section{Diferen\c{c}as essenciais}
+\section{Essential differences}
 
 \begin{table}[H]
 \centering
-\caption{Diferen\c{c}as essenciais entre o projeto e o Linux.}
+\caption{Essential differences between the project and Linux.}
 \label{tab:diferencas}
 \begin{tabularx}{\linewidth}{@{}p{3.2cm}XX@{}}
 \toprule
-\textbf{Aspecto} & \textbf{Linux} & \textbf{Rust VGA Kernel} \\
+\textbf{Aspect} & \textbf{Linux} & \textbf{Rust VGA Kernel} \\
 \midrule
-Linguagem & C e assembly & Rust e assembly \\
-Tamanho & $\sim$38 milh\~oes de linhas & 2.500 linhas \\
-Modelo de boot & Protocolo pr\'oprio, setup, EFI & Multiboot2/GRUB \\
-Interrup\c{c}\~oes & IDT, PIC/APIC, timers & IDT, PIC/PIT; teclado em polling \\
-Concorr\^encia & SMP, preemp\c{c}\~ao, RCU & Uma CPU, sem preemp\c{c}\~ao \\
-Mem\'oria & Buddy, slab, VM, page cache & Bitmap de frames, demand paging,
-sem heap \\
-Processos & Scheduler, namespaces, cgroups & Apenas demo em ring 3 \\
-Entrada/sa\'ida & VFS, block, net, tty & Portas de I/O diretas \\
-Seguran\c{c}a & Rings, SMEP/SMAP, KASLR, LSM & Rings 0/3 e U/S; sem NX,
-SMEP ou SMAP \\
-Portabilidade & V\'arias arquiteturas & Apenas x86\_64 BIOS \\
-Licen\c{c}a & GPL-2.0 & MIT/Apache-2.0 \\
+Language & C and assembly & Rust and assembly \\
+Size & $\sim$38 million lines & 2,500 lines \\
+Boot model & Proprietary protocol, setup, EFI & Multiboot2/GRUB \\
+Interrupts & IDT, PIC/APIC, timers & IDT, PIC/PIT; keyboard by polling \\
+Concurrency & SMP, preemption, RCU & One CPU, no preemption \\
+Memory & Buddy, slab, VM, page cache & Frame bitmap, demand paging,
+no heap \\
+Processes & Scheduler, namespaces, cgroups & Ring 3 demo only \\
+Input/output & VFS, block, net, tty & Direct I/O ports \\
+Security & Rings, SMEP/SMAP, KASLR, LSM & Rings 0/3 and U/S; no NX,
+SMEP, or SMAP \\
+Portability & Several architectures & x86\_64 BIOS only \\
+License & GPL-2.0 & MIT/Apache-2.0 \\
 \bottomrule
 \end{tabularx}
 \end{table}

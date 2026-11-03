@@ -1,146 +1,142 @@
-\chapter{Introdu\c{c}\~ao}
+\chapter{Introduction}
 \label{cap:introducao}
 
-\section{Motiva\c{c}\~ao}
+\section{Motivation}
 
-O kernel Linux \'e um sistema operacional completo, com milh\~oes de linhas de
-c\'odigo e d\'ecadas de evolu\c{c}\~ao. Estudar seu funcionamento a partir do
-c\'odigo real exige percorrer camadas de abstra\c{c}\~ao, configura\c{c}\~oes de
-compila\c{c}\~ao, subsistemas e caminhos de c\'odigo que n\~ao s\~ao essenciais
-para entender o n\'ucleo do problema ``como um computador sai do boot e abre um
-terminal?''.
+The Linux kernel is a complete operating system, with millions of lines of
+code and decades of evolution. Studying how it works from the real code
+requires traversing layers of abstraction, compilation configurations,
+subsystems and code paths that are not essential to understanding the core of
+the problem ``how does a computer go from boot to opening a terminal?''.
 
-O \textbf{Rust VGA Kernel} foi criado como um recorte did\'atico desse
-problema. Ele reimplementa, em Rust, o caminho m\'inimo necess\'ario para:
+The \textbf{Rust VGA Kernel} was created as a didactic slice of that problem.
+It reimplements, in Rust, the minimum path necessary to:
 
 \begin{enumerate}
-  \item ser carregado por um bootloader padr\~ao (GRUB via Multiboot2);
-  \item sair do modo de 32 bits e entrar em modo longo x86\_64;
-  \item configurar p\'aginas e uma pilha de kernel;
-  \item inicializar um console de texto VGA 80$\times$25;
-  \item ler teclas do controlador PS/2 8042 e da serial COM1;
-  \item instalar uma IDT, receber exce\c{c}\~oes e o timer do PIT;
-  \item alocar frames de 4 KiB e materializar p\'aginas sob demanda;
-  \item executar c\'odigo em ring 3 com separa\c{c}\~ao usu\'ario/kernel;
-  \item oferecer um pequeno shell com comandos b\'asicos.
+  \item be loaded by a standard bootloader (GRUB via Multiboot2);
+  \item leave 32-bit mode and enter x86\_64 long mode;
+  \item set up pages and a kernel stack;
+  \item initialize an 80$\times$25 VGA text console;
+  \item read keys from the PS/2 8042 controller and from the COM1 serial port;
+  \item install an IDT, receive exceptions and the PIT timer;
+  \item allocate 4 KiB frames and materialize pages on demand;
+  \item execute code in ring 3 with user/kernel separation;
+  \item offer a small shell with basic commands.
 \end{enumerate}
 
-O resultado n\~ao \'e um Linux reduzido, nem um porte linha a linha. \'E um
-kernel independente, sem depend\^encias externas de Rust, que reproduz
-\emph{conceitos} dos subsistemas equivalentes do Linux em uma escala
-compreens\'ivel.
+The result is not a reduced Linux, nor a line-by-line port. It is an
+independent kernel, with no external Rust dependencies, that reproduces
+\emph{concepts} of the equivalent Linux subsystems at a comprehensible scale.
 
-\section{Objetivo do documento}
+\section{Purpose of the document}
 
-Esta documenta\c{c}\~ao tem quatro objetivos:
+This documentation has four objectives:
 
 \begin{itemize}
-  \item \textbf{Explicar a arquitetura} do kernel: camadas, fluxo de boot,
-        modelo de mem\'oria, modelo de execu\c{c}\~ao e depend\^encias entre
-        m\'odulos.
-  \item \textbf{Documentar as principais fun\c{c}\~oes} de cada m\'odulo,
-        incluindo contratos, pr\'e-condi\c{c}\~oes, efeitos colaterais e
-        limita\c{c}\~oes. O Ap\^endice~\ref{ap:funcoes} traz o cat\'alogo
-        completo das 96 fun\c{c}\~oes do projeto.
-  \item \textbf{Registrar o processo de build, execu\c{c}\~ao e valida\c{c}\~ao},
-        de forma que outra pessoa consiga reproduzir o ambiente e os testes.
-  \item \textbf{Comparar o projeto com o kernel Linux}, apresentando
-        correspond\^encias de arquivos e fun\c{c}\~oes e uma estimativa
-        transparente do n\'ivel de similaridade.
+  \item \textbf{Explain the architecture} of the kernel: layers, boot flow,
+        memory model, execution model and dependencies between modules.
+  \item \textbf{Document the main functions} of each module, including
+        contracts, preconditions, side effects and limitations.
+        Appendix~\ref{ap:funcoes} contains the complete catalog of the
+        project's 96 functions.
+  \item \textbf{Record the build, execution and validation process}, so that
+        another person can reproduce the environment and the tests.
+  \item \textbf{Compare the project with the Linux kernel}, presenting
+        correspondences of files and functions and a transparent estimate of
+        the level of similarity.
 \end{itemize}
 
-\section{Escopo}
+\section{Scope}
 
-\subsection*{O que est\'a inclu\'ido}
+\subsection*{What is included}
 
 \begin{itemize}
-  \item Boot BIOS por CD/ISO usando GRUB e o protocolo Multiboot2.
-  \item Transi\c{c}\~ao de 32 bits para modo longo (x86\_64).
-  \item GDT com segmentos ring 0/ring 3, TSS e pilhas de privil\'egio;
-        tabelas de p\'agina est\'aticas no boot e metade alta do kernel.
-  \item IDT com 256 portas, exce\c{c}\~oes, PIC remapeado e timer PIT em IRQ0.
-  \item Alocador de frames f\'isicos de 4 KiB e \emph{demand paging} para
-        regi\~oes de usu\'ario e de kernel.
-  \item Demos em ring 3 com prote\c{c}\~ao U/S e \emph{syscall} did\'atica
-        \code{int \$0x80}.
-  \item Console VGA em modo texto, com cursor de hardware, rolagem e
-        atributos de cor.
-  \item Driver de teclado PS/2 por \emph{polling}, com Shift, Enter, Tab e
+  \item BIOS boot from CD/ISO using GRUB and the Multiboot2 protocol.
+  \item Transition from 32 bits to long mode (x86\_64).
+  \item GDT with ring 0/ring 3 segments, TSS and privilege stacks; static
+        page tables at boot and the kernel's higher half.
+  \item IDT with 256 gates, exceptions, remapped PIC and PIT timer on IRQ0.
+  \item 4 KiB physical frame allocator and \emph{demand paging} for user and
+        kernel regions.
+  \item Ring 3 demos with U/S protection and a didactic
+        \emph{syscall} \code{int \$0x80}.
+  \item VGA console in text mode, with hardware cursor, scrolling and color
+        attributes.
+  \item PS/2 keyboard driver by \emph{polling}, with Shift, Enter, Tab and
         Backspace.
-  \item Driver da UART 16550 em COM1, usado para depura\c{c}\~ao e entrada.
-  \item Shell sem aloca\c{c}\~ao din\^amica com dez comandos.
-  \item \emph{Panic handler} que imprime a falha e para a CPU.
-  \item Build reprodut\'ivel com Cargo, \code{ld.lld}, \code{grub-mkrescue}
-        e QEMU.
+  \item UART 16550 driver on COM1, used for debugging and input.
+  \item Shell without dynamic allocation with ten commands.
+  \item \emph{Panic handler} that prints the failure and halts the CPU.
+  \item Reproducible build with Cargo, \code{ld.lld}, \code{grub-mkrescue}
+        and QEMU.
 \end{itemize}
 
-\subsection*{O que n\~ao est\'a inclu\'ido}
+\subsection*{What is not included}
 
 \begin{itemize}
-  \item Heap, alocador de objetos, \code{alloc} ou cole\c{c}\~oes din\^amicas.
-  \item Processos completos, threads, escalonador, troca de contexto,
-        espa\c{c}os de endere\c{c}o por processo ou um conjunto amplo de
-        chamadas de sistema.
-  \item Sistema de arquivos, rede, USB, ACPI, SMP ou suporte UEFI nativo.
-  \item Drivers para outros v\'ideos al\'em do VGA texto legado.
-  \item Endurecimento de seguran\c{c}a como SMEP, SMAP, NX, KASLR ou
-        valida\c{c}\~ao de ponteiros de usu\'ario.
+  \item Heap, object allocator, \code{alloc} or dynamic collections.
+  \item Complete processes, threads, scheduler, context switching, per-process
+        address spaces or a broad set of system calls.
+  \item Filesystem, networking, USB, ACPI, SMP or native UEFI support.
+  \item Drivers for video modes other than the legacy VGA text mode.
+  \item Security hardening such as SMEP, SMAP, NX, KASLR or validation of
+        user pointers.
 \end{itemize}
 
-\section{P\'ublico-alvo}
+\section{Target audience}
 
-O documento \'e destinado a:
+The document is intended for:
 
 \begin{itemize}
-  \item estudantes de sistemas operacionais e arquitetura de computadores;
-  \item desenvolvedores Rust interessados em \code{no\_std} e bare metal;
-  \item pessoas que desejam entender o caminho entre BIOS, bootloader e
-        console antes de estudar o kernel Linux em profundidade;
-  \item avaliadores que precisem julgar o grau de correspond\^encia entre
-        este projeto e o Linux.
+  \item students of operating systems and computer architecture;
+  \item Rust developers interested in \code{no\_std} and bare metal;
+  \item people who wish to understand the path between BIOS, bootloader and
+        console before studying the Linux kernel in depth;
+  \item reviewers who need to judge the degree of correspondence between this
+        project and Linux.
 \end{itemize}
 
-\section{Conven\c{c}\~oes}
+\section{Conventions}
 
 \begin{itemize}
-  \item Nomes de c\'odigo aparecem em \code{fonte monoespa\c{c}ada}.
-  \item Endere\c{c}os hexadecimais usam o prefixo \code{0x}.
-  \item ``Metade alta'' refere-se a endere\c{c}os acima de
-        \code{0xFFFF800000000000}, conven\c{c}\~ao usada pelo Linux e pelo
-        alvo \code{x86\_64-unknown-none}.
-  \item ``Original'' ou ``Linux'' refere-se, salvo indica\c{c}\~ao contr\'aria,
-        \`a \'arvore Linux 7.3.1 usada como refer\^encia de compara\c{c}\~ao.
-  \item Valores de endere\c{c}o e tamanho de se\c{c}\~ao citados como
-        ``observados'' foram extra\'idos da compila\c{c}\~ao de refer\^encia e
-        podem variar ligeiramente entre vers\~oes do compilador.
+  \item Code names appear in \code{monospaced font}.
+  \item Hexadecimal addresses use the \code{0x} prefix.
+  \item ``Higher half'' refers to addresses above
+        \code{0xFFFF800000000000}, a convention used by Linux and by the
+        \code{x86\_64-unknown-none} target.
+  \item ``Original'' or ``Linux'' refers, unless stated otherwise, to the Linux
+        7.3.1 tree used as the comparison reference.
+  \item Address and section size values cited as ``observed'' were extracted
+        from the reference compilation and may vary slightly between compiler
+        versions.
 \end{itemize}
 
-\section{Estado do projeto}
+\section{Project status}
 
-A vers\~ao documentada \'e a \code{0.1.0}, com as seguintes caracter\'isticas:
+The documented version is \code{0.1.0}, with the following characteristics:
 
 \begin{table}[H]
 \centering
-\caption{Resumo do estado da vers\~ao documentada.}
+\caption{Summary of the status of the documented version.}
 \label{tab:estado}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{Item} & \textbf{Situa\c{c}\~ao} \\
+\textbf{Item} & \textbf{Status} \\
 \midrule
-Compila\c{c}\~ao & \texttt{make} conclui sem erros; alvo \code{x86\_64-unknown-none}. \\
-Imagem & \code{vga-kernel.iso} El Torito, inicializ\'avel por BIOS. \\
-Boot & Validado em QEMU com SeaBIOS e GRUB Multiboot2. \\
-Console & VGA texto 80$\times$25, cursor, rolagem e cores. \\
-Entrada & PS/2 por polling e serial COM1. \\
-Interrup\c{c}\~oes & IDT com 256 portas, exce\c{c}\~oes, PIC remapeado e PIT a
+Compilation & \texttt{make} completes without errors; target \code{x86\_64-unknown-none}. \\
+Image & \code{vga-kernel.iso} El Torito, bootable by BIOS. \\
+Boot & Validated in QEMU with SeaBIOS and GRUB Multiboot2. \\
+Console & VGA text 80$\times$25, cursor, scrolling and colors. \\
+Input & PS/2 by polling and COM1 serial. \\
+Interrupts & IDT with 256 gates, exceptions, remapped PIC and PIT at
 ~100 Hz. \\
-Mem\'oria & Alocador de frames de 4 KiB, tabelas de 4 KiB e demand paging. \\
-Prote\c{c}\~ao & GDT/TSS, ring 3 e bits U/S para usu\'ario e kernel. \\
+Memory & 4 KiB frame allocator, 4 KiB tables and demand paging. \\
+Protection & GDT/TSS, ring 3 and U/S bits for user and kernel. \\
 Shell & \code{help}, \code{clear}, \code{echo}, \code{info}, \code{demand},
 \code{usertest}, \code{userprot}, \code{mem}, \code{reboot}, \code{halt}. \\
-Testes & Boot, comandos, entrada PS/2/serial, timer, page faults e ring 3
-verificados. \\
-Cobertura Linux & Subconjunto pequeno; similaridade baixa (Cap\'itulo~\ref{cap:similaridade}). \\
+Tests & Boot, commands, PS/2/serial input, timer, page faults and ring 3
+verified. \\
+Linux coverage & Small subset; low similarity (Chapter~\ref{cap:similaridade}). \\
 \bottomrule
 \end{tabularx}
 \end{table}

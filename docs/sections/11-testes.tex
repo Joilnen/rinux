@@ -1,57 +1,57 @@
-\chapter{Testes e valida\c{c}\~ao}
+\chapter{Tests and validation}
 \label{cap:testes}
 
-\section{Estrat\'egia}
+\section{Strategy}
 
-O projeto n\~ao possui testes unit\'arios automatizados no sentido usual
-(\code{cargo test}), porque o c\'odigo depende de hardware, de um bootloader
-e de um ambiente de execu\c{c}\~ao bare metal. A valida\c{c}\~ao foi feita por
-\emph{testes de integra\c{c}\~ao} em QEMU, com verifica\c{c}\~ao de:
+The project does not have automated unit tests in the usual sense
+(\code{cargo test}), because the code depends on hardware, on a bootloader
+and on a bare metal execution environment. Validation was performed through
+\emph{integration tests} in QEMU, with verification of:
 
 \begin{itemize}
-  \item sa\'ida textual na serial;
-  \item conte\'udo da mem\'oria VGA, lido pelo monitor do QEMU;
-  \item entrada pelo teclado PS/2, simulada com \code{sendkey};
-  \item entrada pela serial, enviada por socket Unix;
-  \item validade do ELF e da ISO com ferramentas externas.
+  \item textual output on the serial port;
+  \item contents of VGA memory, read through the QEMU monitor;
+  \item input from the PS/2 keyboard, simulated with \code{sendkey};
+  \item input from the serial port, sent over a Unix socket;
+  \item validity of the ELF and of the ISO with external tools.
 \end{itemize}
 
-\section{Matriz de testes}
+\section{Test matrix}
 
 \begin{table}[H]
 \centering
-\caption{Matriz de testes executados.}
+\caption{Matrix of executed tests.}
 \label{tab:testmatrix}
 \begin{tabularx}{\linewidth}{@{}lXc@{}}
 \toprule
-\textbf{ID} & \textbf{Teste} & \textbf{Resultado} \\
+\textbf{ID} & \textbf{Test} & \textbf{Result} \\
 \midrule
-T01 & \code{make clean \&\& make} conclui sem erros & Passou \\
-T02 & \code{grub-file --is-x86-multiboot2} aceita o ELF & Passou \\
-T03 & ISO reconhecida como El Torito BIOS & Passou \\
-T04 & QEMU/SeaBIOS inicializa a ISO e chega ao banner & Passou \\
-T05 & Prompt \code{rinux>} aparece na tela VGA & Passou \\
-T06 & Entrada PS/2: \code{help} lista os comandos & Passou \\
-T07 & Entrada PS/2: \code{echo ola} imprime \code{ola} & Passou \\
-T08 & Entrada serial: \code{echo serial ok} funciona & Passou \\
-T09 & Prompt retorna ap\'os cada comando & Passou \\
-T10 & \code{info} mostra as configura\c{c}\~oes do kernel & Passou \\
-T11 & \code{clear} limpa a tela & Passou \\
-T12 & \code{reboot} e \code{halt} encerram o fluxo & Verificado manualmente \\
-T13 & IDT instalada e timer IRQ0 incrementa \code{ticks} & Passou \\
-T14 & \code{demand} gera \code{\#PF} e mapeia a p\'agina do kernel & Passou \\
-T15 & \code{usertest} roda em ring 3, gera dois page faults e retorna & Passou \\
-T16 & \code{userprot} viola U/S e \'e encerrado pelo tratador & Passou \\
-T17 & \code{mem} mostra U/S = 1 para usu\'ario e 0 para o kernel & Passou \\
+T01 & \code{make clean \&\& make} completes without errors & Passed \\
+T02 & \code{grub-file --is-x86-multiboot2} accepts the ELF & Passed \\
+T03 & ISO recognized as El Torito BIOS & Passed \\
+T04 & QEMU/SeaBIOS initializes the ISO and reaches the banner & Passed \\
+T05 & \code{rinux>} prompt appears on the VGA screen & Passed \\
+T06 & PS/2 input: \code{help} lists the commands & Passed \\
+T07 & PS/2 input: \code{echo ola} prints \code{ola} & Passed \\
+T08 & Serial input: \code{echo serial ok} works & Passed \\
+T09 & Prompt returns after each command & Passed \\
+T10 & \code{info} shows the kernel configurations & Passed \\
+T11 & \code{clear} clears the screen & Passed \\
+T12 & \code{reboot} and \code{halt} end the flow & Verified manually \\
+T13 & IDT installed and timer IRQ0 increments \code{ticks} & Passed \\
+T14 & \code{demand} raises \code{\#PF} and maps the kernel page & Passed \\
+T15 & \code{usertest} runs in ring 3, raises two page faults and returns & Passed \\
+T16 & \code{userprot} violates U/S and is terminated by the handler & Passed \\
+T17 & \code{mem} shows U/S = 1 for user and 0 for kernel & Passed \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Evid\^encias de execu\c{c}\~ao}
+\section{Execution evidence}
 
-\subsection{Banner e prompt}
+\subsection{Banner and prompt}
 
-\begin{lstlisting}[style=shell,caption={Tela VGA ap\'os o boot.},label={lst:testboot}]
+\begin{lstlisting}[style=shell,caption={VGA screen after boot.},label={lst:testboot}]
 ==============================================================
   Rust VGA Kernel - x86_64 / modo longo
   Boot: Multiboot2 (BIOS)
@@ -66,13 +66,13 @@ Digite 'help' para ver os comandos.
 rinux>
 \end{lstlisting}
 
-O valor de \code{info} varia a cada execu\c{c}\~ao, porque depende da
-aloca\c{c}\~ao feita pelo GRUB. O \code{magic} deve ser sempre
+The value of \code{info} varies on each execution, because it depends on the
+allocation made by GRUB. The \code{magic} must always be
 \code{0x36d76289}.
 
-\subsection{Comando \code{help} via PS/2}
+\subsection{\code{help} command via PS/2}
 
-\begin{lstlisting}[style=shell,caption={Sa\'ida de \code{help} ap\'os entrada PS/2.},label={lst:testhelp}]
+\begin{lstlisting}[style=shell,caption={Output of \code{help} after PS/2 input.},label={lst:testhelp}]
 rinux> help
 Comandos disponiveis:
   help          mostra esta ajuda
@@ -88,31 +88,32 @@ Comandos disponiveis:
 rinux>
 \end{lstlisting}
 
-\subsection{Comando \code{echo} via PS/2}
+\subsection{\code{echo} command via PS/2}
 
-\begin{lstlisting}[style=shell,caption={Sa\'ida de \code{echo ola} ap\'os entrada PS/2.},label={lst:testecho}]
+\begin{lstlisting}[style=shell,caption={Output of \code{echo ola} after PS/2 input.},label={lst:testecho}]
 rinux> echo ola
 ola
 rinux>
 \end{lstlisting}
 
-\subsection{Entrada serial}
+\subsection{Serial input}
 
-\begin{lstlisting}[style=shell,caption={Entrada e sa\'ida pela COM1.},label={lst:testserial}]
+\begin{lstlisting}[style=shell,caption={Input and output through COM1.},label={lst:testserial}]
 echo serial ok
 serial ok
 rinux>
 \end{lstlisting}
 
-O texto digitado no socket serial aparece no VGA porque o shell ecoa cada
-caractere e o console escreve tanto no VGA quanto na serial.
+The text typed on the serial socket appears on the VGA because the shell echoes
+each character and the console writes both to the VGA and to the serial port.
 
-\section{Script de teste headless}
+\section{Headless test script}
 
-O procedimento abaixo pode ser adaptado para CI. Ele inicia o QEMU sem
-interface gr\'afica, envia um comando pela serial e l\^e a sa\'ida.
+The procedure below can be adapted for CI. It starts QEMU without a
+graphical interface, sends a command over the serial port and reads the
+output.
 
-\begin{lstlisting}[language=Python,caption={Esqueleto de teste headless com socket serial.},label={lst:testscript}]
+\begin{lstlisting}[language=Python,caption={Headless test skeleton with a serial socket.},label={lst:testscript}]
 import socket, subprocess, time, os
 
 ISO = "vga-kernel.iso"
@@ -142,11 +143,11 @@ qemu.terminate()
 qemu.wait(timeout=10)
 \end{lstlisting}
 
-Para verificar o VGA, conecte ao monitor, envie
-\code{xp /4000bx 0xb8000}, interprete os pares (caractere, atributo) e
-reconstrua as linhas. O teste PS/2 usa \code{sendkey}:
+To check the VGA, connect to the monitor, send
+\code{xp /4000bx 0xb8000}, interpret the pairs (character, attribute) and
+reconstruct the lines. The PS/2 test uses \code{sendkey}:
 
-\begin{lstlisting}[style=shell,caption={Envio de teclas pelo monitor do QEMU.},label={lst:sendkey}]
+\begin{lstlisting}[style=shell,caption={Sending keys through the QEMU monitor.},label={lst:sendkey}]
 sendkey h
 sendkey e
 sendkey l
@@ -154,15 +155,15 @@ sendkey p
 sendkey ret
 \end{lstlisting}
 
-\begin{atencao}[N\~ao envie \code{quit} antes de terminar]
-O comando \code{quit} no monitor encerra o QEMU. Se o script ainda precisar
-inspecionar o VGA ou enviar mais teclas, use uma conex\~ao separada para cada
-comando e s\'o encerre o processo ao final.
+\begin{atencao}[Do not send \code{quit} before finishing]
+The \code{quit} command in the monitor terminates QEMU. If the script still
+needs to inspect the VGA or send more keys, use a separate connection for each
+command and only terminate the process at the end.
 \end{atencao}
 
-\section{Testes de build e formato}
+\section{Build and format tests}
 
-\begin{lstlisting}[style=shell,caption={Comandos de valida\c{c}\~ao estrutural.},label={lst:testbuild}]
+\begin{lstlisting}[style=shell,caption={Structural validation commands.},label={lst:testbuild}]
 make clean && make
 grub-file --is-x86-multiboot2 target/x86_64-unknown-none/release/vga-kernel
 readelf -h target/x86_64-unknown-none/release/vga-kernel
@@ -170,50 +171,50 @@ readelf -l target/x86_64-unknown-none/release/vga-kernel
 xorriso -indev vga-kernel.iso -report_el_torito plain
 \end{lstlisting}
 
-Resultados esperados:
+Expected results:
 
 \begin{itemize}
-  \item \code{grub-file} retorna c\'odigo 0;
-  \item \code{readelf -h} mostra \code{Type: EXEC}, \code{Machine: Advanced
-        Micro Devices X86-64} e \code{Entry point address: 0x100018};
-  \item \code{readelf -l} mostra um segmento baixo em \code{0x100000} e
-        segmentos altos em \code{0xFFFFFFFF8010...};
-  \item \code{xorriso} reporta \emph{El Torito} com
+  \item \code{grub-file} returns code 0;
+  \item \code{readelf -h} shows \code{Type: EXEC}, \code{Machine: Advanced
+        Micro Devices X86-64} and \code{Entry point address: 0x100018};
+  \item \code{readelf -l} shows a low segment at \code{0x100000} and
+        high segments at \code{0xFFFFFFFF8010...};
+  \item \code{xorriso} reports \emph{El Torito} with
         \code{boot\_hybrid.img}.
 \end{itemize}
 
-\section{Limita\c{c}\~oes dos testes}
+\section{Test limitations}
 
 \begin{itemize}
-  \item N\~ao h\'a cobertura automatizada de todos os caminhos do teclado
-        (Shift, Tab, Backspace, teclas estendidas).
-  \item O teste PS/2 depende do \code{sendkey} do QEMU e do layout de teclas
-        do monitor; nem todos os caracteres s\~ao f\'aceis de simular.
-  \item A leitura do VGA pelo monitor depende do formato de dump e do
-        endere\c{c}o \code{0xB8000}.
-  \item O comportamento em hardware f\'isico pode diferir do QEMU,
-        especialmente em UEFI sem CSM, teclados USB e chipsets sem 8042.
-  \item \code{reboot} e \code{halt} foram verificados manualmente; n\~ao h\'a
-        teste automatizado de reset.
-  \item N\~ao h\'a testes de estresse, tempo ou concorr\^encia.
+  \item There is no automated coverage of all keyboard paths
+        (Shift, Tab, Backspace, extended keys).
+  \item The PS/2 test depends on QEMU's \code{sendkey} and on the monitor's
+        key layout; not all characters are easy to simulate.
+  \item Reading the VGA through the monitor depends on the dump format and on
+        the \code{0xB8000} address.
+  \item Behavior on physical hardware may differ from QEMU,
+        especially on UEFI without CSM, USB keyboards and chipsets without 8042.
+  \item \code{reboot} and \code{halt} were verified manually; there is no
+        automated reset test.
+  \item There are no stress, timing or concurrency tests.
 \end{itemize}
 
-\section{Checklist de aceita\c{c}\~ao}
+\section{Acceptance checklist}
 
 \begin{itemize}
-  \item[$\square$] \code{make} gera ELF e ISO sem erros.
-  \item[$\square$] \code{grub-file} reconhece Multiboot2.
-  \item[$\square$] QEMU chega ao banner e ao prompt \code{rinux>}.
-  \item[$\square$] \code{help}, \code{echo}, \code{info} e \code{clear}
-        funcionam pelo teclado PS/2.
-  \item[$\square$] Entrada pela serial funciona.
-  \item[$\square$] \code{info} mostra o timer e \code{mem} mostra
-        \emph{ticks} crescentes.
-  \item[$\square$] \code{demand} mapeia a p\'agina do kernel ap\'os
+  \item[$\square$] \code{make} generates the ELF and the ISO without errors.
+  \item[$\square$] \code{grub-file} recognizes Multiboot2.
+  \item[$\square$] QEMU reaches the banner and the \code{rinux>} prompt.
+  \item[$\square$] \code{help}, \code{echo}, \code{info} and \code{clear}
+        work through the PS/2 keyboard.
+  \item[$\square$] Serial input works.
+  \item[$\square$] \code{info} shows the timer and \code{mem} shows
+        increasing \emph{ticks}.
+  \item[$\square$] \code{demand} maps the kernel page after
         \code{\#PF}.
-  \item[$\square$] \code{usertest} gera dois page faults e retorna ao shell.
-  \item[$\square$] \code{userprot} \'e encerrado pela prote\c{c}\~ao U/S.
-  \item[$\square$] \code{halt} para a CPU e \code{reboot} reinicia (quando o
-        ambiente suporta).
-  \item[$\square$] A documenta\c{c}\~ao LaTeX compila e gera o PDF.
+  \item[$\square$] \code{usertest} raises two page faults and returns to the shell.
+  \item[$\square$] \code{userprot} is terminated by the U/S protection.
+  \item[$\square$] \code{halt} stops the CPU and \code{reboot} restarts (when the
+        environment supports it).
+  \item[$\square$] The LaTeX documentation compiles and generates the PDF.
 \end{itemize}

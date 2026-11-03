@@ -1,12 +1,12 @@
-\chapter{Arquitetura}
+\chapter{Architecture}
 \label{cap:arquitetura}
 
-\section{Vis\~ao em camadas}
+\section{Layered view}
 
-O kernel \'e organizado em seis camadas conceituais. As camadas inferiores
-dependem apenas de hardware e de \code{core}; as superiores usam as
-inferiores. N\~ao h\'a \code{std}, alocador de heap, \emph{runtime} de Rust
-nem bibliotecas de terceiros.
+The kernel is organized into six conceptual layers. The lower layers depend
+only on hardware and on \code{core}; the upper layers use the lower ones.
+There is no \code{std}, heap allocator, Rust \emph{runtime} or third-party
+library.
 
 \begin{figure}[H]
 \centering
@@ -19,94 +19,94 @@ nem bibliotecas de terceiros.
              align=center, font=\small},
   node distance=0.35cm
 ]
-\node[layer] (shell) {\textbf{Interface} --- shell: linha de comando, \code{help}, \code{echo}, \code{info}, \code{demand}, \code{usertest}};
-\node[layer, below=of shell] (services) {\textbf{Servi\c{c}os} --- console VGA, entrada PS/2, serial, macros de impress\~ao};
-\node[layer, below=of services] (mem) {\textbf{Mem\'oria e interrup\c{c}\~oes} --- GDT/TSS, IDT/PIC/PIT, frames e \emph{demand paging}};
-\node[layer, below=of mem] (core) {\textbf{N\'ucleo} --- \code{kernel\_main}, panic handler, spinlock, portas de I/O};
-\node[layer, below=of core] (boot) {\textbf{Boot} --- stub 32/64 bits, GDT inicial, PML4/PDPT/PD, Multiboot2};
-\node[hw, below=of boot] (hw) {\textbf{Hardware} --- CPU x86\_64, VGA, 8042, UART 16550, PIC/PIT, BIOS/GRUB};
+\node[layer] (shell) {\textbf{Interface} --- shell: command line, \code{help}, \code{echo}, \code{info}, \code{demand}, \code{usertest}};
+\node[layer, below=of shell] (services) {\textbf{Services} --- VGA console, PS/2 input, serial, print macros};
+\node[layer, below=of services] (mem) {\textbf{Memory and interrupts} --- GDT/TSS, IDT/PIC/PIT, frames and \emph{demand paging}};
+\node[layer, below=of mem] (core) {\textbf{Core} --- \code{kernel\_main}, panic handler, spinlock, I/O ports};
+\node[layer, below=of core] (boot) {\textbf{Boot} --- 32/64-bit stub, initial GDT, PML4/PDPT/PD, Multiboot2};
+\node[hw, below=of boot] (hw) {\textbf{Hardware} --- x86\_64 CPU, VGA, 8042, UART 16550, PIC/PIT, BIOS/GRUB};
 \draw[-{Latex[length=2mm]}, thick, rinuxblue] (shell) -- (services);
 \draw[-{Latex[length=2mm]}, thick, rinuxblue] (services) -- (mem);
 \draw[-{Latex[length=2mm]}, thick, rinuxblue] (mem) -- (core);
 \draw[-{Latex[length=2mm]}, thick, rinuxblue] (core) -- (boot);
 \draw[-{Latex[length=2mm]}, thick, black!60] (boot) -- (hw);
 \end{tikzpicture}
-\caption{Camadas do Rust VGA Kernel.}
+\caption{Layers of the Rust VGA Kernel.}
 \label{fig:camadas}
 \end{figure}
 
-\section{Modelo de execu\c{c}\~ao}
+\section{Execution model}
 
-O kernel executa em \textbf{ring 0}, em uma \'unica CPU, com
-\textbf{interrup\c{c}\~oes desligadas}. Todo o processamento \'e feito por
-\emph{polling}: o shell consulta o teclado e a serial em um la\c{c}o ativo,
-usando \code{core::hint::spin\_loop()} quando n\~ao h\'a entrada.
+The kernel runs in \textbf{ring 0}, on a \textbf{single CPU}, with
+\textbf{interrupts disabled}. All processing is done by
+\emph{polling}: the shell checks the keyboard and the serial port in an active
+loop, using \code{core::hint::spin\_loop()} when there is no input.
 
 \begin{table}[H]
 \centering
-\caption{Caracter\'isticas do modelo de execu\c{c}\~ao.}
+\caption{Characteristics of the execution model.}
 \label{tab:modelo}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{Aspecto} & \textbf{Implementa\c{c}\~ao} \\
+\textbf{Aspect} & \textbf{Implementation} \\
 \midrule
-Privil\'egio & Ring 0 para o kernel; ring 3 apenas nos demos de
-\code{user.rs}, com GDT/TSS. \\
-CPUs & Uma CPU; SMP n\~ao \'e inicializado. \\
-Interrup\c{c}\~oes & IDT com 256 portas; PIC remapeado e timer IRQ0 a
-~100 Hz. IRQ1 (teclado) permanece mascarada. \\
-Entrada & Polling de \code{0x60}/\code{0x64} e de COM1; timer por IRQ. \\
-Concorr\^encia & Spinlock no console; o timer n\~ao preempta (n\~ao h\'a
-escalonador). \\
-Mem\'oria & Frames f\'isicos de 4 KiB, tabelas sob demanda e page faults;
-sem heap, \code{alloc} ou \code{Vec}. \\
-Pilhas & 8 KiB no stub (baixa), 32 KiB no kernel (alta), 16 KiB para
-interrup\c{c}\~oes de usu\'ario e 8 KiB de IST para double fault. \\
-Tempo de vida & O shell nunca retorna; \code{halt} e \code{reboot} encerram o fluxo. \\
+Privilege & Ring 0 for the kernel; ring 3 only in the demos of
+\code{user.rs}, with GDT/TSS. \\
+CPUs & One CPU; SMP is not initialized. \\
+Interrupts & IDT with 256 gates; PIC remapped and timer IRQ0 at
+~100 Hz. IRQ1 (keyboard) remains masked. \\
+Input & Polling of \code{0x60}/\code{0x64} and of COM1; timer via IRQ. \\
+Concurrency & Spinlock in the console; the timer does not preempt (there is no
+scheduler). \\
+Memory & 4 KiB physical frames, on-demand tables and page faults;
+no heap, \code{alloc} or \code{Vec}. \\
+Stacks & 8 KiB in the stub (low), 32 KiB in the kernel (high), 16 KiB for
+user interrupts and 8 KiB of IST for double fault. \\
+Lifetime & The shell never returns; \code{halt} and \code{reboot} end the flow. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Depend\^encias entre m\'odulos}
+\section{Dependencies between modules}
 
 \begin{table}[H]
 \centering
-\caption{Depend\^encias principais entre m\'odulos.}
+\caption{Main dependencies between modules.}
 \label{tab:dependencias}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{M\'odulo} & \textbf{Usa / \'e usado por} \\
+\textbf{Module} & \textbf{Uses / is used by} \\
 \midrule
-\code{main.rs} & Declara todos os m\'odulos; chama \code{vga}, \code{serial},
-\code{paging}, \code{gdt}, \code{keyboard}, \code{idt}, \code{arch} e
+\code{main.rs} & Declares all modules; calls \code{vga}, \code{serial},
+\code{paging}, \code{gdt}, \code{keyboard}, \code{idt}, \code{arch} and
 \code{shell}. \\
-\code{boot.rs} & Assembly que chama \code{kernel\_main}; n\~ao \'e chamado por
+\code{boot.rs} & Assembly that calls \code{kernel\_main}; it is not called by
 Rust. \\
-\code{arch.rs} & Portas de I/O, \code{sti}, \code{halt} e \code{reboot};
-usado por v\'arios m\'odulos. \\
-\code{gdt.rs} & GDT/TSS e pilhas; usa apenas \code{core::arch}. \\
-\code{idt.rs} & Usa \code{arch}, \code{paging} e \code{user} para tratar
-exce\c{c}\~oes, IRQs e a \emph{syscall}. \\
-\code{paging.rs} & Frames, tabelas e \emph{page faults}; usa apenas
+\code{arch.rs} & I/O ports, \code{sti}, \code{halt} and \code{reboot};
+used by several modules. \\
+\code{gdt.rs} & GDT/TSS and stacks; uses only \code{core::arch}. \\
+\code{idt.rs} & Uses \code{arch}, \code{paging} and \code{user} to handle
+exceptions, IRQs and the \emph{syscall}. \\
+\code{paging.rs} & Frames, tables and \emph{page faults}; uses only
 \code{core::arch}. \\
-\code{user.rs} & Monta o programa, chama \code{paging} e retorna ao kernel
-por \code{user\_resume}. \\
-\code{shell.rs} & Usa \code{keyboard}, \code{serial}, \code{vga},
-\code{idt}, \code{paging}, \code{user} e \code{arch}. \\
-\code{vga.rs} & Usa \code{sync}, \code{serial} e \code{arch}. \\
-\code{keyboard.rs} & Usa \code{arch} para acessar o 8042. \\
-\code{serial.rs} & Usa \code{arch} para acessar a UART. \\
-\code{sync.rs} & Spinlock do console; usa apenas \code{core}. \\
+\code{user.rs} & Builds the program, calls \code{paging} and returns to the kernel
+through \code{user\_resume}. \\
+\code{shell.rs} & Uses \code{keyboard}, \code{serial}, \code{vga},
+\code{idt}, \code{paging}, \code{user} and \code{arch}. \\
+\code{vga.rs} & Uses \code{sync}, \code{serial} and \code{arch}. \\
+\code{keyboard.rs} & Uses \code{arch} to access the 8042. \\
+\code{serial.rs} & Uses \code{arch} to access the UART. \\
+\code{sync.rs} & Console spinlock; uses only \code{core}. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-A tabela mostra apenas as depend\^encias relevantes. \code{boot.rs} \'e um
-caso especial: ele cont\'em o c\'odigo de montagem que chama \code{kernel\_main}
-e n\~ao \'e chamado por Rust. \code{main.rs} declara todos os m\'odulos e
-exporta as macros \code{print!} e \code{println!}.
+The table shows only the relevant dependencies. \code{boot.rs} is a
+special case: it contains the assembly code that calls \code{kernel\_main}
+and is not called by Rust. \code{main.rs} declares all modules and
+exports the \code{print!} and \code{println!} macros.
 
-\section{Cadeia de boot}
+\section{Boot chain}
 
 \begin{figure}[H]
 \centering
@@ -123,7 +123,7 @@ exporta as macros \code{print!} e \code{println!}.
 \node[stage, right=of grub] (mb) {Multiboot2\\kernel.elf};
 \node[stage, below=1.0cm of mb] (stub) {\_start\\32 bits @ 1 MiB};
 \node[stage, left=of stub] (paging) {PML4/PDPT/PD\\GDT + long mode};
-\node[stage, left=of paging] (main) {kernel\_main\\metade alta};
+\node[stage, left=of paging] (main) {kernel\_main\\higher half};
 \node[stage, left=of main] (shell) {vga / serial / kbd\\shell};
 \draw[arrow] (bios) -- (eltorito);
 \draw[arrow] (eltorito) -- (grub);
@@ -133,95 +133,95 @@ exporta as macros \code{print!} e \code{println!}.
 \draw[arrow] (paging) -- (main);
 \draw[arrow] (main) -- (shell);
 \end{tikzpicture}
-\caption{Cadeia de boot completa.}
+\caption{Complete boot chain.}
 \label{fig:bootchain}
 \end{figure}
 
-\section{Decis\~oes de projeto}
+\section{Design decisions}
 
 \begin{table}[H]
 \centering
-\caption{Decis\~oes arquiteturais e justificativas.}
+\caption{Architectural decisions and rationale.}
 \label{tab:decisoes}
 \begin{tabularx}{\linewidth}{@{}p{3.3cm}X@{}}
 \toprule
-\textbf{Decis\~ao} & \textbf{Justificativa} \\
+\textbf{Decision} & \textbf{Rationale} \\
 \midrule
-\code{no\_std} & Elimina depend\^encia de sistema operacional, alocador e
-\emph{runtime}; o c\'odigo usa apenas \code{core}. \\
-Sem depend\^encias & Reduz superf\'icie de ataque e mant\'em o build
-reprodut\'ivel; \code{Cargo.lock} n\~ao tem pacotes externos. \\
-Alvo \code{x86\_64-unknown-none} & Alvo oficial bare metal, com modelo de
-c\'odigo \emph{kernel} e sem biblioteca padr\~ao. \\
-Kernel na metade alta & Conven\c{c}\~ao do Linux e do alvo; evita depender de
-endere\c{c}os baixos e deixa o stub separado. \\
-Stub em assembly & O controle inicial vem em 32 bits com pilha indefinida;
-a transi\c{c}\~ao para 64 bits exige c\'odigo posicional e controle exato. \\
-Tabelas de p\'agina est\'aticas & O stub n\~ao tem alocador; 3 p\'aginas de
-4 KiB s\~ao suficientes para mapear 1 GiB com \emph{huge pages} de 2 MiB.
-Depois do boot, \code{paging.rs} aloca tabelas de 4 KiB para as regi\~oes sob
-demanda. \\
-Polling no teclado & Mant\'em IRQ1 mascarada e evita um buffer de scancodes;
-o timer IRQ0 j\'a demonstra o caminho de interrup\c{c}\~ao. \\
-Serial al\'em do VGA & Permite depura\c{c}\~ao e testes automatizados sem
-depender de captura gr\'afica. \\
-\emph{Panic abort} & N\~ao h\'a \emph{unwinding} nem runtime de p\^anico;
-\code{panic=abort} reduz c\'odigo gerado. \\
-LTO e \code{codegen-units=1} & Gera um bin\'ario pequeno e previs\'ivel; o
-linker descarta se\c{c}\~oes n\~ao usadas com \code{--gc-sections}. \\
+\code{no\_std} & Eliminates the dependency on an operating system, allocator and
+\emph{runtime}; the code uses only \code{core}. \\
+No dependencies & Reduces the attack surface and keeps the build
+reproducible; \code{Cargo.lock} has no external packages. \\
+Target \code{x86\_64-unknown-none} & Official bare-metal target, with the
+\emph{kernel} code model and no standard library. \\
+Kernel in the higher half & Linux and target convention; avoids depending on
+low addresses and keeps the stub separate. \\
+Stub in assembly & Initial control arrives in 32 bits with an undefined stack;
+the transition to 64 bits requires position-independent code and exact control. \\
+Static page tables & The stub has no allocator; 3 pages of
+4 KiB are enough to map 1 GiB with 2 MiB \emph{huge pages}.
+After boot, \code{paging.rs} allocates 4 KiB tables for the regions under
+demand. \\
+Polling on the keyboard & Keeps IRQ1 masked and avoids a scancode buffer;
+the IRQ0 timer already demonstrates the interrupt path. \\
+Serial in addition to VGA & Allows debugging and automated testing without
+depending on graphical capture. \\
+\emph{Panic abort} & There is no \emph{unwinding} or panic runtime;
+\code{panic=abort} reduces generated code. \\
+LTO and \code{codegen-units=1} & Produces a small, predictable binary; the
+linker discards unused sections with \code{--gc-sections}. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Tratamento de erros e falhas}
+\section{Error and failure handling}
 
-O kernel n\~ao possui um subsistema de erros. As estrat\'egias s\~ao:
+The kernel has no error subsystem. The strategies are:
 
 \begin{itemize}
-  \item \textbf{Timeout em esperas de hardware}: as fun\c{c}\~oes do 8042
-        tentam por um n\'umero limitado de itera\c{c}\~oes e desistem, evitando
-        \emph{hang} quando o controlador n\~ao responde.
-  \item \textbf{Verifica\c{c}\~ao de presen\c{c}a da UART}: se o registrador de
-        status devolver \code{0xFF}, a serial \'e considerada ausente.
-  \item \textbf{Entrada inv\'alida}: bytes fora da faixa imprim\'ivel s\~ao
-        ignorados no shell; UTF-8 inv\'alido em \code{echo} vira uma
-        mensagem fixa.
-  \item \textbf{Panic}: o handler imprime \code{[PANIC]} no console e entra em
-        \code{halt\_loop()}. Exce\c{c}\~oes de CPU passam pela IDT; um
-        \code{\#PF} sob demanda pode ser resolvido, mas uma falha fora das
-        regi\~oes mapeadas imprime diagn\'ostico e para a CPU. Um
-        \code{\#DF} usa a pilha IST e tamb\'em para o sistema.
-  \item \textbf{Sem recupera\c{c}\~ao}: n\~ao h\'a \emph{kernel oops},
-        reinicializa\c{c}\~ao controlada ou despejo de pilha.
+  \item \textbf{Timeouts in hardware waits}: the 8042 functions
+        try for a limited number of iterations and give up, avoiding a
+        \emph{hang} when the controller does not respond.
+  \item \textbf{UART presence check}: if the status register
+        returns \code{0xFF}, the serial port is considered absent.
+  \item \textbf{Invalid input}: bytes outside the printable range are
+        ignored in the shell; invalid UTF-8 in \code{echo} becomes a
+        fixed message.
+  \item \textbf{Panic}: the handler prints \code{[PANIC]} on the console and enters
+        \code{halt\_loop()}. CPU exceptions go through the IDT; a
+        demand \code{\#PF} can be resolved, but a fault outside the
+        mapped regions prints diagnostics and stops the CPU. A
+        \code{\#DF} uses the IST stack and also stops the system.
+  \item \textbf{No recovery}: there is no \emph{kernel oops},
+        controlled reboot or stack dump.
 \end{itemize}
 
-\section{Concorr\^encia e sincroniza\c{c}\~ao}
+\section{Concurrency and synchronization}
 
-Apesar de o sistema ser monoprocessado e rodar com interrup\c{c}\~oes
-desligadas, o console \'e protegido por um \code{SpinLock}. Isso permite que
-chamadas de impress\~ao vindas de contextos diferentes no futuro n\~ao
-intercalem bytes no buffer VGA. O lock usa \code{AtomicBool::swap} com
-ordena\c{c}\~ao \code{Acquire} na aquisi\c{c}\~ao e \code{Release} na
-libera\c{c}\~ao. A serial n\~ao \'e protegida pelo lock; como o console
-escreve VGA e serial em sequ\^encia, uma futura implementa\c{c}\~ao
-multithread precisaria de um lock adicional para a UART.
+Although the system is uniprocessor and runs with interrupts
+disabled, the console is protected by a \code{SpinLock}. This allows
+print calls coming from different contexts in the future not to
+interleave bytes in the VGA buffer. The lock uses \code{AtomicBool::swap} with
+\code{Acquire} ordering on acquisition and \code{Release} on
+release. The serial port is not protected by the lock; since the console
+writes VGA and serial in sequence, a future multithreaded implementation
+would need an additional lock for the UART.
 
-\section{Ciclo de vida da inicializa\c{c}\~ao}
+\section{Initialization lifecycle}
 
 \begin{table}[H]
 \centering
-\caption{Ordem de inicializa\c{c}\~ao em \code{kernel\_main}.}
+\caption{Initialization order in \code{kernel\_main}.}
 \label{tab:init}
 \begin{tabular}{@{}clp{7.5cm}@{}}
 \toprule
-\textbf{\#} & \textbf{Chamada} & \textbf{Efeito} \\
+\textbf{\#} & \textbf{Call} & \textbf{Effect} \\
 \midrule
-1 & \code{vga::init()} & Limpa a tela, zera o cursor, define forma do cursor. \\
-2 & \code{serial::init()} & Configura COM1 em 38400 8N1 e detecta presen\c{c}a. \\
-3 & \code{keyboard::init()} & Configura o 8042, tradu\c{c}\~ao e varredura. \\
-4 & \code{println!} & Banner e mensagem de boas-vindas (VGA + serial). \\
-5 & valida\c{c}\~ao & Confere \code{magic == 0x36d76289}. \\
-6 & \code{shell::run()} & La\c{c}o eterno de prompt e leitura de comandos. \\
+1 & \code{vga::init()} & Clears the screen, zeroes the cursor, sets the cursor shape. \\
+2 & \code{serial::init()} & Configures COM1 at 38400 8N1 and detects presence. \\
+3 & \code{keyboard::init()} & Configures the 8042, translation and scanning. \\
+4 & \code{println!} & Banner and welcome message (VGA + serial). \\
+5 & validation & Checks \code{magic == 0x36d76289}. \\
+6 & \code{shell::run()} & Eternal loop of prompt and command reading. \\
 \bottomrule
 \end{tabular}
 \end{table}

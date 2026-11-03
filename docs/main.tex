@@ -1,12 +1,12 @@
 % =============================================================================
-%  Documentacao tecnica do Rust VGA Kernel
-%  Compile com: latexmk -pdf main.tex   (ou make)
+%  Technical documentation for the Rust VGA Kernel
+%  Build with: latexmk -pdf main.tex   (or make)
 % =============================================================================
 \documentclass[11pt,a4paper,oneside]{report}
 
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
-\usepackage[brazilian]{babel}
+\usepackage[english]{babel}
 \usepackage{lmodern}
 \usepackage{microtype}
 \usepackage[a4paper,top=2.6cm,bottom=2.6cm,left=2.6cm,right=2.6cm]{geometry}
@@ -30,7 +30,7 @@
 \usepackage[hidelinks,unicode]{hyperref}
 
 % -----------------------------------------------------------------------------
-% Cores e estilo
+% Colors and style
 % -----------------------------------------------------------------------------
 \definecolor{rinuxblue}{HTML}{1F4E79}
 \definecolor{rinuxlight}{HTML}{EAF1F8}
@@ -42,7 +42,7 @@
 
 \titleformat{\chapter}[display]
   {\normalfont\bfseries\color{rinuxblue}}
-  {\filright\Large Cap\'itulo \thechapter}
+  {\filright\Large Chapter \thechapter}
   {0.6ex}
   {\Huge}
 \titlespacing*{\chapter}{0pt}{-10pt}{24pt}
@@ -54,7 +54,7 @@
 
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small\textcolor{rinuxgray}{Rust VGA Kernel --- Documenta\c{c}\~ao T\'ecnica}}
+\fancyhead[L]{\small\textcolor{rinuxgray}{Rust VGA Kernel --- Technical Documentation}}
 \fancyhead[R]{\small\textcolor{rinuxgray}{\thepage}}
 \renewcommand{\headrulewidth}{0.4pt}
 \setlength{\headheight}{14pt}
@@ -110,7 +110,7 @@
   backgroundcolor=\color{black!3},
 }
 
-% Caixas de destaque
+% Highlight boxes
 \newtcolorbox{nota}[1][]{
   enhanced, colback=rinuxlight, colframe=rinuxblue,
   boxrule=0.5pt, left=6pt, right=6pt, top=4pt, bottom=4pt,
@@ -125,35 +125,34 @@
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\termo}[1]{\textit{#1}}
 
-% Metadados
+% Metadata
 \title{\vspace{-2cm}\textbf{Rust VGA Kernel}\\[0.4em]
-       \Large Documenta\c{c}\~ao T\'ecnica, Arquitetura e Compara\c{c}\~ao com o Linux}
-\author{Documenta\c{c}\~ao gerada a partir do c\'odigo-fonte}
-\date{Vers\~ao 1.0 --- 3 de novembro de 2026}
+       \Large Technical Documentation, Architecture and Comparison with Linux}
+\author{Documentation generated from the source code}
+\date{Version 1.0 --- November 3, 2026}
 
 \begin{document}
 
 \hypersetup{
-  pdftitle={Rust VGA Kernel - Documentacao Tecnica},
+  pdftitle={Rust VGA Kernel - Technical Documentation},
   pdfauthor={Rust VGA Kernel},
-  pdfsubject={Kernel minimalista x86-64 em Rust},
+  pdfsubject={Minimal x86-64 kernel in Rust},
   pdfkeywords={Rust, kernel, x86-64, multiboot2, VGA, PS/2, Linux}
 }
 
 \maketitle
 
 \begin{abstract}
-Este documento descreve integralmente o \textbf{Rust VGA Kernel}, um kernel
-did\'atico escrito em Rust com \code{no\_std} para PCs padr\~ao com BIOS/x86\_64.
-O texto cobre a arquitetura, a cadeia de boot, o modelo de mem\'oria, os
-drivers de v\'ideo VGA, teclado PS/2 e serial, o shell embutido, o processo de
-compila\c{c}\~ao e empacotamento da ISO, os testes realizados e uma an\'alise
-quantitativa e qualitativa do grau de similaridade com o kernel Linux.
-O c\'odigo implementa o caminho m\'inimo entre o bootloader e um terminal
-funcional, acrescido de IDT, timer, paginas de 4 KiB, \emph{demand paging} e
-uma demonstra\c{c}\~ao de c\'odigo em ring 3. N\~ao \'e um porte do Linux e
-n\~ao implementa escalonador, heap, sistema de arquivos ou um conjunto
-completo de chamadas de sistema.
+This document describes the \textbf{Rust VGA Kernel} in full, an educational
+kernel written in Rust with \code{no\_std} for standard BIOS/x86\_64 PCs.
+The text covers the architecture, the boot chain, the memory model, the VGA
+video, PS/2 keyboard and serial drivers, the built-in shell, the build and ISO
+packaging process, the tests performed, and a quantitative and qualitative
+analysis of how closely it resembles the Linux kernel.
+The code implements the minimum path between the bootloader and a working
+terminal, extended with an IDT, a timer, 4 KiB pages, \emph{demand paging}
+and a demonstration of ring 3 code. It is not a port of Linux and does not
+implement a scheduler, a heap, a filesystem or a complete set of system calls.
 \end{abstract}
 
 \tableofcontents

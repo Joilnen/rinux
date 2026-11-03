@@ -1,0 +1,236 @@
+\chapter{Console VGA em modo texto}
+\label{cap:vga}
+
+\section{Vis\~ao geral}
+
+O driver \code{src/vga.rs} \'e o equivalente simplificado do \code{vgacon} do
+Linux. Ele opera no modo texto legado da VGA, no qual a tela \'e uma matriz
+de 80 colunas por 25 linhas armazenada a partir do endere\c{c}o f\'isico
+\code{0xB8000}. Cada c\'elula ocupa 16 bits.
+
+\begin{table}[H]
+\centering
+\caption{Formato de uma c\'elula de texto VGA.}
+\label{tab:vgacell}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Bits} & \textbf{Campo} & \textbf{Valor usado} \\
+\midrule
+0--7  & Caractere ASCII & C\'odigo do caractere \\
+8--11 & Cor de primeiro plano & \code{0x7} (cinza claro) \\
+12--14 & Cor de fundo & \code{0x0} (preto) \\
+15    & Piscar & \code{0} (desligado) \\
+\midrule
+\multicolumn{3}{@{}l@{}}{\textbf{Atributo completo}: \code{0x07}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+O buffer tem $80 \times 25 = 2.000$ c\'elulas, ou 4.000 bytes. A posi\c{c}\~ao
+do cursor \'e controlada pelos registradores da CRTC, acessados pelas portas
+\code{0x3D4} (\'indice) e \code{0x3D5} (dados).
+
+\section{Estado do console}
+
+\begin{lstlisting}[caption={Estado mantido pelo console.},label={lst:consolestate}]
+struct Console {
+    column: usize,
+    row: usize,
+    color: u8,
+}
+\end{lstlisting}
+
+O estado \'e protegido por \code{static CONSOLE: SpinLock<Console>}. N\~ao
+h\'a buffer de \emph{scrollback}, nem mem\'oria separada da tela: cada
+altera\c{c}\~ao \'e escrita diretamente no \emph{framebuffer} com
+\code{write\_volatile}.
+
+\section{Opera\c{c}\~oes}
+
+\subsection{Inicializa\c{c}\~ao}
+
+\code{vga::init()}:
+
+\begin{enumerate}
+  \item adquire o lock do console;
+  \item preenche as 2.000 c\'elulas com espa\c{c}o e atributo \code{0x07};
+  \item zera coluna e linha;
+  \item configura o cursor como uma linha inferior, escrevendo
+        \code{0x0E} no registrador \code{0x0A} (cursor start) e
+        \code{0x0F} no registrador \code{0x0B} (cursor end);
+  \item atualiza a posi\c{c}\~ao do cursor.
+\end{enumerate}
+
+\subsection{Escrita de bytes}
+
+\begin{lstlisting}[caption={Tratamento de caracteres de controle e imprim\'iveis.},label={lst:writebyte}]
+fn write_byte(&mut self, byte: u8) {
+    match byte {
+        b'\n' => self.newline(),
+        b'\r' => { self.column = 0; self.update_cursor(); }
+        b'\t' => {
+            let next = (self.column + 8) & !7;
+            if next >= BUFFER_WIDTH { self.newline(); }
+            else { self.column = next; self.update_cursor(); }
+        }
+        0x08 => self.backspace(),
+        0x20..=0x7E => self.write_char(byte as char),
+        _ => self.write_char('?'),
+    }
+}
+\end{lstlisting}
+
+Caracteres imprim\'iveis ASCII s\~ao escritos diretamente. Qualquer outro
+byte vira \code{?}; isso inclui acentos em UTF-8, que chegam como bytes
+individuais e n\~ao s\~ao decodificados.
+
+\subsection{Escrita de caracteres e quebra de linha}
+
+\code{write\_char}:
+
+\begin{itemize}
+  \item se a coluna estiver em 80, chama \code{newline()};
+  \item calcula o \'indice \code{row * 80 + column};
+  \item grava \code{(ch as u16) | (color << 8)} com \code{write\_volatile};
+  \item incrementa a coluna;
+  \item se a coluna chegou a 80, chama \code{newline()}; caso contr\'ario,
+        atualiza o cursor.
+\end{itemize}
+
+\code{newline()} zera a coluna e incrementa a linha. Se a linha atual for a
+\'ultima (24), chama \code{scroll()}.
+
+\subsection{Rolagem}
+
+\code{scroll()} move cada c\'elula da linha $n$ para a linha $n-1$ e limpa a
+\'ultima linha. O algoritmo \'e $O(80 \times 24)$ por linha adicional e n\~ao
+usa mem\'oria tempor\'aria:
+
+\begin{lstlisting}[caption={N\'ucleo da rolagem.},label={lst:scroll}]
+for row in 1..BUFFER_HEIGHT {
+    for column in 0..BUFFER_WIDTH {
+        let src = row * BUFFER_WIDTH + column;
+        let dst = (row - 1) * BUFFER_WIDTH + column;
+        let cell = read_volatile(VGA_BUFFER.add(src));
+        write_volatile(VGA_BUFFER.add(dst), cell);
+    }
+}
+/* limpa a ultima linha */
+\end{lstlisting}
+
+Como origem e destino se sobrep\~uem e a c\'opia \'e feita de cima para baixo,
+n\~ao h\'a perda de c\'elulas ainda n\~ao copiadas.
+
+\subsection{Backspace}
+
+O backspace recua a coluna; se estiver na coluna 0, passa para o fim da linha
+anterior. Em seguida, grava uma c\'elula em branco na posi\c{c}\~ao e atualiza
+o cursor. Ele n\~ao apaga al\'em da posi\c{c}\~ao (0,0).
+
+\subsection{Cursor de hardware}
+
+A posi\c{c}\~ao \'e calculada como \code{row * 80 + column} e dividida em dois
+bytes:
+
+\begin{lstlisting}[caption={Atualiza\c{c}\~ao do cursor via CRTC.},label={lst:cursor}]
+outb(0x3D4, 0x0F);
+outb(0x3D5, (position & 0xFF) as u8);
+outb(0x3D4, 0x0E);
+outb(0x3D5, (position >> 8) as u8);
+\end{lstlisting}
+
+O registrador \code{0x0E} recebe o byte alto e \code{0x0F} o byte baixo.
+
+\section{Pipeline de impress\~ao}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw=rinuxblue, fill=rinuxlight, rounded corners=2pt,
+              minimum width=2.8cm, minimum height=1.0cm,
+              align=center, font=\scriptsize},
+  arrow/.style={-{Latex[length=2mm]}, thick, rinuxblue},
+  node distance=0.55cm
+]
+\node[box] (macro) {\code{println!}};
+\node[box, right=of macro] (args) {\code{format\_args!}};
+\node[box, right=of args] (print) {\code{vga::\_print}};
+\node[box, right=of print] (writer) {\code{ConsoleWriter}};
+\node[box, below=0.8cm of writer] (serial) {\code{serial::write\_str}};
+\node[box, left=of serial] (vga) {\code{Console::write\_string}};
+\node[box, left=of vga] (fb) {VGA \code{0xB8000}};
+\draw[arrow] (macro) -- (args);
+\draw[arrow] (args) -- (print);
+\draw[arrow] (print) -- (writer);
+\draw[arrow] (writer) -- (vga);
+\draw[arrow] (writer) -- (serial);
+\draw[arrow] (vga) -- (fb);
+\end{tikzpicture}
+\caption{Fluxo de uma chamada de impress\~ao: VGA e serial recebem o mesmo texto.}
+\label{fig:printpipeline}
+\end{figure}
+
+\code{ConsoleWriter} implementa \code{fmt::Write}. Ele adquire o lock,
+escreve no VGA, libera o lock e s\'o ent\~ao escreve na serial. Isso evita
+manter o lock durante a espera pela UART.
+
+\section{API p\'ublica}
+
+\begin{table}[H]
+\centering
+\caption{Fun\c{c}\~oes e constantes de \code{vga.rs}.}
+\label{tab:vgaapi}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Item} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\code{BUFFER\_WIDTH = 80} & Colunas da tela. \\
+\code{BUFFER\_HEIGHT = 25} & Linhas da tela. \\
+\code{init()} & Limpa a tela, configura forma e posi\c{c}\~ao do cursor. \\
+\code{clear()} & Limpa a tela (comando \code{clear}). \\
+\code{\_print(args)} & Ponto de entrada das macros; escreve VGA e serial. \\
+\code{Console::clear()} & Preenche o buffer e reposiciona o cursor. \\
+\code{Console::write\_byte()} & Interpreta controles e caracteres. \\
+\code{Console::write\_char()} & Grava uma c\'elula e avan\c{c}a a coluna. \\
+\code{Console::write\_string()} & Itera sobre os bytes de uma \code{\&str}. \\
+\code{Console::newline()} & Avan\c{c}a linha, com rolagem se necess\'ario. \\
+\code{Console::backspace()} & Retrocede e apaga uma c\'elula. \\
+\code{Console::scroll()} & Move o conte\'udo uma linha para cima. \\
+\code{Console::update\_cursor()} & Escreve a posi\c{c}\~ao na CRTC. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Exemplo de uso}
+
+\begin{lstlisting}[caption={Uso das macros no shell.},label={lst:usovga}]
+crate::print!("rinux> ");
+println!("Comandos disponiveis:");
+crate::print!("\x08");
+\end{lstlisting}
+
+O primeiro comando imprime o prompt sem quebra de linha. O segundo imprime
+uma linha completa. O terceiro envia o caractere de backspace para apagar o
+\'ultimo caractere vis\'ivel.
+
+\section{Limita\c{c}\~oes e observa\c{c}\~oes}
+
+\begin{itemize}
+  \item \textbf{Somente VGA texto}: n\~ao h\'a framebuffer gr\'afico, VBE,
+        GOP ou console virtual (VT). Em UEFI sem CSM, \code{0xB8000} pode
+        n\~ao existir.
+  \item \textbf{ASCII apenas}: n\~ao h\'a decodifica\c{c}\~ao UTF-8 nem
+        fonte bitmap pr\'opria; a fonte vem da VGA.
+  \item \textbf{Sem atributos din\^amicos}: \code{color} existe no estado,
+        mas n\~ao h\'a API p\'ublica para alter\'a-lo.
+  \item \textbf{Sem sincroniza\c{c}\~ao com o retra\c{c}o vertical}: escritas
+        podem causar \emph{tearing} ocasional, irrelevante para texto.
+  \item \textbf{Sem prote\c{c}\~ao de mem\'oria}: \code{0xB8000} \'e acessado
+        como ponteiro bruto; um endere\c{c}o inv\'alido causaria falha.
+  \item \textbf{\'Indice sem verifica\c{c}\~ao}: \code{row} e \code{column}
+        s\~ao mantidos dentro dos limites pelas fun\c{c}\~oes, mas n\~ao h\'a
+        \emph{assert} de invariantes.
+  \item \textbf{Scroll custa 1.920 leituras/escritas}: aceit\'avel para um
+        terminal, mas poderia usar \emph{hardware scrolling} ou mem\'oria
+        intermedi\'aria.
+\end{itemize}

@@ -1,139 +1,137 @@
-\chapter{Teclado PS/2}
+\chapter{PS/2 Keyboard}
 \label{cap:keyboard}
 
-\section{Vis\~ao geral}
+\section{Overview}
 
-O driver \code{src/keyboard.rs} implementa o subconjunto necess\'ario para
-ler teclas de um teclado PS/2 conectado ao controlador 8042. Ele combina
-conceitos de dois subsistemas do Linux:
+The \code{src/keyboard.rs} driver implements the subset needed to read keys
+from a PS/2 keyboard connected to the 8042 controller. It combines concepts
+from two Linux subsystems:
 
 \begin{itemize}
-  \item \code{drivers/input/serio/i8042.c}: acesso ao controlador e ao
-        protocolo de comandos;
-  \item \code{drivers/input/keyboard/atkbd.c}: interpreta\c{c}\~ao de
-        scancodes e teclas modificadoras.
+  \item \code{drivers/input/serio/i8042.c}: controller access and the command
+        protocol;
+  \item \code{drivers/input/keyboard/atkbd.c}: scancode and modifier key
+        interpretation.
 \end{itemize}
 
-N\~ao h\'a IRQ1, fila de eventos, \code{input\_device}, \emph{keycode} Linux
-nem \code{evdev}. O driver faz \emph{polling} do buffer de sa\'ida do 8042 e
-devolve bytes ASCII diretamente ao shell.
+There is no IRQ1, event queue, \code{input\_device}, Linux \emph{keycode}, or
+\code{evdev}. The driver does \emph{polling} of the 8042 output buffer and
+returns ASCII bytes directly to the shell.
 
-\section{Hardware: controlador 8042}
+\section{Hardware: 8042 controller}
 
-O 8042 exp\~oe duas portas:
+The 8042 exposes two ports:
 
 \begin{table}[H]
 \centering
-\caption{Portas do controlador 8042.}
+\caption{Ports of the 8042 controller.}
 \label{tab:ports8042}
 \begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{Porta} & \textbf{Nome} & \textbf{Uso} \\
+\textbf{Port} & \textbf{Name} & \textbf{Usage} \\
 \midrule
-\code{0x60} & Dados & Leitura de scancodes; escrita de dados ao teclado. \\
-\code{0x64} & Status/Comando & Leitura de status; escrita de comandos ao 8042. \\
+\code{0x60} & Data & Reading scancodes; writing data to the keyboard. \\
+\code{0x64} & Status/Command & Reading status; writing commands to the 8042. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-O registrador de status (\code{0x64}) tem os bits usados pelo driver:
+The status register (\code{0x64}) has the bits used by the driver:
 
 \begin{table}[H]
 \centering
-\caption{Bits de status do 8042.}
+\caption{8042 status bits.}
 \label{tab:status8042}
 \begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{Bit} & \textbf{M\'ascara} & \textbf{Significado} \\
+\textbf{Bit} & \textbf{Mask} & \textbf{Meaning} \\
 \midrule
-0 & \code{0x01} & Buffer de sa\'ida cheio (h\'a dado para ler) \\
-1 & \code{0x02} & Buffer de entrada cheio (n\~ao enviar comando) \\
-5 & \code{0x20} & Dado veio do dispositivo auxiliar (mouse) \\
+0 & \code{0x01} & Output buffer full (there is data to read) \\
+1 & \code{0x02} & Input buffer full (do not send a command) \\
+5 & \code{0x20} & Data came from the auxiliary device (mouse) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{Inicializa\c{c}\~ao}
+\section{Initialization}
 
-A inicializa\c{c}\~ao \'e mais do que limpar o buffer. A BIOS ou o GRUB podem
-deixar o controlador em um estado em que o teclado envia scancodes do
-conjunto 2, enquanto o driver espera o conjunto 1, ou com a varredura
-desabilitada. O procedimento implementado \'e:
+Initialization is more than clearing the buffer. The BIOS or GRUB may leave
+the controller in a state where the keyboard sends set 2 scancodes, while the
+driver expects set 1, or with scanning disabled. The procedure implemented is:
 
 \begin{table}[H]
 \centering
-\caption{Sequ\^encia de inicializa\c{c}\~ao do 8042.}
+\caption{8042 initialization sequence.}
 \label{tab:kbdinit}
 \begin{tabular}{@{}clp{7.3cm}@{}}
 \toprule
-\textbf{\#} & \textbf{Comando} & \textbf{Efeito} \\
+\textbf{\#} & \textbf{Command} & \textbf{Effect} \\
 \midrule
-1 & leituras de \code{0x60} & Descarta bytes pendentes no buffer de sa\'ida. \\
-2 & \code{0xAD} em \code{0x64} & Desabilita a porta do teclado. \\
-3 & \code{0x20} em \code{0x64} & Solicita leitura do \emph{configuration byte}. \\
-4 & leitura de \code{0x60} & Obt\'em o byte de configura\c{c}\~ao atual
-(ou usa \code{0x45} se n\~ao houver resposta). \\
-5 & ajuste & Liga tradu\c{c}\~ao (bit 6), desliga IRQ1 (bit 0) e liga o clock
-(limpa bit 4). \\
-6 & \code{0x60} em \code{0x64} & Prepara a escrita do novo byte de
-configura\c{c}\~ao. \\
-7 & byte em \code{0x60} & Envia o novo \emph{configuration byte}. \\
-8 & \code{0xAE} em \code{0x64} & Reabilita a porta do teclado. \\
-9 & \code{0xF4} em \code{0x60} & Envia ao teclado o comando \emph{enable
-scanning}. \\
-10 & leitura de \code{0x60} & Consome o ACK (\code{0xFA}), se presente. \\
-11 & limpeza & Descarta qualquer res\'iduo do buffer. \\
+1 & reads from \code{0x60} & Discards pending bytes in the output buffer. \\
+2 & \code{0xAD} in \code{0x64} & Disables the keyboard port. \\
+3 & \code{0x20} in \code{0x64} & Requests a read of the \emph{configuration byte}. \\
+4 & read from \code{0x60} & Obtains the current configuration byte
+(or uses \code{0x45} if there is no response). \\
+5 & adjustment & Turns on translation (bit 6), turns off IRQ1 (bit 0), and
+turns on the clock (clears bit 4). \\
+6 & \code{0x60} in \code{0x64} & Prepares the write of the new configuration
+byte. \\
+7 & byte in \code{0x60} & Sends the new \emph{configuration byte}. \\
+8 & \code{0xAE} in \code{0x64} & Re-enables the keyboard port. \\
+9 & \code{0xF4} in \code{0x60} & Sends the \emph{enable scanning} command to
+the keyboard. \\
+10 & read from \code{0x60} & Consumes the ACK (\code{0xFA}), if present. \\
+11 & cleanup & Discards any residue from the buffer. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\begin{nota}[Por que traduzir?]
-O teclado PS/2 moderno costuma falar o \emph{scan code set 2}, mas o
-controlador 8042 pode apresentar ao sistema o \emph{set 1} quando o bit de
-tradu\c{c}\~ao est\'a ligado. O Linux tamb\'em configura essa tradu\c{c}\~ao
-no i8042. Sem ela, as teclas chegam em c\'odigos diferentes dos esperados
-pela tabela do driver.
+\begin{nota}[Why translate?]
+The modern PS/2 keyboard usually speaks \emph{scan code set 2}, but the 8042
+controller can present \emph{set 1} to the system when the translation bit is
+on. Linux also configures this translation in i8042. Without it, keys arrive in
+codes different from those expected by the driver's table.
 \end{nota}
 
-As esperas usam at\'e 100.000 itera\c{c}\~oes, tanto para o buffer de entrada
-esvaziar quanto para o buffer de sa\'ida encher. Se o controlador n\~ao
-responder, a inicializa\c{c}\~ao continua em vez de travar.
+The waits use up to 100,000 iterations, both for the input buffer to empty and
+for the output buffer to fill. If the controller does not respond,
+initialization continues instead of hanging.
 
-\section{Scancodes e tradu\c{c}\~ao para ASCII}
+\section{Scancodes and ASCII translation}
 
-O driver trabalha com o conjunto 1. A tabela \code{KEYMAP} tem 128 posi\c{c}\~oes
-e cobre letras, d\'igitos, espa\c{c}o e alguns s\'imbolos. Posi\c{c}\~oes n\~ao
-mapeadas valem zero e s\~ao ignoradas.
+The driver works with set 1. The \code{KEYMAP} table has 128 positions and
+covers letters, digits, space, and some symbols. Unmapped positions are zero
+and are ignored.
 
 \begin{table}[H]
 \centering
-\caption{Exemplos de scancodes do conjunto 1.}
+\caption{Examples of set 1 scancodes.}
 \label{tab:scancodes}
 \begin{tabular}{@{}llll@{}}
 \toprule
-\textbf{Tecla} & \textbf{Make} & \textbf{Break} & \textbf{Resultado} \\
+\textbf{Key} & \textbf{Make} & \textbf{Break} & \textbf{Result} \\
 \midrule
-\code{A} & \code{0x1E} & \code{0x9E} & \code{a} / \code{A} com Shift \\
-\code{1} & \code{0x02} & \code{0x82} & \code{1} / \code{!} com Shift \\
+\code{A} & \code{0x1E} & \code{0x9E} & \code{a} / \code{A} with Shift \\
+\code{1} & \code{0x02} & \code{0x82} & \code{1} / \code{!} with Shift \\
 \code{Enter} & \code{0x1C} & \code{0x9C} & \code{\textbackslash n} \\
 \code{Backspace} & \code{0x0E} & \code{0x8E} & \code{0x08} \\
 \code{Tab} & \code{0x0F} & \code{0x8F} & \code{\textbackslash t} \\
-\code{Espa\c{c}o} & \code{0x39} & \code{0xB9} & espa\c{c}o \\
-\code{Shift esquerdo} & \code{0x2A} & \code{0xAA} & ativa/desativa Shift \\
-\code{Shift direito} & \code{0x36} & \code{0xB6} & ativa/desativa Shift \\
-\code{Tecla estendida} & \code{0xE0} & --- & prefixo; c\'odigo seguinte ignorado \\
+\code{Space} & \code{0x39} & \code{0xB9} & space \\
+\code{Left Shift} & \code{0x2A} & \code{0xAA} & enables/disables Shift \\
+\code{Right Shift} & \code{0x36} & \code{0xB6} & enables/disables Shift \\
+\code{Extended key} & \code{0xE0} & --- & prefix; next code ignored \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \subsection{Shift}
 
-O estado de Shift \'e mantido em \code{static SHIFT: AtomicBool}. As teclas
-\code{0x2A} e \code{0x36} ligam o estado; os \emph{break codes} \code{0xAA}
-e \code{0xB6} desligam. A fun\c{c}\~ao \code{apply\_shift} transforma letras
-em mai\'usculas e aplica o s\'imbolo secund\'ario de d\'igitos e pontua\c{c}\~ao:
+The Shift state is kept in \code{static SHIFT: AtomicBool}. The \code{0x2A}
+and \code{0x36} keys turn the state on; the \emph{break codes} \code{0xAA} and
+\code{0xB6} turn it off. The \code{apply\_shift} function transforms letters to
+uppercase and applies the secondary symbol of digits and punctuation:
 
-\begin{lstlisting}[caption={Mapeamento com Shift.},label={lst:shift}]
+\begin{lstlisting}[caption={Mapping with Shift.},label={lst:shift}]
 b'a'..=b'z' => byte - 32,
 b'1'..=b'9' => b"!@#$%^&*("[(byte - b'1') as usize],
 b'0' => b')',
@@ -142,20 +140,19 @@ b'=' => b'+',
 /* ... */
 \end{lstlisting}
 
-\subsection{Teclas estendidas}
+\subsection{Extended keys}
 
-O prefixo \code{0xE0} liga a flag \code{EXTENDED}. O pr\'oximo scancode \'e
-descartado e a flag \'e limpa. Isso evita que setas, Insert, Delete, Home,
-End e teclas do teclado num\'erico sejam interpretadas como letras. A
-consequ\^encia \'e que essas teclas n\~ao t\^em fun\c{c}\~ao no shell.
+The \code{0xE0} prefix sets the \code{EXTENDED} flag. The next scancode is
+discarded and the flag is cleared. This prevents arrows, Insert, Delete, Home,
+End, and numeric keypad keys from being interpreted as letters. The
+consequence is that these keys have no function in the shell.
 
 \subsection{Mouse}
 
-Dados do mouse compartilham o mesmo 8042. Se o bit 5 do status estiver
-ligado, o byte lido \'e descartado. Isso evita que movimentos do mouse
-apare\c{c}am como letras.
+Mouse data shares the same 8042. If bit 5 of the status is on, the byte read
+is discarded. This prevents mouse movements from appearing as letters.
 
-\section{Fluxo de leitura}
+\section{Read flow}
 
 \begin{figure}[H]
 \centering
@@ -168,77 +165,75 @@ apare\c{c}am como letras.
   arrow/.style={-{Latex[length=2mm]}, thick, rinuxblue},
   node distance=0.38cm
 ]
-\node[kstep] (status) {L\^e status (\code{0x64})};
-\node[dec, below=of status] (full) {bit 0 setado?};
-\node[kstep, below=of full] (read) {L\^e dado (\code{0x60})};
+\node[kstep] (status) {Reads status (\code{0x64})};
+\node[dec, below=of status] (full) {bit 0 set?};
+\node[kstep, below=of full] (read) {Reads data (\code{0x60})};
 \node[dec, below=of read] (mouse) {bit 5 (mouse)?};
-\node[dec, below=of mouse] (ext) {\code{0xE0} ou extended?};
+\node[dec, below=of mouse] (ext) {\code{0xE0} or extended?};
 \node[dec, below=of ext] (break) {bit 7 (break)?};
-\node[kstep, below=of break] (key) {Traduz e retorna byte};
-\node[kstep, right=2.4cm of full] (none) {Retorna \code{None}};
+\node[kstep, below=of break] (key) {Translates and returns byte};
+\node[kstep, right=2.4cm of full] (none) {Returns \code{None}};
 \draw[arrow] (status) -- (full);
-\draw[arrow] (full) -- node[right,font=\tiny]{sim} (read);
-\draw[arrow] (full.east) -- node[above,font=\tiny]{n\~ao} (none.west);
+\draw[arrow] (full) -- node[right,font=\tiny]{yes} (read);
+\draw[arrow] (full.east) -- node[above,font=\tiny]{no} (none.west);
 \draw[arrow] (read) -- (mouse);
-\draw[arrow] (mouse) -- node[right,font=\tiny]{n\~ao} (ext);
-\draw[arrow] (ext) -- node[right,font=\tiny]{n\~ao} (break);
-\draw[arrow] (break) -- node[right,font=\tiny]{n\~ao} (key);
+\draw[arrow] (mouse) -- node[right,font=\tiny]{no} (ext);
+\draw[arrow] (ext) -- node[right,font=\tiny]{no} (break);
+\draw[arrow] (break) -- node[right,font=\tiny]{no} (key);
 \draw[arrow] (mouse.east) -- ++(0.9,0) |- (none.east);
 \draw[arrow] (ext.east) -- ++(0.5,0) |- (none.east);
 \draw[arrow] (break.east) -- ++(0.2,0) |- (none.east);
 \end{tikzpicture}
-\caption{Fluxo de \code{read\_char()}. Caminhos de descarte levam a \code{None}.}
+\caption{Flow of \code{read\_char()}. Discard paths lead to \code{None}.}
 \label{fig:kbdflow}
 \end{figure}
 
-O shell chama \code{keyboard::read\_char()} repetidamente. Quando a fun\c{c}\~ao
-retorna \code{None}, o shell tenta a serial e, se tamb\'em n\~ao houver dado,
-executa \code{spin\_loop()}.
+The shell calls \code{keyboard::read\_char()} repeatedly. When the function
+returns \code{None}, the shell tries the serial port and, if there is no data
+there either, executes \code{spin\_loop()}.
 
-\section{API e fun\c{c}\~oes internas}
+\section{API and internal functions}
 
 \begin{table}[H]
 \centering
-\caption{Fun\c{c}\~oes de \code{keyboard.rs}.}
+\caption{Functions of \code{keyboard.rs}.}
 \label{tab:kbdapi}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{Fun\c{c}\~ao} & \textbf{Descri\c{c}\~ao} \\
+\textbf{Function} & \textbf{Description} \\
 \midrule
-\code{init()} & Configura tradu\c{c}\~ao, IRQ, clock e varredura do 8042. \\
-\code{read\_char()} & L\^e e traduz um scancode; retorna \code{Option<u8>}. \\
-\code{build\_keymap()} & Constr\'oi a tabela de 128 entradas em tempo de
-compila\c{c}\~ao. \\
-\code{apply\_shift(byte)} & Aplica o efeito de Shift a um caractere. \\
-\code{wait\_input\_clear()} & Espera o buffer de entrada do 8042 esvaziar. \\
-\code{wait\_output\_full()} & Espera um byte ficar dispon\'ivel na sa\'ida. \\
-\code{flush\_output()} & Descarta at\'e 64 bytes pendentes. \\
-\code{send\_command(cmd)} & Envia um comando ao 8042 (porta \code{0x64}). \\
-\code{send\_data(data)} & Envia um byte ao teclado (porta \code{0x60}). \\
+\code{init()} & Configures 8042 translation, IRQ, clock, and scanning. \\
+\code{read\_char()} & Reads and translates a scancode; returns \code{Option<u8>}. \\
+\code{build\_keymap()} & Builds the 128-entry table at compile time. \\
+\code{apply\_shift(byte)} & Applies the effect of Shift to a character. \\
+\code{wait\_input\_clear()} & Waits for the 8042 input buffer to empty. \\
+\code{wait\_output\_full()} & Waits for a byte to become available at the output. \\
+\code{flush\_output()} & Discards up to 64 pending bytes. \\
+\code{send\_command(cmd)} & Sends a command to the 8042 (port \code{0x64}). \\
+\code{send\_data(data)} & Sends a byte to the keyboard (port \code{0x60}). \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Limita\c{c}\~oes}
+\section{Limitations}
 
 \begin{itemize}
-  \item \textbf{Polling}: n\~ao h\'a IRQ1; o shell precisa consultar
-        constantemente. A CPU fica ocupada mesmo sem entrada.
-  \item \textbf{Sem Caps Lock, Num Lock e Scroll Lock}: os LEDs e os estados
-        n\~ao s\~ao tratados.
-  \item \textbf{Sem AltGr}: layouts que dependem de AltGr n\~ao produzem
-        caracteres adicionais.
-  \item \textbf{Sem teclas estendidas funcionais}: setas, Delete, Home, End,
-        Page Up/Down e teclado num\'erico s\~ao descartados.
-  \item \textbf{Sem layout ABNT2}: a tabela \'e baseada em US/QWERTY; a
-        posi\c{c}\~ao f\'isica das teclas e o conjunto de s\'imbolos podem
-        diferir.
-  \item \textbf{Sem \emph{key release} \'util}: al\'em de Shift, os
-        \emph{break codes} s\~ao ignorados; n\~ao h\'a detec\c{c}\~ao de tecla
-        pressionada para jogos ou atalhos.
-  \item \textbf{Sem tratamento de erros}: bytes de erro (\code{0x00},
-        \code{0xFF}, \code{0xEE}) n\~ao t\^em tratamento espec\'ifico.
-  \item \textbf{Depend\^encia de hardware}: assume 8042 compat\'ivel. Em
-        sistemas apenas USB-HID, o teclado pode n\~ao funcionar sem
-        \emph{legacy USB} habilitado na BIOS.
+  \item \textbf{Polling}: there is no IRQ1; the shell must poll constantly. The
+        CPU stays busy even without input.
+  \item \textbf{No Caps Lock, Num Lock, or Scroll Lock}: the LEDs and states
+        are not handled.
+  \item \textbf{No AltGr}: layouts that depend on AltGr do not produce
+        additional characters.
+  \item \textbf{No functional extended keys}: arrows, Delete, Home, End,
+        Page Up/Down, and the numeric keypad are discarded.
+  \item \textbf{No ABNT2 layout}: the table is based on US/QWERTY; the
+        physical key positions and the symbol set may differ.
+  \item \textbf{No useful \emph{key release}}: apart from Shift, the
+        \emph{break codes} are ignored; there is no key press detection for
+        games or shortcuts.
+  \item \textbf{No error handling}: error bytes (\code{0x00}, \code{0xFF},
+        \code{0xEE}) have no specific handling.
+  \item \textbf{Hardware dependency}: assumes an 8042-compatible device. On
+        USB-HID-only systems, the keyboard may not work without \emph{legacy
+        USB} enabled in the BIOS.
 \end{itemize}

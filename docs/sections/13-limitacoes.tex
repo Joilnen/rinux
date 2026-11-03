@@ -1,121 +1,121 @@
-\chapter{Limita\c{c}\~oes, riscos e evolu\c{c}\~ao}
+\chapter{Limitations, Risks, and Evolution}
 \label{cap:limitacoes}
 
-\section{Limita\c{c}\~oes t\'ecnicas}
+\section{Technical limitations}
 
 \begin{table}[H]
 \centering
-\caption{Limita\c{c}\~oes por \'area e consequ\^encias.}
+\caption{Limitations by area and consequences.}
 \label{tab:limitacoes}
 \begin{tabularx}{\linewidth}{@{}p{3.3cm}X@{}}
 \toprule
-\textbf{\'Area} & \textbf{Limita\c{c}\~ao e consequ\^encia} \\
+\textbf{Area} & \textbf{Limitation and consequence} \\
 \midrule
-Interrup\c{c}\~oes & IDT com 256 portas, PIC remapeado e timer IRQ0. IRQ1
-do teclado continua mascarada; n\~ao h\'a APIC, SMP nem preemp\c{c}\~ao. \\
-Mem\'oria & Alocador de frames e p\'aginas de 4 KiB sob demanda. Sem heap;
-n\~ao h\'a \code{Vec}, \code{String} nem buffers din\^amicos. \\
-Processos & Sem scheduler, context switch ou espa\c{c}os de endere\c{c}o
-separados. O demo em ring 3 n\~ao \'e um processo; a \'unica syscall \'e
+Interrupts & IDT with 256 gates, remapped PIC, and IRQ0 timer. The keyboard's
+IRQ1 remains masked; there is no APIC, SMP, or preemption. \\
+Memory & Frame allocator and 4 KiB pages on demand. No heap;
+there is no \code{Vec}, \code{String}, or dynamic buffers. \\
+Processes & No scheduler, context switch, or separate address
+spaces. The ring 3 demo is not a process; the only syscall is
 \code{exit}. \\
-Armazenamento & Sem VFS, block layer, FAT, ext2 ou qualquer sistema de
-arquivos. A ISO \'e s\'o o meio de boot. \\
-Rede & Sem pilha TCP/IP, netdevice ou drivers de rede. \\
-V\'ideo & Apenas VGA texto legado. UEFI sem CSM, GPUs e modos gr\'aficos
-n\~ao s\~ao suportados. \\
-Entrada & Teclado PS/2 por polling, sem USB-HID nativo, Caps Lock, AltGr,
-setas ou layout ABNT2. \\
-Serial & Apenas COM1, polling, sem IRQ, DMA ou controle de fluxo. \\
-Concorr\^encia & Uma CPU; o timer incrementa \emph{ticks} mas n\~ao
-preempta. O spinlock n\~ao desabilita interrup\c{c}\~oes. \\
-Seguran\c{c}a & U/S separa usu\'ario e kernel, mas n\~ao h\'a ASLR, NX,
-SMEP/SMAP, \emph{stack canary}, valida\c{c}\~ao de ponteiros de usu\'ario nem
-espa\c{c}os de endere\c{c}o por processo. \\
-Robustez & IDT evita \emph{triple fault} na maioria dos casos; n\~ao h\'a
-recupera\c{c}\~ao de falhas, watchdog ou logs persistentes. \\
-Portabilidade & C\'odigo espec\'ifico para x86\_64 BIOS; n\~ao compila para
-ARM, RISC-V ou UEFI puro. \\
+Storage & No VFS, block layer, FAT, ext2, or any filesystem.
+The ISO is only the boot medium. \\
+Networking & No TCP/IP stack, netdevice, or network drivers. \\
+Video & Legacy VGA text only. UEFI without CSM, GPUs, and graphics
+modes are not supported. \\
+Input & PS/2 keyboard by polling, with no native USB-HID, Caps Lock, AltGr,
+arrow keys, or ABNT2 layout. \\
+Serial & COM1 only, polling, no IRQ, DMA, or flow control. \\
+Concurrency & One CPU; the timer increments \emph{ticks} but does not
+preempt. The spinlock does not disable interrupts. \\
+Security & U/S separates user and kernel, but there is no ASLR, NX,
+SMEP/SMAP, \emph{stack canary}, user pointer validation, or
+per-process address spaces. \\
+Robustness & The IDT prevents \emph{triple fault} in most cases; there is no
+failure recovery, watchdog, or persistent logs. \\
+Portability & Code specific to x86\_64 BIOS; it does not compile for
+ARM, RISC-V, or pure UEFI. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Riscos}
+\section{Risks}
 
 \begin{table}[H]
 \centering
-\caption{Riscos e mitiga\c{c}\~oes atuais.}
+\caption{Risks and current mitigations.}
 \label{tab:riscos}
 \begin{tabularx}{\linewidth}{@{}p{3.7cm}p{3.0cm}X@{}}
 \toprule
-\textbf{Risco} & \textbf{Probabilidade} & \textbf{Mitiga\c{c}\~ao} \\
+\textbf{Risk} & \textbf{Likelihood} & \textbf{Mitigation} \\
 \midrule
-\emph{Triple fault} por exce\c{c}\~ao & M\'edia em c\'odigo novo & IDT e
-\emph{stubs} j\'a instalados; testar novos tratadores em QEMU antes de
-habilitar rotas cr\'iticas. \\
-\emph{Deadlock} no console & Baixa hoje & N\~ao adquirir o lock duas vezes;
-o timer n\~ao imprime, mas futuras IRQs devem usar \code{irqsave}. \\
-\emph{Hang} em espera de hardware & M\'edia & Timeouts nas esperas do 8042;
-a UART ainda pode travar se presente e defeituosa. \\
-Teclado n\~ao funciona em hardware real & M\'edia & Testar com \emph{legacy
-USB}/PS/2; usar serial como alternativa. \\
-Tela preta em UEFI & Alta sem CSM & Documentar requisito de BIOS/CSM;
-implementar GOP no futuro. \\
-Perda de bytes na serial & M\'edia & Polling r\'apido; futuramente FIFO/IRQ. \\
-Corrup\c{c}\~ao por bug de \'indice & Baixa & Revisar invariantes de
-\code{row}/\code{column}; adicionar testes. \\
+\emph{Triple fault} due to an exception & Medium for new code & IDT and
+\emph{stubs} already installed; test new handlers in QEMU before
+enabling critical paths. \\
+\emph{Deadlock} in the console & Low today & Do not acquire the lock twice;
+the timer does not print, but future IRQs must use \code{irqsave}. \\
+\emph{Hang} while waiting for hardware & Medium & Timeouts in the 8042 waits;
+the UART can still hang if present and faulty. \\
+Keyboard does not work on real hardware & Medium & Test with \emph{legacy
+USB}/PS/2; use serial as an alternative. \\
+Black screen on UEFI & High without CSM & Document the BIOS/CSM requirement;
+implement GOP in the future. \\
+Byte loss on serial & Medium & Fast polling; FIFO/IRQ in the future. \\
+Corruption due to an index bug & Low & Review the invariants of
+\code{row}/\code{column}; add tests. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Roadmap sugerido}
+\section{Suggested roadmap}
 
-A ordem abaixo prioriza ganhos de robustez e de compreens\~ao antes de
-adicionar complexidade.
+The order below prioritizes gains in robustness and understanding before
+adding complexity.
 
 \begin{table}[H]
 \centering
-\caption{Roadmap priorizado.}
+\caption{Prioritized roadmap.}
 \label{tab:roadmap}
 \begin{tabularx}{\linewidth}{@{}clX@{}}
 \toprule
-\textbf{Prior.} & \textbf{Item} & \textbf{Objetivo} \\
+\textbf{Prior.} & \textbf{Item} & \textbf{Goal} \\
 \midrule
-1 & Processos e syscalls & \code{task\_struct}, scheduler round-robin,
-espa\c{c}os de endere\c{c}o separados e mais chamadas de sistema. \\
-2 & Robustez de IRQ e teclado & IRQ1 com buffer de scancodes, \code{irqsave}
-no console e trata\-mento de IRQs esp\'urias. \\
-3 & Heap simples & \code{alloc} + alocador de blocos; habilitar
+1 & Processes and syscalls & \code{task\_struct}, round-robin scheduler,
+separate address spaces, and more system calls. \\
+2 & IRQ and keyboard robustness & IRQ1 with a scancode buffer, \code{irqsave}
+in the console, and handling of spurious IRQs. \\
+3 & Simple heap & \code{alloc} + block allocator; enable
 \code{Vec}/\code{String}. \\
-4 & Framebuffer GOP/VBE & Suporte a UEFI e modos gr\'aficos; fonte bitmap. \\
-5 & Console virtual e log & M\'ultiplos terminais, \emph{scrollback},
-n\'iveis de log. \\
-6 & Driver de teclado completo & USB-HID, Caps Lock, AltGr, layout ABNT2,
-teclas estendidas. \\
-7 & Endurecimento de mem\'oria & NX, SMEP/SMAP, valida\c{c}\~ao de ponteiros
-de usu\'ario e ASLR. \\
-8 & Sistema de arquivos & Leitura de FAT ou initramfs; \emph{loader} de
-programas. \\
-9 & Rede & NE2000/virtio-net, ARP/IP/ICMP/UDP, testes com QEMU. \\
-10 & Testes automatizados & CI com QEMU headless, dumps VGA e asserts. \\
+4 & GOP/VBE framebuffer & Support for UEFI and graphics modes; bitmap font. \\
+5 & Virtual console and log & Multiple terminals, \emph{scrollback},
+log levels. \\
+6 & Complete keyboard driver & USB-HID, Caps Lock, AltGr, ABNT2 layout,
+extended keys. \\
+7 & Memory hardening & NX, SMEP/SMAP, validation of user
+pointers, and ASLR. \\
+8 & Filesystem & Reading FAT or initramfs; program
+\emph{loader}. \\
+9 & Networking & NE2000/virtio-net, ARP/IP/ICMP/UDP, tests with QEMU. \\
+10 & Automated tests & CI with headless QEMU, VGA dumps, and asserts. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Crit\'erios para considerar o projeto ``um kernel''}
+\section{Criteria for considering the project ``a kernel''}
 
-Do ponto de vista did\'atico, o projeto j\'a \'e um kernel: roda em ring 0,
-controla hardware e n\~ao depende de sistema operacional. Do ponto de vista
-de um sistema operacional utiliz\'avel, ainda faltam, no m\'inimo:
+From the educational point of view, the project is already a kernel: it runs in ring 0,
+controls hardware, and does not depend on an operating system. From the point of view
+of a usable operating system, the following are still missing, at a minimum:
 
 \begin{itemize}
-  \item isolamento de processos e espa\c{c}o de usu\'ario por processo;
-  \item escalonador e preemp\c{c}\~ao;
-  \item aloca\c{c}\~ao din\^amica de mem\'oria (heap);
-  \item sistema de arquivos e \emph{loader};
-  \item drivers de entrada/sa\'ida al\'em de VGA/PS/2/serial;
-  \item tratamento de erros e recupera\c{c}\~ao.
+  \item process isolation and a per-process user space;
+  \item scheduler and preemption;
+  \item dynamic memory allocation (heap);
+  \item filesystem and \emph{loader};
+  \item input/output drivers beyond VGA/PS/2/serial;
+  \item error handling and recovery.
 \end{itemize}
 
-O projeto atual \'e melhor classificado como \textbf{kernel monol\'itico
-m\'inimo de demonstra\c{c}\~ao}, focado em boot, mem\'oria, interrup\c{c}\~oes
-e console.
+The current project is best classified as a \textbf{minimal monolithic
+demonstration kernel}, focused on boot, memory, interrupts,
+and console.

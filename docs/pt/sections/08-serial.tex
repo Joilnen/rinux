@@ -1,0 +1,200 @@
+\chapter{Serial COM1}
+\label{cap:serial}
+
+\section{Vis\~ao geral}
+
+O m\'odulo \code{src/serial.rs} implementa um subconjunto do driver 8250 do
+Linux para a UART 16550 em COM1. A serial tem dois pap\'eis:
+
+\begin{itemize}
+  \item \textbf{depura\c{c}\~ao}: todo texto impresso no VGA tamb\'em \'e
+        enviado para COM1;
+  \item \textbf{entrada}: al\'em do teclado PS/2, o shell aceita comandos
+        digitados no terminal serial, o que viabiliza testes automatizados.
+\end{itemize}
+
+N\~ao h\'a interrup\c{c}\~oes, FIFO baseada em IRQ, \emph{termios}, \emph{tty}
+layer ou controle de fluxo. O acesso \'e feito por polling de registradores
+de I/O.
+
+\section{Hardware}
+
+A UART 16550 em COM1 usa uma base de 8 portas a partir de \code{0x3F8}:
+
+\begin{table}[H]
+\centering
+\caption{Registradores da UART 16550 (COM1).}
+\label{tab:uartregs}
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Offset} & \textbf{Nome} & \textbf{Leitura} & \textbf{Escrita} \\
+\midrule
+\code{+0} & RBR / THR & Receive Buffer & Transmit Holding \\
+\code{+1} & IER / DLM & Interrupt Enable & Divisor Latch High \\
+\code{+2} & IIR / FCR & Interrupt ID & FIFO Control \\
+\code{+3} & LCR & Line Control & Line Control \\
+\code{+4} & MCR & Modem Control & Modem Control \\
+\code{+5} & LSR & Line Status & --- \\
+\code{+6} & MSR & Modem Status & --- \\
+\code{+7} & SCR & Scratch & Scratch \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+O registrador LSR tem os bits usados pelo driver:
+
+\begin{table}[H]
+\centering
+\caption{Bits do Line Status Register (LSR).}
+\label{tab:lsr}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Bit} & \textbf{M\'ascara} & \textbf{Significado} \\
+\midrule
+0 & \code{0x01} & Dado dispon\'ivel para leitura \\
+5 & \code{0x20} & Transmitter Holding Register vazio (pode enviar) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Inicializa\c{c}\~ao}
+
+A configura\c{c}\~ao implementada \'e 38400 baud, 8 bits de dados, sem
+paridade e 1 bit de parada (8N1), com FIFO habilitada e IRQs desligadas.
+
+\begin{table}[H]
+\centering
+\caption{Sequ\^encia de inicializa\c{c}\~ao da COM1.}
+\label{tab:uartinit}
+\begin{tabular}{@{}llp{7.2cm}@{}}
+\toprule
+\textbf{Offset} & \textbf{Valor} & \textbf{Efeito} \\
+\midrule
+\code{+1} & \code{0x00} & Desabilita interrup\c{c}\~oes. \\
+\code{+3} & \code{0x80} & Liga DLAB para acessar o divisor. \\
+\code{+0} & \code{0x03} & Divisor baixo = 3. \\
+\code{+1} & \code{0x00} & Divisor alto = 0. \\
+\code{+3} & \code{0x03} & 8 bits, sem paridade, 1 stop; desliga DLAB. \\
+\code{+2} & \code{0xC7} & FIFO habilitada, limpa buffers, gatilho de 14 bytes. \\
+\code{+4} & \code{0x0B} & DTR, RTS e OUT2; IRQs desligadas. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+O divisor 3 produz:
+
+\[
+\text{baud} = \frac{115200}{3} = 38400.
+\]
+
+Ap\'os a configura\c{c}\~ao, o driver l\^e o LSR. Se o valor for \code{0xFF},
+considera que n\~ao h\'a UART no barramento e marca \code{PRESENT = false}.
+Essa heur\'istica funciona porque um barramento sem dispositivo geralmente
+devolve todos os bits em 1.
+
+\begin{nota}[Por que 38400 e n\~ao 115200?]
+O divisor 3 \'e um valor conservador e amplamente suportado por emula\c{c}\~oes
+e cabos simples. A taxa n\~ao precisa ser alta para um terminal de texto.
+Para 115200, o divisor seria 1; para 9600, 12. A escolha n\~ao afeta o
+funcionamento do VGA.
+\end{nota}
+
+\section{Escrita}
+
+\begin{lstlisting}[caption={Envio de um byte pela UART.},label={lst:uartwrite}]
+fn write_byte(byte: u8) {
+    unsafe {
+        while inb(COM1 + 5) & 0x20 == 0 {}
+        outb(COM1, byte);
+    }
+}
+\end{lstlisting}
+
+O la\c{c}o espera o THR esvaziar. Se n\~ao houver UART e o barramento devolver
+\code{0xFF}, o bit \code{0x20} j\'a est\'a ligado e o la\c{c}o n\~ao trava;
+o byte \'e simplesmente descartado. Se houver uma UART presente mas
+travada, o la\c{c}o pode esperar indefinidamente.
+
+\code{write\_str} converte \code{\textbackslash n} em \code{\textbackslash r
+\textbackslash n}, porque terminais serial geralmente esperam CRLF:
+
+\begin{lstlisting}[caption={Escrita de string com convers\~ao de nova linha.},label={lst:uartstr}]
+pub fn write_str(text: &str) {
+    for byte in text.bytes() {
+        if byte == b'\n' {
+            write_byte(b'\r');
+        }
+        write_byte(byte);
+    }
+}
+\end{lstlisting}
+
+\section{Leitura}
+
+\begin{lstlisting}[caption={Leitura n\~ao bloqueante de um byte.},label={lst:uartread}]
+pub fn read_byte() -> Option<u8> {
+    if !PRESENT.load(Ordering::Relaxed) {
+        return None;
+    }
+    unsafe {
+        if inb(COM1 + 5) & 0x01 == 0 {
+            return None;
+        }
+        Some(inb(COM1))
+    }
+}
+\end{lstlisting}
+
+A fun\c{c}\~ao \'e n\~ao bloqueante: se n\~ao h\'a byte, retorna \code{None}.
+O shell a chama depois de \code{keyboard::read\_char()}, de modo que a
+serial funciona como fonte alternativa de entrada.
+
+\section{API}
+
+\begin{table}[H]
+\centering
+\caption{API de \code{serial.rs}.}
+\label{tab:serialapi}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Fun\c{c}\~ao} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\code{init()} & Configura COM1 em 38400 8N1 e detecta presen\c{c}a. \\
+\code{read\_byte()} & Retorna um byte recebido ou \code{None}. \\
+\code{write\_byte(byte)} & Envia um byte, esperando o THR. Interna. \\
+\code{write\_str(text)} & Envia uma string, convertendo \code{\textbackslash n}
+em CRLF. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Uso no QEMU e em hardware f\'isico}
+
+No QEMU, a serial pode ser exposta de v\'arias formas:
+
+\begin{lstlisting}[style=shell,caption={Exemplos de exposi\c{c}\~ao da serial no QEMU.},label={lst:qemuserial}]
+# Terminal interativo no stdio (usado por `make run`)
+qemu-system-x86_64 -cdrom vga-kernel.iso -boot order=d -m 128M -serial stdio
+
+# Socket Unix para testes automatizados
+qemu-system-x86_64 -cdrom vga-kernel.iso -boot order=d -m 128M \
+  -display none -serial unix:/tmp/vga-serial.sock,server=on,wait=off
+\end{lstlisting}
+
+Em um PC f\'isico, COM1 aparece em \code{0x3F8} e pode ser acessada com um
+cabo USB-serial e um terminal em 38400 8N1. A BIOS pode desabilitar a porta
+ou remape\'a-la; nesse caso o driver n\~ao a encontra.
+
+\section{Limita\c{c}\~oes}
+
+\begin{itemize}
+  \item \textbf{Sem IRQs}: a leitura depende de polling.
+  \item \textbf{Sem FIFO de entrada}: bytes podem ser perdidos se chegarem
+        mais r\'apido do que o shell consulta.
+  \item \textbf{Sem controle de fluxo}: RTS/CTS n\~ao s\~ao usados.
+  \item \textbf{Sem \emph{echo} autom\'atico}: o pr\'oprio shell ecoa os
+        caracteres recebidos.
+  \item \textbf{Sem suporte a outras portas}: apenas COM1.
+  \item \textbf{Detec\c{c}\~ao heur\'istica}: \code{LSR == 0xFF} pode n\~ao
+        ser suficiente em todos os chipsets.
+\end{itemize}

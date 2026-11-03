@@ -1,0 +1,223 @@
+\chapter{Shell e linha de comando}
+\label{cap:shell}
+
+\section{Vis\~ao geral}
+
+O \code{src/shell.rs} implementa um terminal de linha de comando sem
+aloca\c{c}\~ao din\^amica. Ele n\~ao \'e um shell POSIX, n\~ao interpreta
+pipes, redirecionamentos, vari\'aveis, aspas ou scripts. \'E um la\c{c}o que:
+
+\begin{enumerate}
+  \item imprime o prompt \code{rinux> };
+  \item l\^e bytes do teclado PS/2 ou da serial;
+  \item ecoa caracteres imprim\'iveis e trata Backspace;
+  \item ao receber Enter, executa o comando;
+  \item volta ao in\'icio.
+\end{enumerate}
+
+\section{La\c{c}o principal}
+
+\begin{lstlisting}[caption={Estrutura do la\c{c}o do shell.},label={lst:shellloop}]
+pub fn run() -> ! {
+    loop {
+        crate::print!("rinux> ");
+        let mut line = [0u8; LINE_MAX];
+        let mut len = 0usize;
+
+        loop {
+            let byte = match keyboard::read_char().or_else(serial::read_byte) {
+                Some(byte) => byte,
+                None => { core::hint::spin_loop(); continue; }
+            };
+
+            match byte {
+                b'\n' | b'\r' => {
+                    println!();
+                    execute(&line[..len]);
+                    break;
+                }
+                0x08 | 0x7F => {
+                    if len > 0 {
+                        len -= 1;
+                        crate::print!("\x08");
+                    }
+                }
+                b'\t' => {}
+                0x20..=0x7E => {
+                    if len < LINE_MAX {
+                        line[len] = byte;
+                        len += 1;
+                        crate::print!("{}", byte as char);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{Buffer de linha}
+
+A linha \'e um array fixo de 128 bytes na pilha do shell:
+
+\begin{lstlisting}[caption={Buffer de linha.},label={lst:linebuffer}]
+const LINE_MAX: usize = 128;
+let mut line = [0u8; LINE_MAX];
+let mut len = 0usize;
+\end{lstlisting}
+
+Quando a linha est\'a cheia, novos caracteres s\~ao silenciosamente
+ignorados. N\~ao h\'a beep, mensagem de erro nem crescimento din\^amico.
+
+\subsection{Entrada e eco}
+
+A entrada vem de duas fontes, nesta ordem:
+
+\begin{enumerate}
+  \item \code{keyboard::read\_char()}: teclado PS/2 na janela VGA;
+  \item \code{serial::read\_byte()}: terminal serial, quando dispon\'ivel.
+\end{enumerate}
+
+Se ambas retornarem \code{None}, o shell executa \code{spin\_loop()} e tenta
+novamente. N\~ao h\'a \emph{sleep}, j\'a que n\~ao existe temporizador.
+
+Caracteres imprim\'iveis (0x20 a 0x7E) s\~ao armazenados no buffer e ecoados
+no console. Backspace (\code{0x08} ou \code{0x7F}) decrementa o tamanho e
+imprime \code{\textbackslash x08}, que o console VGA interpreta como apagar
+a c\'elula anterior. Tab (\code{\textbackslash t}) \'e ignorado.
+
+\section{Interpreta\c{c}\~ao}
+
+\subsection{Trim}
+
+Antes de comparar, a linha passa por \code{trim}, que remove espa\c{c}os
+ASCII no in\'icio e no fim. A fun\c{c}\~ao retorna uma \emph{slice} da
+pr\'opria linha, sem c\'opia:
+
+\begin{lstlisting}[caption={Remo\c{c}\~ao de espa\c{c}os nas extremidades.},label={lst:trim}]
+fn trim(bytes: &[u8]) -> &[u8] {
+    let start = bytes.iter()
+        .position(|byte| !byte.is_ascii_whitespace())
+        .unwrap_or(bytes.len());
+    let end = bytes.iter()
+        .rposition(|byte| !byte.is_ascii_whitespace())
+        .map_or(start, |index| index + 1);
+    &bytes[start..end]
+}
+\end{lstlisting}
+
+Uma linha vazia ou composta apenas de espa\c{c}os n\~ao executa nada.
+
+\subsection{Convers\~ao para texto}
+
+\code{as\_text} tenta interpretar os bytes como UTF-8. Como o console s\'o
+aceita ASCII, na pr\'atica a convers\~ao sempre funciona para texto digitado;
+se falhar, retorna a string fixa \code{"<bytes invalidos>"}.
+
+\subsection{Comandos}
+
+A execu\c{c}\~ao \'e uma cadeia de compara\c{c}\~oes \code{if}/\code{else if}.
+N\~ao h\'a tabela de despacho, \emph{parsing} de argumentos nem an\'alise
+sint\'atica.
+
+\begin{table}[H]
+\centering
+\caption{Comandos implementados.}
+\label{tab:comandos}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{Comando} & \textbf{Efeito} \\
+\midrule
+\code{help} & Lista os comandos dispon\'iveis. \\
+\code{clear} & Limpa a tela VGA e reposiciona o cursor. \\
+\code{echo <texto>} & Imprime o texto ap\'os o primeiro espa\c{c}o. \\
+\code{info} & Mostra informa\c{c}\~oes do kernel e do modelo de entrada. \\
+\code{reboot} & Reinicia o PC via comando \code{0xFE} ao 8042. \\
+\code{halt} & Imprime uma mensagem e para a CPU com \code{cli; hlt}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{nota}[Detalhes de comportamento]
+\begin{itemize}
+  \item \code{echo} sem argumento n\~ao \'e reconhecido como comando; apenas
+        \code{echo } seguido de texto casa com o prefixo.
+  \item \code{echo   ola} preserva os espa\c{c}os internos ap\'os o prefixo
+        \code{"echo "}; o \emph{trim} remove apenas as extremidades.
+  \item A compara\c{c}\~ao \'e sens\'ivel a mai\'usculas: \code{HELP} n\~ao
+        funciona.
+  \item Comandos desconhecidos produzem duas linhas de mensagem.
+\end{itemize}
+\end{nota}
+
+\section{Sa\'ida de \code{info}}
+
+O comando \code{info} imprime:
+
+\begin{lstlisting}[style=shell,caption={Sa\'ida do comando \code{info}.},label={lst:info}]
+Kernel: Rust, no_std, x86_64
+Boot:   Multiboot2 (BIOS) -> modo longo
+Video:  VGA texto 80x25, buffer 0xB8000
+Entrada: teclado PS/2 e serial COM1 (polling, sem IRQ)
+Heap:   nenhum (apenas core, sem alocacao)
+\end{lstlisting}
+
+Essas informa\c{c}\~oes s\~ao est\'aticas; n\~ao h\'a leitura de CPU, mem\'oria
+ou tempo.
+
+\section{Comandos especiais}
+
+\subsection{\code{halt}}
+
+Imprime \code{"CPU parada. Use reset ou feche o QEMU."} e chama
+\code{arch::halt\_loop()}, que executa \code{cli; hlt} indefinidamente. A
+\'unica sa\'ida \'e reset f\'isico ou fechar o emulador.
+
+\subsection{\code{reboot}}
+
+Imprime \code{"Reiniciando..."} e chama \code{arch::reboot()}. O reset pode
+n\~ao funcionar em todos os ambientes; se o comando ao 8042 for ignorado, a
+CPU termina em \code{halt\_loop()}.
+
+\section{Como estender}
+
+Para adicionar um comando:
+
+\begin{enumerate}
+  \item acrescente um ramo \code{else if line == b"meucomando"} em
+        \code{execute};
+  \item use \code{println!} para a sa\'ida;
+  \item se precisar de argumentos, use \code{strip\_prefix} como em
+        \code{echo};
+  \item mantenha o comando sem aloca\c{c}\~ao e sem bloqueio;
+  \item atualize a lista de \code{help} e esta documenta\c{c}\~ao.
+\end{enumerate}
+
+Exemplo:
+
+\begin{lstlisting}[caption={Esqueleto de um novo comando.},label={lst:novocomando}]
+} else if line == b"versao" {
+    println!("Rust VGA Kernel 0.1.0");
+} else if let Some(arg) = line.strip_prefix(b"upper ") {
+    for byte in arg {
+        crate::print!("{}", byte.to_ascii_uppercase() as char);
+    }
+    println!();
+}
+\end{lstlisting}
+
+\section{Limita\c{c}\~oes}
+
+\begin{itemize}
+  \item Sem hist\'orico, setas, Ctrl+C, Ctrl+D ou edi\c{c}\~ao no meio da
+        linha.
+  \item Sem aspas, escape, pipes, redirecionamento ou vari\'aveis.
+  \item Sem argumentos estruturados: cada comando decide como interpretar o
+        restante.
+  \item Sem execu\c{c}\~ao de programas: n\~ao h\'a \emph{loader} nem
+        processos.
+  \item Sem tradu\c{c}\~ao de UTF-8: acentos digitados podem virar \code{?}.
+  \item A linha \'e limitada a 128 bytes e o excesso \'e descartado em
+        sil\^encio.
+\end{itemize}

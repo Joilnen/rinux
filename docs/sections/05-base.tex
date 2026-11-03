@@ -1,16 +1,16 @@
-\chapter{M\'odulos de base}
+\chapter{Base modules}
 \label{cap:base}
 
-Este cap\'itulo documenta os m\'odulos que n\~ao pertencem a um driver
-espec\'ifico: \code{main.rs}, \code{arch.rs} e \code{sync.rs}. Eles fornecem o
-ponto de entrada, as macros de impress\~ao, o acesso a portas de I/O, o
-desligamento/reinicializa\c{c}\~ao e o spinlock do console.
+This chapter documents the modules that do not belong to a specific driver:
+\code{main.rs}, \code{arch.rs}, and \code{sync.rs}. They provide the entry
+point, the printing macros, I/O port access,
+shutdown/reboot, and the console spinlock.
 
-\section{\code{main.rs}: ponto de entrada Rust}
+\section{\code{main.rs}: Rust entry point}
 
-\subsection{Atributos globais}
+\subsection{Global attributes}
 
-\begin{lstlisting}[caption={Atributos e m\'odulos declarados em \code{main.rs}.},label={lst:mainattrs}]
+\begin{lstlisting}[caption={Attributes and modules declared in \code{main.rs}.},label={lst:mainattrs}]
 #![no_std]
 #![no_main]
 
@@ -28,19 +28,19 @@ mod vga;
 \end{lstlisting}
 
 \begin{itemize}
-  \item \code{no\_std}: o crate n\~ao usa a biblioteca padr\~ao; n\~ao h\'a
-        \code{std::io}, \code{String}, \code{Vec}, sistema de arquivos nem
+  \item \code{no\_std}: the crate does not use the standard library; there is no
+        \code{std::io}, \code{String}, \code{Vec}, filesystem, or
         \emph{threads}.
-  \item \code{no\_main}: n\~ao existe a fun\c{c}\~ao \code{main} do runtime
-        Rust. O ponto de entrada real \'e \code{\_start}, definido no
-        assembly de \code{boot.rs}.
-  \item \code{mod boot}: necess\'ario para que o linker inclua o c\'odigo de
-        montagem e o cabe\c{c}alho Multiboot2.
+  \item \code{no\_main}: the Rust runtime \code{main} function does not exist.
+        The real entry point is \code{\_start}, defined in the
+        assembly of \code{boot.rs}.
+  \item \code{mod boot}: required for the linker to include the assembly code
+        and the Multiboot2 header.
 \end{itemize}
 
 \subsection{\code{kernel\_main}}
 
-\begin{lstlisting}[caption={Assinatura e corpo principal de \code{kernel\_main}.},label={lst:kernelmain}]
+\begin{lstlisting}[caption={Signature and main body of \code{kernel\_main}.},label={lst:kernelmain}]
 #[unsafe(no_mangle)]
 pub extern "C" fn kernel_main(multiboot_magic: u32, multiboot_info: u32) -> ! {
     vga::init();
@@ -72,35 +72,35 @@ pub extern "C" fn kernel_main(multiboot_magic: u32, multiboot_info: u32) -> ! {
 
 \begin{table}[H]
 \centering
-\caption{Contrato de \code{kernel\_main}.}
+\caption{Contract of \code{kernel\_main}.}
 \label{tab:kernelmain}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{Aspecto} & \textbf{Descri\c{c}\~ao} \\
+\textbf{Aspect} & \textbf{Description} \\
 \midrule
-Visibilidade & \code{pub extern "C"}, exportada sem \emph{mangling}. \\
-Argumentos & \code{multiboot\_magic} (deve ser \code{0x36D76289}) e
-\code{multiboot\_info} (endere\c{c}o f\'isico da estrutura Multiboot2). \\
-Retorno & \code{!}: nunca retorna; termina em \code{shell::run()}. \\
-Pr\'e-condi\c{c}\~oes & CPU em modo longo, pagina\c{c}\~ao ativa, pilha alta
-v\'alida, \code{.bss} zerada pelo carregador. \\
-Efeitos & Inicializa VGA, serial, alocador de frames, GDT/TSS, teclado,
-IDT/PIC/PIT e liga interrup\c{c}\~oes; imprime banner; entra no shell. \\
-Chamado por & Stub de assembly em \code{boot.rs}. \\
+Visibility & \code{pub extern "C"}, exported without \emph{mangling}. \\
+Arguments & \code{multiboot\_magic} (must be \code{0x36D76289}) and
+\code{multiboot\_info} (physical address of the Multiboot2 structure). \\
+Return & \code{!}: never returns; ends in \code{shell::run()}. \\
+Preconditions & CPU in long mode, paging active, valid higher-half
+stack, \code{.bss} zeroed by the loader. \\
+Effects & Initializes VGA, serial, frame allocator, GDT/TSS, keyboard,
+IDT/PIC/PIT, and enables interrupts; prints the banner; enters the shell. \\
+Called by & Assembly stub in \code{boot.rs}. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-O valor \code{multiboot\_info} \'e usado por \code{paging::init} para
-percorrer as tags Multiboot2 e liberar os frames de RAM dispon\'ivel. A
-estrutura tamb\'em \'e reservada para n\~ao ser entregue pelo alocador.
+The \code{multiboot\_info} value is used by \code{paging::init} to
+walk the Multiboot2 tags and free the available RAM frames. The
+structure is also reserved so that it is not handed out by the allocator.
 
-\subsection{Macros \code{print!} e \code{println!}}
+\subsection{\code{print!} and \code{println!} macros}
 
-As macros s\~ao definidas com \code{macro\_rules!} e \code{\$crate}, para
-funcionar em qualquer m\'odulo do crate sem importa\c{c}\~ao:
+The macros are defined with \code{macro\_rules!} and \code{\$crate}, so that
+they work in any module of the crate without imports:
 
-\begin{lstlisting}[caption={Macros de impress\~ao sem aloca\c{c}\~ao.},label={lst:macros}]
+\begin{lstlisting}[caption={Printing macros without allocation.},label={lst:macros}]
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => {
@@ -117,13 +117,13 @@ macro_rules! println {
 }
 \end{lstlisting}
 
-\code{format\_args!} cria uma descri\c{c}\~ao de formata\c{c}\~ao sem alocar;
-a implementa\c{c}\~ao de \code{fmt::Write} em \code{vga.rs} consome os
-fragmentos. N\~ao h\'a \code{format!} (que exigiria \code{alloc}).
+\code{format\_args!} creates a formatting description without allocating;
+the \code{fmt::Write} implementation in \code{vga.rs} consumes the
+fragments. There is no \code{format!} (which would require \code{alloc}).
 
 \subsection{Panic handler}
 
-\begin{lstlisting}[caption={\emph{Panic handler} do kernel.},label={lst:panic}]
+\begin{lstlisting}[caption={\emph{Panic handler} of the kernel.},label={lst:panic}]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     crate::println!();
@@ -132,20 +132,20 @@ fn panic(info: &PanicInfo) -> ! {
 }
 \end{lstlisting}
 
-Como o perfil usa \code{panic = "abort"}, o handler n\~ao precisa de
-\emph{unwinding}. Ele imprime a mensagem no console e para a CPU. Se o
-p\^anico ocorrer antes de \code{vga::init()}, a sa\'ida pode n\~ao ser
-vis\'ivel; se ocorrer dentro do console com o spinlock adquirido, pode
-ocorrer \emph{deadlock} (o handler tentaria imprimir e esperaria o lock).
+Because the profile uses \code{panic = "abort"}, the handler does not need
+\emph{unwinding}. It prints the message to the console and halts the CPU. If the
+panic occurs before \code{vga::init()}, the output may not be
+visible; if it occurs inside the console with the spinlock held, a
+\emph{deadlock} may occur (the handler would try to print and would wait for the lock).
 
-\section{\code{arch.rs}: arquitetura e portas de I/O}
+\section{\code{arch.rs}: architecture and I/O ports}
 
-\subsection{Portas de I/O}
+\subsection{I/O ports}
 
-O m\'odulo \code{arch::port} encapsula as instru\c{c}\~oes \code{in} e
-\code{out} do x86:
+The \code{arch::port} module encapsulates the x86 \code{in} and
+\code{out} instructions:
 
-\begin{lstlisting}[caption={Leitura e escrita de portas de 8 bits.},label={lst:portio}]
+\begin{lstlisting}[caption={Reading and writing 8-bit ports.},label={lst:portio}]
 pub unsafe fn inb(port: u16) -> u8 {
     let value: u8;
     asm!("in al, dx",
@@ -163,43 +163,43 @@ pub unsafe fn outb(port: u16, value: u8) {
 }
 \end{lstlisting}
 
-As fun\c{c}\~oes s\~ao \code{unsafe} porque qualquer porta pode n\~ao existir
-ou pode ter efeitos colaterais no hardware. As op\c{c}\~oes \code{nomem},
-\code{nostack} e \code{preserves\_flags} informam ao compilador que a
-instru\c{c}\~ao n\~ao altera mem\'oria, pilha ou flags, permitindo otimiza\c{c}\~oes
-e evitando que o bloco seja removido.
+The functions are \code{unsafe} because any port may not exist
+or may have side effects on the hardware. The \code{nomem},
+\code{nostack}, and \code{preserves\_flags} options tell the compiler that the
+instruction does not change memory, stack, or flags, allowing optimizations
+and preventing the block from being removed.
 
 \begin{table}[H]
 \centering
-\caption{API de \code{arch}.}
+\caption{API of \code{arch}.}
 \label{tab:archapi}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{Fun\c{c}\~ao} & \textbf{Descri\c{c}\~ao} \\
+\textbf{Function} & \textbf{Description} \\
 \midrule
-\code{inb(port)} & L\^e um byte de uma porta de I/O. \code{unsafe}. \\
-\code{outb(port, value)} & Escreve um byte em uma porta. \code{unsafe}. \\
-\code{halt\_loop()} & Executa \code{cli; hlt} em la\c{c}o infinito; n\~ao
-retorna. Usado no panic e no comando \code{halt}. \\
-\code{reboot()} & Espera o buffer de entrada do 8042 esvaziar e envia o
-comando \code{0xFE} (reset). Se n\~ao funcionar, cai em \code{halt\_loop}. \\
+\code{inb(port)} & Reads a byte from an I/O port. \code{unsafe}. \\
+\code{outb(port, value)} & Writes a byte to a port. \code{unsafe}. \\
+\code{halt\_loop()} & Executes \code{cli; hlt} in an infinite loop; does not
+return. Used in the panic handler and in the \code{halt} command. \\
+\code{reboot()} & Waits for the 8042 input buffer to empty and sends the
+\code{0xFE} command (reset). If it does not work, it falls back to \code{halt\_loop}. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\subsection{Reinicializa\c{c}\~ao}
+\subsection{Reboot}
 
-O reset usa o controlador 8042, que historicamente controla a linha de reset
-da CPU. O c\'odigo espera at\'e 100.000 itera\c{c}\~oes pelo bit
-\code{INPUT\_FULL} (\code{0x02}) do status limpar e escreve \code{0xFE} na
-porta de comando (\code{0x64}). Em m\'aquinas virtualizadas ou sem 8042, o
-reset pode n\~ao ocorrer; nesse caso a CPU \'e parada.
+The reset uses the 8042 controller, which historically controls the CPU reset
+line. The code waits up to 100,000 iterations for the
+\code{INPUT\_FULL} bit (\code{0x02}) of the status register to clear and writes \code{0xFE} to the
+command port (\code{0x64}). On virtualized machines or machines without an 8042, the
+reset may not occur; in that case the CPU is halted.
 
 \section{\code{sync.rs}: spinlock}
 
-\subsection{Implementa\c{c}\~ao}
+\subsection{Implementation}
 
-\begin{lstlisting}[caption={Spinlock com \code{AtomicBool}.},label={lst:spinlock}]
+\begin{lstlisting}[caption={Spinlock with \code{AtomicBool}.},label={lst:spinlock}]
 pub struct SpinLock<T> {
     locked: AtomicBool,
     data: UnsafeCell<T>,
@@ -220,38 +220,38 @@ impl<T> SpinLock<T> {
 }
 \end{lstlisting}
 
-O \emph{guard} implementa \code{Deref}, \code{DerefMut} e \code{Drop}. Ao ser
-destru\'ido, armazena \code{false} com ordena\c{c}\~ao \code{Release}. O
-spinlock \'e usado apenas para o console:
+The \emph{guard} implements \code{Deref}, \code{DerefMut}, and \code{Drop}. When it is
+destroyed, it stores \code{false} with \code{Release} ordering. The
+spinlock is used only for the console:
 
-\begin{lstlisting}[caption={Console global protegido por spinlock.},label={lst:consoleglobal}]
+\begin{lstlisting}[caption={Global console protected by a spinlock.},label={lst:consoleglobal}]
 static CONSOLE: SpinLock<Console> = SpinLock::new(Console::new());
 \end{lstlisting}
 
-Como \code{Console::new()} \'e \code{const}, o lock pode ser inicializado
-estaticamente sem c\'odigo de inicializa\c{c}\~ao em tempo de execu\c{c}\~ao.
+Because \code{Console::new()} is \code{const}, the lock can be initialized
+statically without runtime initialization code.
 
-\subsection{Propriedades e limita\c{c}\~oes}
+\subsection{Properties and limitations}
 
 \begin{itemize}
-  \item \textbf{Bloqueio girat\'orio}: se outra CPU ou interrup\c{c}\~ao
-        mantiver o lock, a CPU atual gira at\'e liberar. N\~ao h\'a
-        \emph{sleep} nem timeout.
-  \item \textbf{Sem IRQ save/restore}: desabilitar interrup\c{c}\~oes ao
-        adquirir o lock n\~ao \'e feito. Com IRQs desligadas no boot, isso
-        n\~ao \'e problema hoje; ao habilitar IRQs, um handler que use o
-        console pode causar \emph{deadlock}.
-  \item \textbf{Sem detec\c{c}\~ao de recurs\~ao}: adquirir o mesmo lock duas
-        vezes na mesma CPU trava.
-  \item \textbf{Ordem de mem\'oria}: \code{Acquire}/\code{Release} garante
-        que escritas ao console n\~ao sejam reordenadas para fora da
-        regi\~ao cr\'itica em arquiteturas com mem\'oria fraca; no x86,
-        o modelo \'e mais forte, mas a anota\c{c}\~ao mant\'em o c\'odigo
-        correto.
+  \item \textbf{Spinning lock}: if another CPU or an interrupt
+        holds the lock, the current CPU spins until it is released. There is no
+        \emph{sleep} or timeout.
+  \item \textbf{No IRQ save/restore}: disabling interrupts when
+        acquiring the lock is not done. With IRQs disabled at boot, this is
+        not a problem today; once IRQs are enabled, a handler that uses the
+        console may cause a \emph{deadlock}.
+  \item \textbf{No recursion detection}: acquiring the same lock twice
+        on the same CPU hangs.
+  \item \textbf{Memory ordering}: \code{Acquire}/\code{Release} guarantees
+        that writes to the console are not reordered out of the
+        critical section on architectures with weak memory; on x86,
+        the model is stronger, but the annotation keeps the code
+        correct.
 \end{itemize}
 
-\begin{nota}[Escopo atual]
-Com uma CPU, interrup\c{c}\~oes desligadas e apenas o shell chamando
-\code{print!}, o spinlock nunca fica contended. Ele existe como prepara\c{c}\~ao
-para extens\~oes e para documentar a inten\c{c}\~ao de exclus\~ao m\'utua.
+\begin{nota}[Current scope]
+With one CPU, interrupts disabled, and only the shell calling
+\code{print!}, the spinlock is never contended. It exists as preparation
+for extensions and to document the intent of mutual exclusion.
 \end{nota}

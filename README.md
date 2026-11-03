@@ -142,17 +142,23 @@ confirme que a ISO está sendo escolhida como dispositivo de boot.
 ## Documentação
 
 A documentação técnica completa (arquitetura, boot, memória, drivers, shell,
-build, testes e comparação com o Linux) está em `docs/`:
+build, testes e comparação com o Linux) está em `docs/`. A versão em inglês é
+a principal; a versão em português é mantida em paralelo.
 
-- `docs/main.pdf` — documento compilado;
-- `docs/main.tex` — fonte LaTeX;
-- `docs/sections/` — capítulos.
+- `docs/main.pdf` — documento compilado em inglês (principal);
+- `docs/main.tex` — fonte LaTeX em inglês;
+- `docs/sections/` — capítulos em inglês;
+- `docs/pt/main.pdf` — documento compilado em português;
+- `docs/pt/main.tex` — fonte LaTeX em português;
+- `docs/pt/sections/` — capítulos em português.
 
-Para regerar o PDF:
+Para regerar os PDFs:
 
 ```sh
 cd docs
-make
+make        # inglês (principal)
+make pt     # português
+make both   # ambos
 ```
 
 ## Cadeia de boot

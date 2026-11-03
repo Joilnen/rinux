@@ -1,118 +1,118 @@
-\chapter{Boot e inicializa\c{c}\~ao de baixo n\'ivel}
+\chapter{Boot and low-level initialization}
 \label{cap:boot}
 
-\section{Responsabilidades de \code{boot.rs}}
+\section{Responsibilities of \code{boot.rs}}
 
-O m\'odulo \code{src/boot.rs} concentra tudo o que precisa acontecer antes de
-existir uma pilha Rust, mem\'oria virtual ou console:
+The \code{src/boot.rs} module concentrates everything that must happen before
+a Rust stack, virtual memory or console exists:
 
 \begin{enumerate}
-  \item declarar o cabe\c{c}alho Multiboot2 reconhecido pelo GRUB;
-  \item salvar os argumentos passados pelo bootloader;
-  \item construir as tabelas de p\'agina;
-  \item carregar uma GDT de 64 bits;
-  \item habilitar PAE, \emph{long mode} e pagina\c{c}\~ao;
-  \item transferir o controle para \code{kernel\_main} na metade alta.
+  \item declare the Multiboot2 header recognized by GRUB;
+  \item save the arguments passed by the bootloader;
+  \item build the page tables;
+  \item load a 64-bit GDT;
+  \item enable PAE, \emph{long mode} and paging;
+  \item transfer control to \code{kernel\_main} in the higher half.
 \end{enumerate}
 
-O arquivo combina uma estrutura Rust est\'atica (o cabe\c{c}alho) e um bloco
-\code{global\_asm!} com o restante. N\~ao h\'a fun\c{c}\~oes Rust nesse
-m\'odulo.
+The file combines a static Rust structure (the header) and a
+\code{global\_asm!} block with the rest. There are no Rust functions in this
+module.
 
-\section{Cabe\c{c}alho Multiboot2}
+\section{Multiboot2 header}
 
-O GRUB procura a assinatura \code{0xE85250D6} nos primeiros 32 KiB do
-arquivo. O cabe\c{c}alho \'e declarado em uma \code{static} alinhada a 8 bytes
-e colocada na se\c{c}\~ao \code{.multiboot\_header}.
+GRUB looks for the \code{0xE85250D6} signature in the first 32 KiB of the
+file. The header is declared in a \code{static} aligned to 8 bytes
+and placed in the \code{.multiboot\_header} section.
 
 \begin{table}[H]
 \centering
-\caption{Campos do cabe\c{c}alho Multiboot2 implementado.}
+\caption{Fields of the implemented Multiboot2 header.}
 \label{tab:mbheader}
 \begin{tabular}{@{}rrl@{}}
 \toprule
-\textbf{Valor} & \textbf{Offset} & \textbf{Significado} \\
+\textbf{Value} & \textbf{Offset} & \textbf{Meaning} \\
 \midrule
-\code{0xE85250D6} & 0x00 & Assinatura Multiboot2 \\
-\code{0x00000000} & 0x04 & Arquitetura i386 (32 bits) \\
-\code{0x00000018} & 0x08 & Tamanho total do cabe\c{c}alho (24 bytes) \\
+\code{0xE85250D6} & 0x00 & Multiboot2 signature \\
+\code{0x00000000} & 0x04 & i386 architecture (32 bits) \\
+\code{0x00000018} & 0x08 & Total header size (24 bytes) \\
 \code{0x17ADAF12} & 0x0C & Checksum \\
-\code{0x00000000} & 0x10 & Tag final: tipo 0 \\
-\code{0x00000008} & 0x14 & Tag final: tamanho 8 \\
+\code{0x00000000} & 0x10 & Final tag: type 0 \\
+\code{0x00000008} & 0x14 & Final tag: size 8 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-O checksum \'e calculado de modo que a soma dos quatro primeiros inteiros de
-32 bits seja zero:
+The checksum is computed so that the sum of the first four 32-bit integers
+is zero:
 
 \begin{verbatim}
 -(0xE85250D6 + 0x00000000 + 0x00000018) = 0x17ADAF12
 \end{verbatim}
 
-A tag final \'e obrigat\'oria. N\~ao h\'a tags de informa\c{c}\~ao de
-v\'ideo, mem\'oria ou m\'odulos; o kernel recebe apenas o ponteiro para a
-estrutura Multiboot2 e ignora seu conte\'udo, exceto pelo valor de
-\code{magic}, que \'e validado e impresso.
+The final tag is mandatory. There are no video, memory or module information
+tags; the kernel receives only the pointer to the
+Multiboot2 structure and ignores its contents, except for the value of
+\code{magic}, which is validated and printed.
 
-\section{Contrato de entrada}
+\section{Entry contract}
 
-Quando o GRUB transfere o controle para \code{\_start}:
+When GRUB transfers control to \code{\_start}:
 
 \begin{itemize}
-  \item a CPU est\'a em modo protegido de 32 bits;
-  \item \code{eax} cont\'em \code{0x36D76289} (assinatura Multiboot2);
-  \item \code{ebx} cont\'em o endere\c{c}o f\'isico da estrutura de
-        informa\c{c}\~oes Multiboot2;
-  \item a pilha n\~ao \'e confi\'avel;
-  \item as interrup\c{c}\~oes podem estar em qualquer estado.
+  \item the CPU is in 32-bit protected mode;
+  \item \code{eax} contains \code{0x36D76289} (Multiboot2 signature);
+  \item \code{ebx} contains the physical address of the Multiboot2
+        information structure;
+  \item the stack is not reliable;
+  \item interrupts may be in any state.
 \end{itemize}
 
-O stub imediatamente executa \code{cli} e \code{cld}, define uma pilha
-tempor\'aria de 8 KiB em \code{boot\_stack\_top} e zera \code{ebp}.
+The stub immediately executes \code{cli} and \code{cld}, sets up a temporary
+8 KiB stack at \code{boot\_stack\_top} and zeroes \code{ebp}.
 
-\section{Sequ\^encia do stub}
+\section{Stub sequence}
 
 \begin{enumerate}
-  \item \textbf{Salvar argumentos}: \code{eax} e \code{ebx} s\~ao copiados
-        para \code{mb\_magic} e \code{mb\_info}, vari\'aveis de 32 bits em
-        \code{.boot.bss}. Como o c\'odigo ainda roda em endere\c{c}os baixos,
-        esses endere\c{c}os s\~ao acess\'iveis diretamente.
-  \item \textbf{Zerar p\'aginas}: \code{rep stosl} limpa 3 $\times$ 4096
-        bytes (PML4, PDPT e PD).
-  \item \textbf{Montar PML4}: a entrada 0 aponta para a PDPT e a entrada 511
-        tamb\'em aponta para a mesma PDPT. A entrada 511 cobre a faixa
-        \code{0xFFFFFF8000000000} em diante.
-  \item \textbf{Montar PDPT}: a entrada 0 e a entrada 510 apontam para a
-        mesma PD. A entrada 510, dentro do PML4[511], resulta em
+  \item \textbf{Save arguments}: \code{eax} and \code{ebx} are copied
+        to \code{mb\_magic} and \code{mb\_info}, 32-bit variables in
+        \code{.boot.bss}. Since the code still runs at low addresses,
+        these addresses are directly accessible.
+  \item \textbf{Zero pages}: \code{rep stosl} clears 3 $\times$ 4096
+        bytes (PML4, PDPT and PD).
+  \item \textbf{Build PML4}: entry 0 points to the PDPT and entry 511
+        also points to the same PDPT. Entry 511 covers the range
+        \code{0xFFFFFF8000000000} onward.
+  \item \textbf{Build PDPT}: entry 0 and entry 510 point to the
+        same PD. Entry 510, inside PML4[511], results in
         \code{0xFFFFFFFF80000000}.
-  \item \textbf{Montar PD}: 512 entradas de 2 MiB, cada uma com os bits
-        \emph{present} e \emph{page size} (\code{0x83}),
-        mapeando fisicamente 0 a 1 GiB.
-  \item \textbf{Carregar GDT}: \code{lgdt gdt64\_ptr}.
-  \item \textbf{Preparar a CPU}: limpar \code{CR0.EM}, setar \code{CR0.MP},
-        setar \code{CR4.PAE}, \code{CR4.OSFXSR} e \code{CR4.OSXMMEXCPT}.
-  \item \textbf{Ativar long mode}: setar \code{EFER.LME} via \code{rdmsr} /
-        \code{wrmsr} e, em seguida, \code{CR0.PG | CR0.PE}.
-  \item \textbf{Salto de modo}: \code{ljmp \$0x08, \$long\_mode\_entry\_low},
-        carregando um seletor de c\'odigo com o bit \code{L} ligado.
-  \item \textbf{Modo 64 bits}: recarregar os segmentos de dados com
-        \code{0x10}, carregar \code{rsp} com \code{stack\_top} (metade alta),
-        preparar \code{edi}/\code{esi} e chamar \code{kernel\_main}.
+  \item \textbf{Build PD}: 512 entries of 2 MiB, each with the
+        \emph{present} and \emph{page size} bits (\code{0x83}),
+        mapping physical 0 to 1 GiB.
+  \item \textbf{Load GDT}: \code{lgdt gdt64\_ptr}.
+  \item \textbf{Prepare the CPU}: clear \code{CR0.EM}, set \code{CR0.MP},
+        set \code{CR4.PAE}, \code{CR4.OSFXSR} and \code{CR4.OSXMMEXCPT}.
+  \item \textbf{Enable long mode}: set \code{EFER.LME} via \code{rdmsr} /
+        \code{wrmsr} and then \code{CR0.PG | CR0.PE}.
+  \item \textbf{Mode jump}: \code{ljmp \$0x08, \$long\_mode\_entry\_low},
+        loading a code selector with the \code{L} bit set.
+  \item \textbf{64-bit mode}: reload the data segments with
+        \code{0x10}, load \code{rsp} with \code{stack\_top} (higher half),
+        prepare \code{edi}/\code{esi} and call \code{kernel\_main}.
 \end{enumerate}
 
-\begin{nota}[Por que duas pilhas?]
-A pilha do stub precisa estar em endere\c{c}o baixo, porque a CPU ainda n\~ao
-usa pagina\c{c}\~ao quando o stub come\c{c}a. A pilha definitiva do Rust fica
-em \code{.bss}, na metade alta, e s\'o pode ser usada depois que o modo longo
-e a pagina\c{c}\~ao est\~ao ativos.
+\begin{nota}[Why two stacks?]
+The stub stack must be at a low address, because the CPU does not yet
+use paging when the stub starts. The definitive Rust stack is
+in \code{.bss}, in the higher half, and can only be used after long mode
+and paging are active.
 \end{nota}
 
-\section{Pagina\c{c}\~ao e layout de mem\'oria}
+\section{Paging and memory layout}
 
-A tradu\c{c}\~ao de endere\c{c}os usa quatro n\'iveis, mas apenas tr\^es
-tabelas s\~ao preenchidas. O page directory usa \emph{huge pages} de 2 MiB,
-reduzindo o consumo a 12 KiB de tabelas.
+Address translation uses four levels, but only three
+tables are filled. The page directory uses 2 MiB \emph{huge pages},
+reducing consumption to 12 KiB of tables.
 
 \begin{figure}[H]
 \centering
@@ -129,21 +129,21 @@ reduzindo o consumo a 12 KiB de tabelas.
 \node[tab] (pml4) {PML4\\[0]=0x...003\\{[511]=0x...003}};
 \node[tab, right=of pml4] (pdpt) {PDPT\\{[0]=PD, [510]=PD}};
 \node[tab, right=of pdpt] (pd) {PD\\{512 x 2 MiB}};
-\node[box, below=1.2cm of pd] (low) {Identidade\\0x00000000--0x3FFFFFFF};
-\node[box, below=1.2cm of pml4] (high) {Metade alta\\0xFFFFFFFF80000000\\--0xFFFFFFFFBFFFFFFF};
+\node[box, below=1.2cm of pd] (low) {Identity\\0x00000000--0x3FFFFFFF};
+\node[box, below=1.2cm of pml4] (high) {Higher half\\0xFFFFFFFF80000000\\--0xFFFFFFFFBFFFFFFF};
 \draw[arrow] (pml4) -- node[above,font=\tiny]{PDPT} (pdpt);
 \draw[arrow] (pdpt) -- node[above,font=\tiny]{PD} (pd);
 \draw[arrow] (pdpt.south) -- ++(0,-0.35) -| (low.north);
 \draw[arrow] (pdpt.south) -- ++(0,-0.35) -| (high.north);
 \end{tikzpicture}
-\caption{Estrutura de pagina\c{c}\~ao: uma \'unica PDPT e uma \'unica PD
-servem tanto \`a identidade baixa quanto \`a metade alta.}
+\caption{Paging structure: a single PDPT and a single PD
+serve both the low identity and the higher half.}
 \label{fig:paging}
 \end{figure}
 
-\subsection{C\'alculo dos \'indices}
+\subsection{Index calculation}
 
-Para um endere\c{c}o virtual de 48 bits, os \'indices s\~ao:
+For a 48-bit virtual address, the indices are:
 
 \begin{align*}
 \text{PML4} &= \left\lfloor \frac{\text{VA}}{2^{39}} \right\rfloor \bmod 512,\\
@@ -151,7 +151,7 @@ Para um endere\c{c}o virtual de 48 bits, os \'indices s\~ao:
 \text{PD}   &= \left\lfloor \frac{\text{VA}}{2^{21}} \right\rfloor \bmod 512.
 \end{align*}
 
-Para \code{0xFFFFFFFF80000000}:
+For \code{0xFFFFFFFF80000000}:
 
 \begin{itemize}
   \item PML4 = 511 (\code{0xFFFFFFFF80000000 >> 39 \& 0x1FF});
@@ -159,87 +159,87 @@ Para \code{0xFFFFFFFF80000000}:
   \item PD = 0.
 \end{itemize}
 
-Assim, a entrada 510 da PDPT aponta para a PD que descreve os primeiros 1 GiB
-f\'isicos. O mesmo conjunto de tabelas atende aos dois mapeamentos:
+Thus, entry 510 of the PDPT points to the PD that describes the first 1 GiB
+of physical memory. The same set of tables serves both mappings:
 
 \begin{itemize}
-  \item \textbf{identidade baixa}: \code{0x00000000}--\code{0x3FFFFFFF}
-        (stub, tabelas, estruturas do GRUB);
-  \item \textbf{metade alta}: \code{0xFFFFFFFF80000000}--
-        \code{0xFFFFFFFFBFFFFFFF} (c\'odigo e dados do kernel).
+  \item \textbf{low identity}: \code{0x00000000}--\code{0x3FFFFFFF}
+        (stub, tables, GRUB structures);
+  \item \textbf{higher half}: \code{0xFFFFFFFF80000000}--
+        \code{0xFFFFFFFFBFFFFFFF} (kernel code and data).
 \end{itemize}
 
-\begin{atencao}[Limite de 1 GiB]
-O mapeamento cobre exatamente 1 GiB. Se o kernel ou o \emph{framebuffer}
-estiverem acima disso, ou se a m\'aquina tiver mais de 1 GiB e o kernel
-precisar acessar mem\'oria al\'em desse limite, o mapeamento precisa ser
-estendido (mais entradas na PD ou tabelas adicionais).
+\begin{atencao}[1 GiB limit]
+The mapping covers exactly 1 GiB. If the kernel or the \emph{framebuffer}
+are above that, or if the machine has more than 1 GiB and the kernel
+needs to access memory beyond that limit, the mapping must be
+extended (more entries in the PD or additional tables).
 \end{atencao}
 
-\section{GDT e modo longo}
+\section{GDT and long mode}
 
-A GDT cont\'em tr\^es descritores:
+The GDT contains three descriptors:
 
 \begin{table}[H]
 \centering
-\caption{Descritores da GDT de 64 bits.}
+\caption{Descriptors of the 64-bit GDT.}
 \label{tab:gdt}
 \begin{tabular}{@{}clll@{}}
 \toprule
-\textbf{Seletor} & \textbf{Valor} & \textbf{Tipo} & \textbf{Uso} \\
+\textbf{Selector} & \textbf{Value} & \textbf{Type} & \textbf{Use} \\
 \midrule
-\code{0x00} & \code{0x0000000000000000} & Nulo & Obrigat\'orio \\
-\code{0x08} & \code{0x00AF9A000000FFFF} & C\'odigo ring 0, L=1 & \code{CS} \\
-\code{0x10} & \code{0x00CF92000000FFFF} & Dados ring 0 & \code{DS/ES/FS/GS/SS} \\
+\code{0x00} & \code{0x0000000000000000} & Null & Mandatory \\
+\code{0x08} & \code{0x00AF9A000000FFFF} & Code ring 0, L=1 & \code{CS} \\
+\code{0x10} & \code{0x00CF92000000FFFF} & Data ring 0 & \code{DS/ES/FS/GS/SS} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-O descritor de c\'odigo tem o bit \code{L} (long mode) ligado, indicando
-c\'odigo de 64 bits. O descritor de dados \'e o tradicional de 32 bits, usado
-apenas para os registradores de segmento; em modo longo, a segmenta\c{c}\~ao
-de dados \'e praticamente ignorada.
+The code descriptor has the \code{L} (long mode) bit set, indicating
+64-bit code. The data descriptor is the traditional 32-bit one, used
+only for the segment registers; in long mode, data
+segmentation is practically ignored.
 
-\section{Registradores de controle}
+\section{Control registers}
 
 \begin{table}[H]
 \centering
-\caption{Configura\c{c}\~ao dos registradores de controle.}
+\caption{Configuration of the control registers.}
 \label{tab:cr}
 \begin{tabular}{@{}llp{7.5cm}@{}}
 \toprule
-\textbf{Registrador} & \textbf{Bits} & \textbf{Efeito} \\
+\textbf{Register} & \textbf{Bits} & \textbf{Effect} \\
 \midrule
-\code{CR0} & \code{EM=0}, \code{MP=1} & Habilita SSE/FXSR sem emula\c{c}\~ao de FPU. \\
-\code{CR0} & \code{PG=1}, \code{PE=1} & Ativa pagina\c{c}\~ao e modo protegido. \\
-\code{CR3} & \code{pml4} & Aponta para o PML4 f\'isico. \\
-\code{CR4} & \code{PAE=1} & Habilita endere\c{c}os f\'isicos de 36 bits e p\'aginas de 2 MiB. \\
-\code{CR4} & \code{OSFXSR=1} & Sistema operacional suporta \code{FXSAVE}/\code{FXRSTOR}. \\
-\code{CR4} & \code{OSXMMEXCPT=1} & Exce\c{c}\~oes SIMD entregues ao SO. \\
-\code{EFER} & \code{LME=1} & Habilita \emph{long mode}. \\
+\code{CR0} & \code{EM=0}, \code{MP=1} & Enables SSE/FXSR without FPU emulation. \\
+\code{CR0} & \code{PG=1}, \code{PE=1} & Enables paging and protected mode. \\
+\code{CR3} & \code{pml4} & Points to the physical PML4. \\
+\code{CR4} & \code{PAE=1} & Enables 36-bit physical addresses and 2 MiB pages. \\
+\code{CR4} & \code{OSFXSR=1} & Operating system supports \code{FXSAVE}/\code{FXRSTOR}. \\
+\code{CR4} & \code{OSXMMEXCPT=1} & SIMD exceptions delivered to the OS. \\
+\code{EFER} & \code{LME=1} & Enables \emph{long mode}. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \section{Linker script}
 
-O arquivo \code{linker.ld} define dois mundos:
+The \code{linker.ld} file defines two worlds:
 
 \begin{enumerate}
-  \item \code{.boot}, carregado em \code{0x100000} (1 MiB), cont\'em o
-        cabe\c{c}alho Multiboot2, o c\'odigo de 32/64 bits, a GDT, as tabelas
-        de p\'agina e a pilha do stub;
-  \item \code{.text}, \code{.rodata}, \code{.data} e \code{.bss}, ligados em
-        \code{0xFFFFFFFF80000000} com \emph{load address} f\'isico
-        \code{0x00100000 + deslocamento}.
+  \item \code{.boot}, loaded at \code{0x100000} (1 MiB), contains the
+        Multiboot2 header, the 32/64-bit code, the GDT, the page
+        tables and the stub stack;
+  \item \code{.text}, \code{.rodata}, \code{.data} and \code{.bss}, linked at
+        \code{0xFFFFFFFF80000000} with physical \emph{load address}
+        \code{0x00100000 + offset}.
 \end{enumerate}
 
-A macro \code{KERNEL\_VMA} vale \code{0xFFFFFFFF80000000}. Para cada
-se\c{c}\~ao alta, o script usa \code{AT(ADDR(.secao) - KERNEL\_VMA)} para
-informar ao linker que o endere\c{c}o de carga f\'isico \'e baixo, embora o
-endere\c{c}o virtual seja alto.
+The \code{KERNEL\_VMA} macro equals \code{0xFFFFFFFF80000000}. For each
+high section, the script uses \code{AT(ADDR(.secao) - KERNEL\_VMA)} to
+tell the linker that the physical load address is low, even though the
+virtual address is high.
 
-\begin{lstlisting}[caption={Trecho central de \code{linker.ld}.},label={lst:linker}]
+\begin{lstlisting}[caption={Central excerpt of \code{linker.ld}.},label={lst:linker}]
 ENTRY(_start)
 KERNEL_VMA = 0xFFFFFFFF80000000;
 
@@ -267,22 +267,22 @@ SECTIONS
 }
 \end{lstlisting}
 
-Se\c{c}\~oes de metadados que n\~ao s\~ao necess\'arias em um kernel
-(\code{.eh\_frame}, \code{.comment}, \code{.note}) s\~ao descartadas com
-\code{/DISCARD/}, e o build usa \code{--gc-sections} para remover c\'odigo
-n\~ao referenciado.
+Metadata sections that are not needed in a kernel
+(\code{.eh\_frame}, \code{.comment}, \code{.note}) are discarded with
+\code{/DISCARD/}, and the build uses \code{--gc-sections} to remove
+unreferenced code.
 
-\section{Se\c{c}\~oes observadas no ELF}
+\section{Sections observed in the ELF}
 
-A compila\c{c}\~ao de refer\^encia gerou o seguinte layout:
+The reference build produced the following layout:
 
 \begin{table}[H]
 \centering
-\caption{Se\c{c}\~oes do ELF de refer\^encia (endere\c{c}os virtuais).}
+\caption{Sections of the reference ELF (virtual addresses).}
 \label{tab:elf}
 \begin{tabular}{@{}llrr@{}}
 \toprule
-\textbf{Se\c{c}\~ao} & \textbf{VMA} & \textbf{Offset} & \textbf{Tamanho} \\
+\textbf{Section} & \textbf{VMA} & \textbf{Offset} & \textbf{Size} \\
 \midrule
 \code{.boot}   & \code{0x0000000000100000} & \code{0x1000} & \code{0x6008} \\
 \code{.text}   & \code{0xFFFFFFFF80107000} & \code{0x8000} & \code{0x2516} \\
@@ -293,15 +293,15 @@ A compila\c{c}\~ao de refer\^encia gerou o seguinte layout:
 \end{tabular}
 \end{table}
 
-O ponto de entrada \'e \code{0x100018}, dentro de \code{.boot}. O ELF tem
-6 \emph{program headers}: um segmento baixo \code{RWE} para o stub e quatro
-segmentos altos (c\'odigo, read-only, dados e BSS).
+The entry point is \code{0x100018}, inside \code{.boot}. The ELF has
+6 \emph{program headers}: one low \code{RWE} segment for the stub and four high
+segments (code, read-only, data and BSS).
 
-\section{Passagem para Rust}
+\section{Handoff to Rust}
 
-O \'ultimo trecho do stub carrega os argumentos e chama a fun\c{c}\~ao Rust:
+The last part of the stub loads the arguments and calls the Rust function:
 
-\begin{lstlisting}[caption={Chamada de \code{kernel\_main} a partir do stub.},label={lst:callmain}]
+\begin{lstlisting}[caption={Call to \code{kernel\_main} from the stub.},label={lst:callmain}]
     mov mb_magic(%rip), %edi
     mov mb_info(%rip), %esi
     movabs $kernel_main, %rax
@@ -313,25 +313,25 @@ O \'ultimo trecho do stub carrega os argumentos e chama a fun\c{c}\~ao Rust:
     jmp 3b
 \end{lstlisting}
 
-A fun\c{c}\~ao Rust usa a conven\c{c}\~ao \code{extern "C"}: os dois primeiros
-argumentos inteiros v\~ao em \code{edi} e \code{esi}. O retorno \'e
-\code{!}, mas o stub ainda mant\'em um la\c{c}o de seguran\c{c}a com
-\code{cli; hlt} caso a chamada retorne inesperadamente.
+The Rust function uses the \code{extern "C"} convention: the first two
+integer arguments go in \code{edi} and \code{esi}. The return type is
+\code{!}, but the stub still keeps a safety loop with
+\code{cli; hlt} in case the call returns unexpectedly.
 
-\section{Limita\c{c}\~oes do boot}
+\section{Boot limitations}
 
 \begin{itemize}
-  \item N\~ao h\'a suporte a UEFI nativo; depende de BIOS/CSM e de VGA
-        legado.
-  \item N\~ao h\'a real-mode setup, \emph{protected mode} pr\'oprio nem
-        descompress\~ao; o GRUB faz o carregamento.
-  \item O \emph{stub} n\~ao solicita informa\c{c}\~oes de mem\'oria,
-        framebuffer ou m\'odulos. A estrutura Multiboot2 s\'o \'e interpretada
-        depois, em Rust, por \code{paging::init}, para liberar frames.
-  \item O \emph{stub} mapeia apenas 1 GiB por identidade e n\~ao instala
-        demand paging, prote\c{c}\~ao \code{NX} ou \emph{guard pages}. Essas
-        estruturas s\~ao criadas depois por \code{paging.rs}.
-  \item O \emph{stub} n\~ao instala IDT; at\'e \code{idt::init()} rodar,
-        qualquer exce\c{c}\~ao (incluindo \emph{page fault}) resulta em
+  \item There is no native UEFI support; it depends on BIOS/CSM and on legacy
+        VGA.
+  \item There is no real-mode setup, no custom \emph{protected mode} and no
+        decompression; GRUB does the loading.
+  \item The \emph{stub} does not request memory, framebuffer or module
+        information. The Multiboot2 structure is only interpreted
+        later, in Rust, by \code{paging::init}, to release frames.
+  \item The \emph{stub} maps only 1 GiB by identity and does not install
+        demand paging, \code{NX} protection or \emph{guard pages}. These
+        structures are created later by \code{paging.rs}.
+  \item The \emph{stub} does not install an IDT; until \code{idt::init()} runs,
+        any exception (including a \emph{page fault}) results in a
         \emph{triple fault}.
 \end{itemize}

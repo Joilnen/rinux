@@ -1,86 +1,86 @@
-\chapter{Mem\'oria virtual, demand paging e interrup\c{c}\~oes}
+\chapter{Virtual memory, demand paging, and interrupts}
 \label{cap:memoria-usuario}
 
-Este cap\'itulo documenta os m\'odulos \code{gdt.rs}, \code{idt.rs},
-\code{paging.rs} e \code{user.rs}, adicionados depois do console e do shell.
-O objetivo \'e sair do modelo ``ring 0, interrup\c{c}\~oes desligadas e
-mem\'oria est\'atica'' para um kernel capaz de:
+This chapter documents the \code{gdt.rs}, \code{idt.rs},
+\code{paging.rs}, and \code{user.rs} modules, added after the console and the shell.
+The goal is to move away from the ``ring 0, interrupts disabled, and
+static memory'' model to a kernel capable of:
 
 \begin{itemize}
-  \item receber exce\c{c}\~oes e IRQs por uma IDT;
-  \item receber o timer do PIT em IRQ0;
-  \item alocar frames f\'isicos de 4 KiB;
-  \item materializar p\'aginas somente quando a CPU gera \code{\#PF};
-  \item executar c\'odigo em ring 3 com uma barreira real entre usu\'ario e
+  \item receiving exceptions and IRQs through an IDT;
+  \item receiving the PIT timer on IRQ0;
+  \item allocating 4 KiB physical frames;
+  \item materializing pages only when the CPU generates \code{\#PF};
+  \item executing code in ring 3 with a real barrier between user and
         kernel.
 \end{itemize}
 
-\section{Ordem de inicializa\c{c}\~ao}
+\section{Initialization order}
 
-A sequ\^encia em \code{kernel\_main} passou a ser:
+The sequence in \code{kernel\_main} became:
 
 \begin{enumerate}
-  \item \code{vga::init()} e \code{serial::init()};
-  \item \code{paging::init(magic, info)} --- libera os frames dispon\'iveis
-        descritos pelo Multiboot2;
-  \item \code{gdt::init()} --- GDT definitiva, segmentos ring 3 e TSS;
-  \item \code{keyboard::init()} --- teclado PS/2 por \emph{polling};
-  \item \code{idt::init()} --- IDT, remapeamento do PIC e PIT;
-  \item \code{sti} e entrada no shell.
+  \item \code{vga::init()} and \code{serial::init()};
+  \item \code{paging::init(magic, info)} --- frees the available frames
+        described by Multiboot2;
+  \item \code{gdt::init()} --- final GDT, ring 3 segments, and TSS;
+  \item \code{keyboard::init()} --- PS/2 keyboard by \emph{polling};
+  \item \code{idt::init()} --- IDT, PIC remapping, and PIT;
+  \item \code{sti} and entry into the shell.
 \end{enumerate}
 
-A IDT s\'o \'e instalada depois que a GDT tem a TSS, pois a porta de
-\emph{double fault} usa uma pilha IST. O timer s\'o \'e desmascarado depois
-que a IDT est\'a pronta.
+The IDT is installed only after the GDT has the TSS, because the
+\emph{double fault} gate uses an IST stack. The timer is unmasked only after
+the IDT is ready.
 
-\section{GDT, TSS e pilhas de privil\'egio}
+\section{GDT, TSS, and privilege stacks}
 
-A GDT do stub de boot cont\'em apenas descritores ring 0. Para entrar em
-ring 3, \code{gdt.rs} monta uma tabela com sete entradas:
+The GDT of the boot stub contains only ring 0 descriptors. To enter
+ring 3, \code{gdt.rs} builds a table with seven entries:
 
 \begin{table}[H]
 \centering
-\caption{Descritores da GDT definitiva.}
+\caption{Descriptors of the final GDT.}
 \label{tab:gdt-usuario}
 \begin{tabular}{@{}rll@{}}
 \toprule
-\textbf{Selector} & \textbf{Conte\'udo} & \textbf{DPL} \\
+\textbf{Selector} & \textbf{Contents} & \textbf{DPL} \\
 \midrule
-\code{0x08} & c\'odigo 64 bits & 0 \\
-\code{0x10} & dados & 0 \\
-\code{0x18} & dados & 3 \\
-\code{0x20} & c\'odigo 64 bits & 3 \\
-\code{0x28} & TSS (duas entradas) & 0 \\
+\code{0x08} & 64-bit code & 0 \\
+\code{0x10} & data & 0 \\
+\code{0x18} & data & 3 \\
+\code{0x20} & 64-bit code & 3 \\
+\code{0x28} & TSS (two entries) & 0 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-A TSS \'e obrigat\'oria para a troca autom\'atica de pilha. Quando a CPU
-passa de ring 3 para ring 0 por interrup\c{c}\~ao ou exce\c{c}\~ao, ela l\^e
-\code{rsp0} da TSS e continua a empilhar nessa pilha. O kernel reserva:
+The TSS is mandatory for automatic stack switching. When the CPU
+moves from ring 3 to ring 0 due to an interrupt or exception, it reads
+\code{rsp0} from the TSS and continues pushing onto that stack. The kernel reserves:
 
 \begin{itemize}
-  \item \code{USER\_KERNEL\_STACK}: 16 KiB para interrup\c{c}\~oes vindas do
-        usu\'ario;
-  \item \code{DOUBLE\_FAULT\_STACK}: 8 KiB como \code{IST1}, para que um
-        \code{\#DF} n\~ao tente usar uma pilha possivelmente corrompida.
+  \item \code{USER\_KERNEL\_STACK}: 16 KiB for interrupts coming from
+        user mode;
+  \item \code{DOUBLE\_FAULT\_STACK}: 8 KiB as \code{IST1}, so that a
+        \code{\#DF} does not try to use a possibly corrupted stack.
 \end{itemize}
 
-O campo \code{iomap\_base} aponta para o fim da TSS, desativando o bitmap de
-I/O. Assim, instru\c{c}\~oes \code{in}/\code{out} em ring 3 geram \code{\#GP}.
+The \code{iomap\_base} field points to the end of the TSS, disabling the I/O
+bitmap. Thus, \code{in}/\code{out} instructions in ring 3 generate \code{\#GP}.
 
-\section{IDT, stubs e normaliza\c{c}\~ao do erro}
+\section{IDT, stubs, and error-code normalization}
 
-A IDT tem 256 portas de 16 bytes. As 32 primeiras s\~ao exce\c{c}\~oes; as
-16 seguintes s\~ao as IRQs do PIC remapeadas para \code{0x20..0x2F}; a porta
-\code{0x80} \'e uma \emph{syscall} did\'atica com DPL = 3.
+The IDT has 256 gates of 16 bytes. The first 32 are exceptions; the
+next 16 are the PIC IRQs remapped to \code{0x20..0x2F}; gate
+\code{0x80} is a didactic \emph{syscall} with DPL = 3.
 
-O problema cl\'assico \'e que a CPU empilha um c\'odigo de erro apenas em
-algumas exce\c{c}\~oes (8, 10--14, 17, 21, 29 e 30). Se cada \emph{stub}
-tratasse a pilha de forma diferente, o layout visto pelo Rust mudaria. Para
-uniformizar, \code{idt.rs} gera stubs em assembly:
+The classic problem is that the CPU pushes an error code only on
+some exceptions (8, 10--14, 17, 21, 29, and 30). If each \emph{stub}
+handled the stack differently, the layout seen by Rust would change. To
+standardize, \code{idt.rs} generates stubs in assembly:
 
-\begin{lstlisting}[caption={Stubs que normalizam o c\'odigo de erro.},label={lst:isrstubs}]
+\begin{lstlisting}[caption={Stubs that normalize the error code.},label={lst:isrstubs}]
 .macro isr_no_err n
 .global isr_stub_\n
 isr_stub_\n:
@@ -97,12 +97,12 @@ isr_stub_\n:
 .endm
 \end{lstlisting}
 
-O \emph{stub} comum salva os registradores de uso geral, preserva
-\code{xmm0..xmm15} e \code{MXCSR}, alinha a pilha para chamar
-\code{interrupt\_dispatch} e, no retorno, restaura tudo e executa
-\code{iretq}. O frame visto pelo Rust \'e:
+The common \emph{stub} saves the general-purpose registers, preserves
+\code{xmm0..xmm15} and \code{MXCSR}, aligns the stack to call
+\code{interrupt\_dispatch}, and, on return, restores everything and executes
+\code{iretq}. The frame seen by Rust is:
 
-\begin{lstlisting}[caption={Layout de \code{InterruptFrame} ap\'os o stub comum.},label={lst:frame}]
+\begin{lstlisting}[caption={Layout of \code{InterruptFrame} after the common stub.},label={lst:frame}]
 #[repr(C)]
 pub struct InterruptFrame {
     pub r15: u64, /* ... r8 */
@@ -117,15 +117,15 @@ pub struct InterruptFrame {
 }
 \end{lstlisting}
 
-O vetor 14 chama o tratador de \emph{page fault}; o vetor 13 trata
-\code{\#GP}; o vetor 0x80 encerra o programa de usu\'ario; o vetor 32
-incrementa o contador de \emph{ticks} e envia EOI ao PIC.
+Vector 14 calls the \emph{page fault} handler; vector 13 handles
+\code{\#GP}; vector 0x80 terminates the user program; vector 32
+increments the \emph{ticks} counter and sends EOI to the PIC.
 
-\section{PIC e PIT}
+\section{PIC and PIT}
 
-O PIC 8259 \'e remapeado para n\~ao colidir com as exce\c{c}\~oes:
+The 8259 PIC is remapped so as not to collide with the exceptions:
 
-\begin{lstlisting}[caption={Remapeamento do PIC e inicializa\c{c}\~ao do PIT.},label={lst:picpit}]
+\begin{lstlisting}[caption={PIC remapping and PIT initialization.},label={lst:picpit}]
 outb(0x20, 0x11); outb(0xA0, 0x11);  // ICW1
 outb(0x21, 0x20); outb(0xA1, 0x28);  // ICW2: vetores 0x20/0x28
 outb(0x21, 0x04); outb(0xA1, 0x02);  // ICW3
@@ -140,20 +140,20 @@ outb(0x21, 0xFE);                    // so IRQ0
 outb(0xA1, 0xFF);
 \end{lstlisting}
 
-A IRQ1 continua mascarada porque \code{keyboard.rs} l\^e o 8042 por
-\emph{polling}. Habilit\'a-la exigiria um buffer de scancodes e coordenar o
-acesso ao controlador.
+IRQ1 remains masked because \code{keyboard.rs} reads the 8042 by
+\emph{polling}. Enabling it would require a scancode buffer and coordinating
+access to the controller.
 
-\section{Alocador de frames f\'isicos}
+\section{Physical frame allocator}
 
-\code{paging::init} percorre as tags Multiboot2. A tag 6 (mapa de mem\'oria)
-fornece entradas de 24 bytes com base, tamanho e tipo. O alocador come\c{c}a
-com todos os 262.144 frames do primeiro GiB marcados como usados e libera
-somente as faixas do tipo 1 (RAM dispon\'ivel).
+\code{paging::init} walks the Multiboot2 tags. Tag 6 (memory map)
+provides 24-byte entries with base, size, and type. The allocator starts
+with all 262,144 frames of the first GiB marked as used and frees
+only the ranges of type 1 (available RAM).
 
-O bitmap tem 32 KiB:
+The bitmap is 32 KiB:
 
-\begin{lstlisting}[caption={Bitmap de frames e aloca\c{c}\~ao.},label={lst:bitmap}]
+\begin{lstlisting}[caption={Frame bitmap and allocation.},label={lst:bitmap}]
 static mut FRAME_BITMAP: [u8; 32 * 1024] = [0xFF; 32 * 1024];
 
 pub fn alloc_frame() -> Option<u64> {
@@ -161,117 +161,116 @@ pub fn alloc_frame() -> Option<u64> {
 }
 \end{lstlisting}
 
-O primeiro MiB e o fim do kernel (s\'imbolo \code{\_\_kernel\_end} do
-\emph{linker script}) ficam sempre reservados. A estrutura Multiboot2 tamb\'em
-\'e reservada depois que as faixas dispon\'iveis s\~ao liberadas.
+The first MiB and the end of the kernel (symbol \code{\_\_kernel\_end} from the
+\emph{linker script}) are always reserved. The Multiboot2 structure is also
+reserved after the available ranges are freed.
 
-Como o stub mapeia o primeiro GiB por identidade, escrever no endere\c{c}o
-f\'isico do frame \'e equivalente a escrever no endere\c{c}o virtual baixo.
-Isso permite zerar frames sem precisar de um mapa direto adicional.
+Since the stub maps the first GiB by identity, writing to the physical
+address of the frame is equivalent to writing to the low virtual address.
+This makes it possible to zero frames without needing an additional direct map.
 
-\section{Demand paging e prote\c{c}\~ao U/S}
+\section{Demand paging and U/S protection}
 
-Cada entrada de tabela tem bits de presen\c{c}a (P), escrita (W) e
-usu\'ario (U/S). O x86\_64 exige U/S = 1 em \emph{todos} os n\'iveis
-(PML4, PDPT, PD e PT) para permitir um acesso em ring 3. O kernel usa isso
-para criar duas regi\~oes:
+Each table entry has present (P), writable (W), and user (U/S) bits. x86\_64
+requires U/S = 1 at \emph{all} levels (PML4, PDPT, PD, and PT) to allow an
+access in ring 3. The kernel uses this to create two regions:
 
 \begin{table}[H]
 \centering
-\caption{Regi\~oes de demand paging.}
+\caption{Demand paging regions.}
 \label{tab:demand}
 \begin{tabularx}{\linewidth}{@{}lrrX@{}}
 \toprule
-\textbf{Regi\~ao} & \textbf{Base} & \textbf{Tamanho} & \textbf{U/S das folhas} \\
+\textbf{Region} & \textbf{Base} & \textbf{Size} & \textbf{Leaf U/S} \\
 \midrule
-Usu\'ario & \code{0x0000008000000000} & 2 MiB & 1 \\
+User & \code{0x0000008000000000} & 2 MiB & 1 \\
 Kernel   & \code{0xFFFFFFFFC0000000} & 2 MiB & 0 \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Nenhuma folha dessas regi\~oes existe no boot. Quando o \code{\#PF} ocorre,
-o tratador l\^e \code{CR2} e o c\'odigo de erro e decide:
+No leaf of these regions exists at boot. When \code{\#PF} occurs,
+the handler reads \code{CR2} and the error code and decides:
 
 \begin{enumerate}
-  \item se o endere\c{c}o pertence \`a regi\~ao de usu\'ario e a p\'agina
-        n\~ao est\'a presente, aloca um frame e mapeia com
-        \code{P|W|U/S}; as tabelas intermedi\'arias tamb\'em recebem U/S = 1;
-  \item se pertence \`a regi\~ao do kernel e o bit U/S do erro \'e zero,
-        mapeia com \code{P|W} e U/S = 0;
-  \item se um usu\'ario tentar a regi\~ao do kernel, o erro tem U/S = 1 e o
-        tratador recusa o mapeamento; o programa de usu\'ario \'e encerrado;
-  \item se o endere\c{c}o est\'a fora das duas regi\~oes, a falha \'e fatal
-        para o kernel ou encerra o usu\'ario.
+  \item if the address belongs to the user region and the page is not
+        present, it allocates a frame and maps it with
+        \code{P|W|U/S}; the intermediate tables also receive U/S = 1;
+  \item if it belongs to the kernel region and the error's U/S bit is zero,
+        it maps with \code{P|W} and U/S = 0;
+  \item if a user tries the kernel region, the error has U/S = 1 and the
+        handler refuses the mapping; the user program is terminated;
+  \item if the address is outside both regions, the fault is fatal
+        to the kernel or terminates the user.
 \end{enumerate}
 
-\begin{nota}[Por que o kernel n\~ao pode ``abrir'' uma tabela do supervisor]
-Mapear uma p\'agina de usu\'ario n\~ao consiste apenas em ligar U/S na folha.
-Se qualquer n\'ivel intermedi\'ario for supervisor, o hardware nega o acesso.
-Al\'em disso, transformar uma tabela do kernel em tabela de usu\'ario poderia
-expor outros mapeamentos. Por isso \code{next\_table} recusa uma tabela
-supervisor no caminho de uma p\'agina de usu\'ario.
+\begin{nota}[Why the kernel cannot ``open up'' a supervisor table]
+Mapping a user page is not just a matter of setting U/S on the leaf.
+If any intermediate level is supervisor, the hardware denies the access.
+Moreover, turning a kernel table into a user table could expose other mappings.
+For this reason \code{next\_table} refuses a supervisor table on the path of a
+user page.
 \end{nota}
 
-\section{Modo usu\'ario e retorno ao kernel}
+\section{User mode and return to kernel}
 
-\code{user.rs} monta um pequeno programa de m\'aquina em um buffer e o copia
-para a p\'agina \code{USER\_CODE}, que \'e residente. A pilha e a p\'agina de
-dados ficam sob demanda:
+\code{user.rs} builds a small machine program in a buffer and copies it
+to the \code{USER\_CODE} page, which is resident. The stack and the data
+page are on demand:
 
 \begin{enumerate}
-  \item o programa faz \code{push}/\code{pop}, gerando \code{\#PF} na pilha;
-  \item escreve em \code{USER\_DATA}, gerando outro \code{\#PF};
-  \item executa \code{int \$0x80} com \code{rax = 0}.
+  \item the program performs \code{push}/\code{pop}, generating \code{\#PF} on the stack;
+  \item it writes to \code{USER\_DATA}, generating another \code{\#PF};
+  \item it executes \code{int \$0x80} with \code{rax = 0}.
 \end{enumerate}
 
-O comando \code{userprot} usa outro programa: ele tenta ler
-\code{0xFFFFFFFF80000000} (in\'icio do kernel). A p\'agina existe, mas tem
-U/S = 0; o erro de \emph{page fault} tem P = 1 e U/S = 1. O tratador
-reconhece a viola\c{c}\~ao, imprime os dados e n\~ao devolve o controle ao
-programa.
+The \code{userprot} command uses another program: it tries to read
+\code{0xFFFFFFFF80000000} (start of the kernel). The page exists, but it has
+U/S = 0; the \emph{page fault} error has P = 1 and U/S = 1. The handler
+recognizes the violation, prints the data, and does not return control to the
+program.
 
-A entrada em ring 3 \'e feita por \code{iretq}, que carrega CS/SS de DPL 3,
-RIP, RSP e RFLAGS. A volta n\~ao usa o caminho normal do \code{iretq}:
+Entry into ring 3 is done by \code{iretq}, which loads CS/SS from DPL 3,
+RIP, RSP, and RFLAGS. The return does not use the normal \code{iretq} path:
 
 \begin{itemize}
-  \item \code{user\_enter} salva os registradores callee-saved e o RSP do
-        kernel em \code{user\_saved\_rsp};
-  \item uma exce\c{c}\~ao ou \code{int \$0x80} cai no \emph{stub} comum em
+  \item \code{user\_enter} saves the callee-saved registers and the
+        kernel RSP in \code{user\_saved\_rsp};
+  \item an exception or \code{int \$0x80} lands in the common \emph{stub} in
         ring 0;
-  \item \code{user::abort} grava o status e chama \code{user\_resume}, que
-        restaura o RSP salvo, recarrega os segmentos do kernel e retorna para
-        a chamada de \code{user\_enter}.
+  \item \code{user::abort} writes the status and calls \code{user\_resume}, which
+        restores the saved RSP, reloads the kernel segments, and returns to
+        the \code{user\_enter} call.
 \end{itemize}
 
-Esse mecanismo \'e um \emph{longjmp} controlado. Ele evita ter de reconstruir
-o frame de interrup\c{c}\~ao para voltar a ring 0 e mant\'em o shell simples.
+This mechanism is a controlled \emph{longjmp}. It avoids having to reconstruct
+the interrupt frame to return to ring 0 and keeps the shell simple.
 
-\section{Comandos e evid\^encias}
+\section{Commands and evidence}
 
 \begin{table}[H]
 \centering
-\caption{Comandos que exercitam a nova infraestrutura.}
+\caption{Commands that exercise the new infrastructure.}
 \label{tab:comandos-memoria}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{Comando} & \textbf{Efeito} \\
+\textbf{Command} & \textbf{Effect} \\
 \midrule
-\code{demand} & escreve na regi\~ao de demand paging do kernel; o primeiro
-acesso gera \code{\#PF} \\
-\code{usertest} & entra em ring 3, gera \code{\#PF} na pilha e nos dados e
-sai por \code{int \$0x80} \\
-\code{userprot} & entra em ring 3 e tenta ler o kernel; a prote\c{c}\~ao U/S
-encerra o programa \\
-\code{mem} & mostra frames alocados/livres, \emph{page faults}, \emph{ticks}
-e os bits U/S de uma p\'agina de usu\'ario e do kernel \\
+\code{demand} & writes to the kernel demand paging region; the first
+access generates \code{\#PF} \\
+\code{usertest} & enters ring 3, generates \code{\#PF} on the stack and on the data, and
+exits via \code{int \$0x80} \\
+\code{userprot} & enters ring 3 and tries to read the kernel; U/S protection
+terminates the program \\
+\code{mem} & shows allocated/free frames, \emph{page faults}, \emph{ticks},
+and the U/S bits of a user page and of the kernel \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Uma execu\c{c}\~ao t\'ipica em QEMU:
+A typical execution in QEMU:
 
-\begin{lstlisting}[style=shell,caption={Sa\'ida dos comandos de mem\'oria e ring 3.},label={lst:testdemand}]
+\begin{lstlisting}[style=shell,caption={Output of the memory and ring 3 commands.},label={lst:testdemand}]
 rinux> demand
 [PF] demanda atendida: 0xffffffffc0000000 (kernel, erro=0x2)
 [DEMAND] 0xffffffffc0000000 = 0xdeadbeefcafe1234 (page faults: 1)
@@ -294,22 +293,22 @@ Frames fisicos (4 KiB):
   KERNEL_VMA flags=0xe3 (U/S=0)
 \end{lstlisting}
 
-O erro \code{0x6} (P = 0, W = 1, U/S = 1) confirma uma escrita de usu\'ario em
-p\'agina ausente; o erro \code{0x5} (P = 1, U/S = 1, sem W) confirma uma
-leitura de usu\'ario em p\'agina presente e supervisor.
+The \code{0x6} error (P = 0, W = 1, U/S = 1) confirms a user write to an
+absent page; the \code{0x5} error (P = 1, U/S = 1, without W) confirms a
+user read from a present, supervisor page.
 
-\section{Limita\c{c}\~oes desta implementa\c{c}\~ao}
+\section{Limitations of this implementation}
 
 \begin{itemize}
-  \item n\~ao h\'a espa\c{c}os de endere\c{c}o separados por processo: o
-        programa de usu\'ario usa a mesma PML4 do kernel;
-  \item n\~ao h\'a escalonador nem troca de contexto; o timer apenas conta
+  \item there are no separate address spaces per process: the
+        user program uses the same PML4 as the kernel;
+  \item there is no scheduler or context switching; the timer only counts
         \emph{ticks};
-  \item a \'unica \emph{syscall} \'e \code{exit} (\code{rax = 0}); n\~ao
-        h\'a valida\c{c}\~ao de ponteiros de usu\'ario;
-  \item SMEP/SMAP e NX ainda n\~ao est\~ao habilitados; a separa\c{c}\~ao
-        depende apenas de U/S;
-  \item o teclado continua em \emph{polling} e IRQ1 permanece mascarada;
-  \item as regi\~oes de demand paging t\^em tamanho fixo de 2 MiB e ficam
-        fora do primeiro GiB mapeado por identidade.
+  \item the only \emph{syscall} is \code{exit} (\code{rax = 0}); there is
+        no validation of user pointers;
+  \item SMEP/SMAP and NX are not yet enabled; the separation
+        depends only on U/S;
+  \item the keyboard remains in \emph{polling} and IRQ1 remains masked;
+  \item the demand paging regions have a fixed size of 2 MiB and lie
+        outside the first GiB mapped by identity.
 \end{itemize}

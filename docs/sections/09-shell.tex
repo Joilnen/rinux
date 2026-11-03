@@ -1,23 +1,23 @@
-\chapter{Shell e linha de comando}
+\chapter{Shell and command line}
 \label{cap:shell}
 
-\section{Vis\~ao geral}
+\section{Overview}
 
-O \code{src/shell.rs} implementa um terminal de linha de comando sem
-aloca\c{c}\~ao din\^amica. Ele n\~ao \'e um shell POSIX, n\~ao interpreta
-pipes, redirecionamentos, vari\'aveis, aspas ou scripts. \'E um la\c{c}o que:
+The \code{src/shell.rs} implements a command-line terminal without dynamic
+allocation. It is not a POSIX shell and does not interpret pipes,
+redirections, variables, quotes, or scripts. It is a loop that:
 
 \begin{enumerate}
-  \item imprime o prompt \code{rinux> };
-  \item l\^e bytes do teclado PS/2 ou da serial;
-  \item ecoa caracteres imprim\'iveis e trata Backspace;
-  \item ao receber Enter, executa o comando;
-  \item volta ao in\'icio.
+  \item prints the \code{rinux> } prompt;
+  \item reads bytes from the PS/2 keyboard or the serial port;
+  \item echoes printable characters and handles Backspace;
+  \item upon receiving Enter, executes the command;
+  \item returns to the beginning.
 \end{enumerate}
 
-\section{La\c{c}o principal}
+\section{Main loop}
 
-\begin{lstlisting}[caption={Estrutura do la\c{c}o do shell.},label={lst:shellloop}]
+\begin{lstlisting}[caption={Structure of the shell loop.},label={lst:shellloop}]
 pub fn run() -> ! {
     loop {
         crate::print!("rinux> ");
@@ -57,45 +57,45 @@ pub fn run() -> ! {
 }
 \end{lstlisting}
 
-\subsection{Buffer de linha}
+\subsection{Line buffer}
 
-A linha \'e um array fixo de 128 bytes na pilha do shell:
+The line is a fixed array of 128 bytes on the shell's stack:
 
-\begin{lstlisting}[caption={Buffer de linha.},label={lst:linebuffer}]
+\begin{lstlisting}[caption={Line buffer.},label={lst:linebuffer}]
 const LINE_MAX: usize = 128;
 let mut line = [0u8; LINE_MAX];
 let mut len = 0usize;
 \end{lstlisting}
 
-Quando a linha est\'a cheia, novos caracteres s\~ao silenciosamente
-ignorados. N\~ao h\'a beep, mensagem de erro nem crescimento din\^amico.
+When the line is full, new characters are silently ignored. There is no
+beep, error message, or dynamic growth.
 
-\subsection{Entrada e eco}
+\subsection{Input and echo}
 
-A entrada vem de duas fontes, nesta ordem:
+Input comes from two sources, in this order:
 
 \begin{enumerate}
-  \item \code{keyboard::read\_char()}: teclado PS/2 na janela VGA;
-  \item \code{serial::read\_byte()}: terminal serial, quando dispon\'ivel.
+  \item \code{keyboard::read\_char()}: PS/2 keyboard in the VGA window;
+  \item \code{serial::read\_byte()}: serial terminal, when available.
 \end{enumerate}
 
-Se ambas retornarem \code{None}, o shell executa \code{spin\_loop()} e tenta
-novamente. N\~ao h\'a \emph{sleep}, j\'a que n\~ao existe temporizador.
+If both return \code{None}, the shell executes \code{spin\_loop()} and tries
+again. There is no \emph{sleep}, since no timer exists.
 
-Caracteres imprim\'iveis (0x20 a 0x7E) s\~ao armazenados no buffer e ecoados
-no console. Backspace (\code{0x08} ou \code{0x7F}) decrementa o tamanho e
-imprime \code{\textbackslash x08}, que o console VGA interpreta como apagar
-a c\'elula anterior. Tab (\code{\textbackslash t}) \'e ignorado.
+Printable characters (0x20 to 0x7E) are stored in the buffer and echoed to
+the console. Backspace (\code{0x08} or \code{0x7F}) decrements the length and
+prints \code{\textbackslash x08}, which the VGA console interprets as erasing
+the previous cell. Tab (\code{\textbackslash t}) is ignored.
 
-\section{Interpreta\c{c}\~ao}
+\section{Parsing}
 
 \subsection{Trim}
 
-Antes de comparar, a linha passa por \code{trim}, que remove espa\c{c}os
-ASCII no in\'icio e no fim. A fun\c{c}\~ao retorna uma \emph{slice} da
-pr\'opria linha, sem c\'opia:
+Before comparing, the line goes through \code{trim}, which removes ASCII
+whitespace at the beginning and end. The function returns a \emph{slice} of
+the line itself, without copying:
 
-\begin{lstlisting}[caption={Remo\c{c}\~ao de espa\c{c}os nas extremidades.},label={lst:trim}]
+\begin{lstlisting}[caption={Removal of whitespace at the edges.},label={lst:trim}]
 fn trim(bytes: &[u8]) -> &[u8] {
     let start = bytes.iter()
         .position(|byte| !byte.is_ascii_whitespace())
@@ -107,55 +107,53 @@ fn trim(bytes: &[u8]) -> &[u8] {
 }
 \end{lstlisting}
 
-Uma linha vazia ou composta apenas de espa\c{c}os n\~ao executa nada.
+An empty line or one consisting only of spaces executes nothing.
 
-\subsection{Convers\~ao para texto}
+\subsection{Text conversion}
 
-\code{as\_text} tenta interpretar os bytes como UTF-8. Como o console s\'o
-aceita ASCII, na pr\'atica a convers\~ao sempre funciona para texto digitado;
-se falhar, retorna a string fixa \code{"<bytes invalidos>"}.
+\code{as\_text} tries to interpret the bytes as UTF-8. Since the console only
+accepts ASCII, in practice the conversion always succeeds for typed text; if
+it fails, it returns the fixed string \code{"<bytes invalidos>"}.
 
-\subsection{Comandos}
+\subsection{Commands}
 
-A execu\c{c}\~ao \'e uma cadeia de compara\c{c}\~oes \code{if}/\code{else if}.
-N\~ao h\'a tabela de despacho, \emph{parsing} de argumentos nem an\'alise
-sint\'atica.
+Execution is a chain of \code{if}/\code{else if} comparisons. There is no
+dispatch table, argument \emph{parsing}, or syntax analysis.
 
 \begin{table}[H]
 \centering
-\caption{Comandos implementados.}
+\caption{Implemented commands.}
 \label{tab:comandos}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
-\textbf{Comando} & \textbf{Efeito} \\
+\textbf{Command} & \textbf{Effect} \\
 \midrule
-\code{help} & Lista os comandos dispon\'iveis. \\
-\code{clear} & Limpa a tela VGA e reposiciona o cursor. \\
-\code{echo <texto>} & Imprime o texto ap\'os o primeiro espa\c{c}o. \\
-\code{info} & Mostra informa\c{c}\~oes do kernel e do modelo de entrada. \\
-\code{reboot} & Reinicia o PC via comando \code{0xFE} ao 8042. \\
-\code{halt} & Imprime uma mensagem e para a CPU com \code{cli; hlt}. \\
+\code{help} & Lists the available commands. \\
+\code{clear} & Clears the VGA screen and repositions the cursor. \\
+\code{echo <texto>} & Prints the text after the first space. \\
+\code{info} & Shows kernel and input model information. \\
+\code{reboot} & Restarts the PC via command \code{0xFE} to the 8042. \\
+\code{halt} & Prints a message and stops the CPU with \code{cli; hlt}. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\begin{nota}[Detalhes de comportamento]
+\begin{nota}[Behavior details]
 \begin{itemize}
-  \item \code{echo} sem argumento n\~ao \'e reconhecido como comando; apenas
-        \code{echo } seguido de texto casa com o prefixo.
-  \item \code{echo   ola} preserva os espa\c{c}os internos ap\'os o prefixo
-        \code{"echo "}; o \emph{trim} remove apenas as extremidades.
-  \item A compara\c{c}\~ao \'e sens\'ivel a mai\'usculas: \code{HELP} n\~ao
-        funciona.
-  \item Comandos desconhecidos produzem duas linhas de mensagem.
+  \item \code{echo} without an argument is not recognized as a command; only
+        \code{echo } followed by text matches the prefix.
+  \item \code{echo   ola} preserves the internal spaces after the
+        \code{"echo "} prefix; \emph{trim} removes only the edges.
+  \item Comparison is case-sensitive: \code{HELP} does not work.
+  \item Unknown commands produce two lines of message.
 \end{itemize}
 \end{nota}
 
-\section{Sa\'ida de \code{info}}
+\section{\code{info} output}
 
-O comando \code{info} imprime:
+The \code{info} command prints:
 
-\begin{lstlisting}[style=shell,caption={Sa\'ida do comando \code{info}.},label={lst:info}]
+\begin{lstlisting}[style=shell,caption={Output of the \code{info} command.},label={lst:info}]
 Kernel: Rust, no_std, x86_64
 Boot:   Multiboot2 (BIOS) -> modo longo
 Video:  VGA texto 80x25, buffer 0xB8000
@@ -163,40 +161,39 @@ Entrada: teclado PS/2 e serial COM1 (polling, sem IRQ)
 Heap:   nenhum (apenas core, sem alocacao)
 \end{lstlisting}
 
-Essas informa\c{c}\~oes s\~ao est\'aticas; n\~ao h\'a leitura de CPU, mem\'oria
-ou tempo.
+This information is static; there is no reading of CPU, memory, or time.
 
-\section{Comandos especiais}
+\section{Special commands}
 
 \subsection{\code{halt}}
 
-Imprime \code{"CPU parada. Use reset ou feche o QEMU."} e chama
-\code{arch::halt\_loop()}, que executa \code{cli; hlt} indefinidamente. A
-\'unica sa\'ida \'e reset f\'isico ou fechar o emulador.
+Prints \code{"CPU parada. Use reset ou feche o QEMU."} and calls
+\code{arch::halt\_loop()}, which executes \code{cli; hlt} indefinitely. The
+only way out is a physical reset or closing the emulator.
 
 \subsection{\code{reboot}}
 
-Imprime \code{"Reiniciando..."} e chama \code{arch::reboot()}. O reset pode
-n\~ao funcionar em todos os ambientes; se o comando ao 8042 for ignorado, a
-CPU termina em \code{halt\_loop()}.
+Prints \code{"Reiniciando..."} and calls \code{arch::reboot()}. The reset may
+not work in all environments; if the command to the 8042 is ignored, the CPU
+ends up in \code{halt\_loop()}.
 
-\section{Como estender}
+\section{How to extend}
 
-Para adicionar um comando:
+To add a command:
 
 \begin{enumerate}
-  \item acrescente um ramo \code{else if line == b"meucomando"} em
+  \item add an \code{else if line == b"meucomando"} branch in
         \code{execute};
-  \item use \code{println!} para a sa\'ida;
-  \item se precisar de argumentos, use \code{strip\_prefix} como em
+  \item use \code{println!} for output;
+  \item if you need arguments, use \code{strip\_prefix} as in
         \code{echo};
-  \item mantenha o comando sem aloca\c{c}\~ao e sem bloqueio;
-  \item atualize a lista de \code{help} e esta documenta\c{c}\~ao.
+  \item keep the command allocation-free and non-blocking;
+  \item update the \code{help} list and this documentation.
 \end{enumerate}
 
-Exemplo:
+Example:
 
-\begin{lstlisting}[caption={Esqueleto de um novo comando.},label={lst:novocomando}]
+\begin{lstlisting}[caption={Skeleton of a new command.},label={lst:novocomando}]
 } else if line == b"versao" {
     println!("Rust VGA Kernel 0.1.0");
 } else if let Some(arg) = line.strip_prefix(b"upper ") {
@@ -207,17 +204,15 @@ Exemplo:
 }
 \end{lstlisting}
 
-\section{Limita\c{c}\~oes}
+\section{Limitations}
 
 \begin{itemize}
-  \item Sem hist\'orico, setas, Ctrl+C, Ctrl+D ou edi\c{c}\~ao no meio da
-        linha.
-  \item Sem aspas, escape, pipes, redirecionamento ou vari\'aveis.
-  \item Sem argumentos estruturados: cada comando decide como interpretar o
-        restante.
-  \item Sem execu\c{c}\~ao de programas: n\~ao h\'a \emph{loader} nem
-        processos.
-  \item Sem tradu\c{c}\~ao de UTF-8: acentos digitados podem virar \code{?}.
-  \item A linha \'e limitada a 128 bytes e o excesso \'e descartado em
-        sil\^encio.
+  \item No history, arrows, Ctrl+C, Ctrl+D, or editing in the middle of the
+        line.
+  \item No quotes, escaping, pipes, redirection, or variables.
+  \item No structured arguments: each command decides how to interpret the
+        remainder.
+  \item No program execution: there is no \emph{loader} or processes.
+  \item No UTF-8 translation: typed accents may become \code{?}.
+  \item The line is limited to 128 bytes and excess is silently discarded.
 \end{itemize}
