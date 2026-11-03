@@ -3,9 +3,11 @@
 \chapter{Cat\'alogo de fun\c{c}\~oes}
 \label{ap:funcoes}
 
-Esta se\c{c}\~ao lista as 43 fun\c{c}\~oes do c\'odigo Rust, agrupadas por
+Esta se\c{c}\~ao lista as 96 fun\c{c}\~oes do c\'odigo Rust, agrupadas por
 m\'odulo. O \emph{stub} \code{\_start} n\~ao \'e uma fun\c{c}\~ao Rust e
-aparece separadamente no Cap\'itulo~\ref{cap:boot}.
+aparece separadamente no Cap\'itulo~\ref{cap:boot}. Declara\c{c}\~oes
+\code{extern} sem corpo, como \code{gdt\_reload\_cs}, \code{user\_enter} e
+\code{user\_resume}, n\~ao s\~ao contadas.
 
 \section{\code{main.rs} (2 fun\c{c}\~oes)}
 
@@ -26,7 +28,7 @@ Ponto de entrada Rust; inicializa drivers, imprime banner e entra no shell. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{arch.rs} (4 fun\c{c}\~oes)}
+\section{\code{arch.rs} (5 fun\c{c}\~oes)}
 
 \begin{longtable}{@{}p{5.2cm}p{9.3cm}@{}}
 \caption{Fun\c{c}\~oes de \code{arch.rs}.}\\
@@ -42,6 +44,8 @@ Ponto de entrada Rust; inicializa drivers, imprime banner e entra no shell. \\
 L\^e um byte de uma porta. \code{unsafe}. \\
 \code{outb(port: u16, value: u8)} &
 Escreve um byte em uma porta. \code{unsafe}. \\
+\code{enable\_interrupts()} &
+Executa \code{sti} para habilitar interrup\c{c}\~oes mascar\'aveis. \\
 \code{halt\_loop() -> !} &
 La\c{c}o infinito com \code{cli; hlt}. \\
 \code{reboot() -> !} &
@@ -176,7 +180,7 @@ Envia string com convers\~ao de \code{\textbackslash n} para CRLF. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{shell.rs} (4 fun\c{c}\~oes)}
+\section{\code{shell.rs} (7 fun\c{c}\~oes)}
 
 \begin{longtable}{@{}p{4.8cm}p{9.7cm}@{}}
 \caption{Fun\c{c}\~oes de \code{shell.rs}.}\\
@@ -196,6 +200,173 @@ Remove espa\c{c}os ASCII das extremidades. \\
 Converte bytes em \code{\&str} ou texto de erro. \\
 \code{execute(line: \&[u8])} &
 Compara e executa o comando. \\
+\code{demand\_demo()} &
+Escreve na regi\~ao de demand paging do kernel e mostra o valor. \\
+\code{user\_demo(protection: bool)} &
+Executa o demo em ring 3 e imprime o status ou a falha. \\
+\code{memory\_info()} &
+Mostra frames, page faults, ticks e flags U/S das p\'aginas. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{gdt.rs} (6 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{6.0cm}p{8.5cm}@{}}
+\caption{Fun\c{c}\~oes de \code{gdt.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{stack\_top<const N: usize>(stack: *mut Stack<N>) -> u64} &
+Calcula o topo de uma pilha est\'atica. \\
+\code{user\_kernel\_stack\_top() -> u64} &
+Topo da pilha de 16 KiB usada em interrup\c{c}\~oes vindas de ring 3. \\
+\code{double\_fault\_stack\_top() -> u64} &
+Topo da pilha IST1 de 8 KiB para \code{\#DF}. \\
+\code{descriptor(base, limit, access, flags) -> u64} &
+Monta um descritor de segmento de 64 bits. \\
+\code{tss\_descriptor(base: u64, limit: u32) -> (u64, u64)} &
+Monta as duas entradas de 8 bytes do descritor de TSS. \\
+\code{init()} &
+Carrega a GDT definitiva, a TSS e as pilhas de privil\'egio. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{idt.rs} (14 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{6.2cm}p{8.3cm}@{}}
+\caption{Fun\c{c}\~oes de \code{idt.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{init()} &
+Instala as 256 portas, remapeia o PIC e liga o PIT em IRQ0. \\
+\code{set\_gate(idt, vector, handler, dpl, ist)} &
+Preenche uma porta com seletor de c\'odigo, DPL e \'indice IST. \\
+\code{io\_wait()} &
+Pequeno atraso de I/O para o PIC assimilar comandos. \\
+\code{remap\_pic()} &
+Move as IRQs do PIC mestre/escravo para \code{0x20..0x2F}. \\
+\code{pit\_init()} &
+Programa o divisor do PIT para aproximadamente 100 Hz. \\
+\code{eoi(irq: u8)} &
+Envia \emph{End of Interrupt} ao PIC mestre e, se preciso, ao escravo. \\
+\code{ticks() -> u64} &
+Devolve o contador de interrup\c{c}\~oes do timer. \\
+\code{exception\_name(vector: u64) -> \&'static str} &
+Mapeia o vetor para um nome leg\'ivel de exce\c{c}\~ao. \\
+\code{interrupt\_dispatch(frame: *mut InterruptFrame)} &
+Ponto \'unico chamado pelos \emph{stubs}; despacha exce\c{c}\~oes, IRQs e a
+\emph{syscall}. \\
+\code{page\_fault(frame: \&mut InterruptFrame)} &
+L\^e \code{CR2} e delega ao \code{paging::handle\_page\_fault}; pode encerrar
+o usu\'ario. \\
+\code{general\_protection(frame: \&mut InterruptFrame)} &
+Trata \code{\#GP}; encerra o usu\'ario ou para o kernel. \\
+\code{user\_fault(frame: \&mut InterruptFrame) -> bool} &
+Verifica se a falha veio de ring 3 com um programa ativo. \\
+\code{syscall(frame: \&mut InterruptFrame)} &
+Implementa a \emph{syscall} did\'atica \code{int \$0x80} (\code{rax = 0}:
+\emph{exit}). \\
+\code{fatal(frame: \&InterruptFrame) -> !} &
+Imprime o diagn\'ostico da falha e para a CPU. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{paging.rs} (22 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{6.2cm}p{8.3cm}@{}}
+\caption{Fun\c{c}\~oes de \code{paging.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{bitmap() -> *mut u8} &
+Devolve o ponteiro para o bitmap est\'atico de 32 KiB. \code{unsafe}. \\
+\code{frame\_is\_used(frame: usize) -> bool} &
+Consulta um bit do bitmap. \\
+\code{mark\_used(frame: usize)} &
+Marca um frame como em uso. \\
+\code{mark\_free(frame: usize)} &
+Marca um frame como livre. \\
+\code{free\_range(start, end, reserve\_end)} &
+Libera uma faixa de RAM dispon\'ivel, preservando o fim do kernel. \\
+\code{reserve\_range(start: u64, end: u64)} &
+Reserva uma faixa (primeiro MiB, kernel, estruturas Multiboot2). \\
+\code{init(multiboot\_magic, multiboot\_info)} &
+L\^e o mapa Multiboot2 e inicializa o alocador de frames. \\
+\code{alloc\_frame() -> Option<u64>} &
+Aloca e zera um frame de 4 KiB; devolve \code{None} se a RAM acabou. \\
+\code{free\_frame(frame: u64)} &
+Devolve um frame ao bitmap. \\
+\code{stats() -> Stats} &
+Devolve frames alocados, livres e total. \\
+\code{demand\_faults() -> u64} &
+Devolve o n\'umero de page faults atendidos por demand paging. \\
+\code{read\_cr3() -> u64} &
+L\^e o PML4 atual de \code{CR3}. \\
+\code{invlpg(virt: u64)} &
+Invalida uma entrada da TLB. \code{unsafe}. \\
+\code{next\_table(entry, user) -> Result<*mut PageTable, \&'static str>} &
+Obt\'em ou cria a pr\'oxima tabela, aplicando U/S quando necess\'ario. \\
+\code{map\_page(virt, phys, flags, user\_tables)} &
+Mapeia uma p\'agina de 4 KiB e invalida a TLB. \code{unsafe}. \\
+\code{page\_flags(virt: u64) -> Option<u64>} &
+Devolve a entrada final que traduz um endere\c{c}o, sem criar tabelas. \\
+\code{unmap\_page(virt: u64) -> Result<(), \&'static str>} &
+Remove um mapeamento e libera o frame f\'isico. \\
+\code{reset\_user\_demand()} &
+Desfaz as p\'aginas de pilha/dados do demo de usu\'ario. \\
+\code{paging\_page(address: u64) -> u64} &
+Alinha um endere\c{c}o para o in\'icio da p\'agina. \\
+\code{handle\_page\_fault(addr, error) -> Result<(), \&'static str>} &
+Decide entre materializar uma p\'agina ou recusar o acesso. \\
+\code{kernel\_demand\_addr(index: usize) -> u64} &
+Endere\c{c}o de uma p\'agina da regi\~ao de demand paging do kernel. \\
+\code{install\_user\_code(bytes: \&[u8]) -> Result<(), \&'static str>} &
+Copia o programa para \code{USER\_CODE}, criando a p\'agina residente. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{user.rs} (7 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{6.0cm}p{8.5cm}@{}}
+\caption{Fun\c{c}\~oes de \code{user.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{Program::new() -> Program} &
+Cria um buffer vazio de 64 bytes para o c\'odigo de usu\'ario. \\
+\code{Program::push(\&mut self, bytes: \&[u8])} &
+Anexa bytes ao programa. \\
+\code{Program::movabs\_rax(\&mut self, value: u64)} &
+Emite \code{movabs rax, imm64}. \\
+\code{program(demo: Demo) -> Program} &
+Monta o c\'odigo de m\'aquina dos demos \code{Demand} e \code{Protection}. \\
+\code{is\_active() -> bool} &
+Indica se h\'a um programa de usu\'ario em execu\c{c}\~ao. \\
+\code{run(demo: Demo) -> Result<i32, \&'static str>} &
+Instala o c\'odigo, entra em ring 3 e devolve o status de sa\'ida. \\
+\code{abort(status: i32) -> !} &
+Chamado por exce\c{c}\~oes/\emph{syscall}; grava o status e retoma o kernel. \\
 \bottomrule
 \end{longtable}
 
@@ -216,6 +387,9 @@ Compara e executa o comando. \\
 \code{0x64} & 8042 status/comando & Status, comandos, reset \\
 \code{0x3D4} & VGA CRTC \'indice & Sele\c{c}\~ao de registrador \\
 \code{0x3D5} & VGA CRTC dados & Posi\c{c}\~ao e forma do cursor \\
+\code{0x20--0x21} & PIC mestre & Comandos, m\'ascara e EOI \\
+\code{0xA0--0xA1} & PIC escravo & Comandos, m\'ascara e EOI \\
+\code{0x40--0x43} & PIT 8253/8254 & Canal 0, modo e divisor do timer \\
 \code{0x3F8--0x3FF} & UART 16550 COM1 & Dados, LSR, divisor, FIFO \\
 \bottomrule
 \end{tabular}
@@ -242,6 +416,12 @@ tabelas de p\'agina, pilha de 8 KiB). \\
 \code{0x000B8000} & Framebuffer de texto VGA (80x25, 4.000 bytes). \\
 \code{0xFFFFFFFF80000000} & Base virtual do kernel (metade alta). \\
 \code{0xFFFFFFFF80107000} & In\'icio virtual de \code{.text}. \\
+\code{0x0000008000001000} & \code{USER\_CODE}: p\'agina residente do demo. \\
+\code{0x0000008000002000} & \code{USER\_DATA}: p\'agina sob demanda. \\
+\code{0x0000008000007FF8} & Topo da pilha do usu\'ario; a p\'agina abaixo
+\'e sob demanda. \\
+\code{0xFFFFFFFFC0000000} & \code{KDEMAND\_BASE}: 2 MiB de demand paging do
+kernel. \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -266,10 +446,21 @@ O que n\~ao muda \'e o esquema: stub em 1 MiB, kernel em
   \item[CRTC] Controlador de tubo de raios cat\'odicos da VGA; controla
         cursor e timing de v\'ideo.
   \item[El Torito] Padr\~ao para tornar CDs/DVDs inicializ\'aveis.
+  \item[Demand paging] T\'ecnica de criar a p\'agina somente no primeiro
+        acesso, quando a CPU gera \code{\#PF}.
   \item[GDT] Global Descriptor Table; define segmentos de c\'odigo e dados.
   \item[GOP] Graphics Output Protocol, interface de framebuffer em UEFI.
   \item[IDT] Interrupt Descriptor Table; define handlers de interrup\c{c}\~oes
         e exce\c{c}\~oes.
+  \item[Page fault] Exce\c{c}\~ao (\code{\#PF}) gerada quando uma p\'agina
+        n\~ao est\'a presente ou viola as permiss\~oes U/S.
+  \item[PIC] Programmable Interrupt Controller 8259; prioriza e entrega as
+        IRQs \`a CPU.
+  \item[PIT] Programmable Interval Timer 8253/8254; gera a IRQ0 do timer.
+  \item[Ring 3] N\'ivel de privil\'egio de usu\'ario; c\'odigo com acesso
+        restrito \`a mem\'oria marcada U/S.
+  \item[TSS] Task State Segment; fornece \code{rsp0} e pilhas IST ao trocar
+        de ring 3 para ring 0.
   \item[LME] Long Mode Enable, bit do registrador EFER que habilita o modo
         de 64 bits.
   \item[LSR] Line Status Register da UART; indica dados dispon\'iveis e

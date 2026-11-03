@@ -38,6 +38,11 @@ T09 & Prompt retorna ap\'os cada comando & Passou \\
 T10 & \code{info} mostra as configura\c{c}\~oes do kernel & Passou \\
 T11 & \code{clear} limpa a tela & Passou \\
 T12 & \code{reboot} e \code{halt} encerram o fluxo & Verificado manualmente \\
+T13 & IDT instalada e timer IRQ0 incrementa \code{ticks} & Passou \\
+T14 & \code{demand} gera \code{\#PF} e mapeia a p\'agina do kernel & Passou \\
+T15 & \code{usertest} roda em ring 3, gera dois page faults e retorna & Passou \\
+T16 & \code{userprot} viola U/S e \'e encerrado pelo tratador & Passou \\
+T17 & \code{mem} mostra U/S = 1 para usu\'ario e 0 para o kernel & Passou \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -51,6 +56,8 @@ T12 & \code{reboot} e \code{halt} encerram o fluxo & Verificado manualmente \\
   Rust VGA Kernel - x86_64 / modo longo
   Boot: Multiboot2 (BIOS)
   Video: VGA texto 80x25 @ 0xB8000
+  Memoria: paginas de 4 KiB + demand paging
+  Interrupcoes: IDT + PIC + timer IRQ0 (~100 Hz)
 ==============================================================
 Multiboot2: magic=0x36d76289 info=0x00112040
 
@@ -72,6 +79,10 @@ Comandos disponiveis:
   clear         limpa a tela
   echo <texto>  imprime o texto
   info          informacoes do kernel
+  demand        testa demand paging no kernel
+  usertest      roda um programa em ring 3 com page fault
+  userprot      testa a protecao usuario/kernel
+  mem           estatisticas de frames e paginas
   reboot        reinicia o PC
   halt          para a CPU
 rinux>
@@ -196,6 +207,12 @@ Resultados esperados:
   \item[$\square$] \code{help}, \code{echo}, \code{info} e \code{clear}
         funcionam pelo teclado PS/2.
   \item[$\square$] Entrada pela serial funciona.
+  \item[$\square$] \code{info} mostra o timer e \code{mem} mostra
+        \emph{ticks} crescentes.
+  \item[$\square$] \code{demand} mapeia a p\'agina do kernel ap\'os
+        \code{\#PF}.
+  \item[$\square$] \code{usertest} gera dois page faults e retorna ao shell.
+  \item[$\square$] \code{userprot} \'e encerrado pela prote\c{c}\~ao U/S.
   \item[$\square$] \code{halt} para a CPU e \code{reboot} reinicia (quando o
         ambiente suporta).
   \item[$\square$] A documenta\c{c}\~ao LaTeX compila e gera o PDF.

@@ -1,0 +1,16 @@
+[package]
+name = "vga-kernel"
+version = "0.1.0"
+edition = "2021"
+description = "Kernel minimalista em Rust: boot BIOS (multiboot2), console VGA 80x25 e teclado PS/2"
+license = "MIT OR Apache-2.0"
+
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+lto = true
+codegen-units = 1

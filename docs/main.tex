@@ -149,10 +149,11 @@ O texto cobre a arquitetura, a cadeia de boot, o modelo de mem\'oria, os
 drivers de v\'ideo VGA, teclado PS/2 e serial, o shell embutido, o processo de
 compila\c{c}\~ao e empacotamento da ISO, os testes realizados e uma an\'alise
 quantitativa e qualitativa do grau de similaridade com o kernel Linux.
-O c\'odigo implementa apenas o caminho m\'inimo entre o bootloader e um
-terminal funcional; n\~ao \'e um porte do Linux e n\~ao implementa
-gerenciamento de processos, heap, interrup\c{c}\~oes, sistema de arquivos ou
-chamadas de sistema.
+O c\'odigo implementa o caminho m\'inimo entre o bootloader e um terminal
+funcional, acrescido de IDT, timer, paginas de 4 KiB, \emph{demand paging} e
+uma demonstra\c{c}\~ao de c\'odigo em ring 3. N\~ao \'e um porte do Linux e
+n\~ao implementa escalonador, heap, sistema de arquivos ou um conjunto
+completo de chamadas de sistema.
 \end{abstract}
 
 \tableofcontents
@@ -169,6 +170,7 @@ chamadas de sistema.
 \input{sections/07-keyboard}
 \input{sections/08-serial}
 \input{sections/09-shell}
+\input{sections/09a-memoria-idt}
 \input{sections/10-build}
 \input{sections/11-testes}
 \input{sections/12-similaridade}

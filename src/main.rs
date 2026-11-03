@@ -5,6 +5,10 @@
 //!
 //! Modulos principais:
 //!   boot      : cabecalho multiboot2, GDT, paginacao e entrada em modo longo
+//!   gdt       : GDT com segmentos de usuario e TSS
+//!   idt       : IDT, excecoes, PIC e timer (IRQ0)
+//!   paging    : alocador de frames, paginas de 4 KiB e demand paging
+//!   user      : entrada em ring 3 e demos de protecao usuario/kernel
 //!   arch      : portas de I/O, halt e reboot
 //!   vga       : driver do console VGA em modo texto (80x25, 0xB8000)
 //!   keyboard  : driver do teclado PS/2 (8042), por polling
@@ -19,10 +23,14 @@ use core::panic::PanicInfo;
 
 mod arch;
 mod boot;
+mod gdt;
+mod idt;
 mod keyboard;
+mod paging;
 mod serial;
 mod shell;
 mod sync;
+mod user;
 mod vga;
 
 /// Imprime sem alocar memoria.
@@ -56,14 +64,26 @@ pub extern "C" fn kernel_main(multiboot_magic: u32, multiboot_info: u32) -> ! {
     // 2. Serial (opcional, para depuracao em qemu -serial stdio).
     serial::init();
 
-    // 3. Teclado PS/2.
+    // 3. Alocador de frames fisicos, a partir do mapa do Multiboot2.
+    paging::init(multiboot_magic, multiboot_info);
+
+    // 4. GDT de 64 bits com segmentos de usuario e TSS.
+    gdt::init();
+
+    // 5. Teclado PS/2 (ainda por polling; IRQ1 fica mascarada).
     keyboard::init();
+
+    // 6. IDT, PIC e timer. Depois disso as interrupcoes podem ser ligadas.
+    idt::init();
+    arch::enable_interrupts();
 
     println!();
     println!("==============================================================");
     println!("  Rust VGA Kernel - x86_64 / modo longo");
     println!("  Boot: Multiboot2 (BIOS)");
     println!("  Video: VGA texto 80x25 @ 0xB8000");
+    println!("  Memoria: paginas de 4 KiB + demand paging");
+    println!("  Interrupcoes: IDT + PIC + timer IRQ0 (~100 Hz)");
     println!("==============================================================");
 
     if multiboot_magic != 0x36d7_6289 {

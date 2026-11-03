@@ -14,11 +14,19 @@ reimplementa o caminho mínimo de boot, console e teclado.
 - Boot BIOS via GRUB/multiboot2.
 - Transição 32 bits -> modo longo (x86_64).
 - Paginação com identidade dos primeiros 1 GiB e mapeamento da metade alta.
+- IDT com 256 portas: exceções, IRQs do PIC remapeadas e `int 0x80`.
+- PIC remapeado para `0x20..0x2F` e timer PIT em ~100 Hz (IRQ0).
+- Alocador de frames físicos de 4 KiB baseado no mapa de memória do Multiboot2.
+- Demand paging: páginas de usuário e de kernel são materializadas no `#PF`.
+- GDT com segmentos ring 3 e TSS; proteção usuário/kernel pelos bits U/S.
+- Demos em ring 3 (`usertest`, `userprot`) com retorno ao kernel via `int 0x80`
+  ou por exceção.
 - Console VGA em modo texto (80x25, buffer em `0xB8000`), com rolagem,
   cursor de hardware e cores.
 - Teclado PS/2 (controlador 8042) por polling, com Shift e Backspace.
 - Saída de depuração em COM1 (38400 8N1).
-- Shell mínimo: `help`, `clear`, `echo`, `info`, `reboot`, `halt`.
+- Shell mínimo: `help`, `clear`, `echo`, `info`, `demand`, `usertest`,
+  `userprot`, `mem`, `reboot`, `halt`.
 - Panic handler que imprime a mensagem no console e para a CPU.
 
 Testado em QEMU 11.1.3 (SeaBIOS): boot, tela VGA, teclado e comandos funcionam.
@@ -35,8 +43,12 @@ output/
 ├── boot/grub/grub.cfg        # menu multiboot2, console VGA
 └── src/
     ├── main.rs               # kernel_main, macros print!/println!, panic
-    ├── boot.rs               # multiboot2, GDT, paginação, modo longo
-    ├── arch.rs               # inb/outb, halt, reboot
+    ├── boot.rs               # multiboot2, GDT inicial, paginação, modo longo
+    ├── gdt.rs                # GDT definitiva, segmentos ring 3, TSS e IST
+    ├── idt.rs                # IDT, stubs de exceção/IRQ, PIC e PIT
+    ├── paging.rs             # frames, tabelas de 4 KiB e demand paging
+    ├── user.rs               # entrada em ring 3 e demos de proteção
+    ├── arch.rs               # inb/outb, halt, reboot, sti
     ├── vga.rs                # driver do console VGA (vgacon)
     ├── keyboard.rs           # driver do teclado PS/2 (atkbd/i8042)
     ├── serial.rs             # UART 16550 / COM1
@@ -120,6 +132,10 @@ confirme que a ISO está sendo escolhida como dispositivo de boot.
 | `clear`         | limpa a tela VGA                            |
 | `echo <texto>`  | imprime o texto                             |
 | `info`          | informações do kernel                       |
+| `demand`        | testa demand paging na região do kernel     |
+| `usertest`      | executa demo em ring 3 com page fault       |
+| `userprot`      | tenta acessar o kernel em ring 3 (deve falhar) |
+| `mem`           | frames, page faults e bits U/S              |
 | `reboot`        | reinicia o PC (reset via 8042)              |
 | `halt`          | para a CPU                                  |
 
@@ -154,10 +170,14 @@ BIOS (SeaBIOS)
                       ├─ ativa PAE, LME e paginação
                       └─ ljmp para o stub de 64 bits
                            └─ kernel_main() na metade alta
-                                ├─ vga::init()
-                                ├─ serial::init()
-                                ├─ keyboard::init()
-                                └─ shell::run()
+                                 ├─ vga::init()
+                                 ├─ serial::init()
+                                 ├─ paging::init()   (frames do Multiboot2)
+                                 ├─ gdt::init()      (ring 3 + TSS)
+                                 ├─ keyboard::init()
+                                 ├─ idt::init()      (PIC + PIT, IRQ0)
+                                 ├─ sti
+                                 └─ shell::run()
 ```
 
 O cabeçalho multiboot2 fica em `.multiboot_header`, no início do arquivo,
@@ -172,8 +192,11 @@ em 1 MiB (endereços baixos); o código Rust é ligado em
 |--------------------------------------------------|-------------------------|
 | `arch/x86/boot/header.S`, `arch/x86/boot/pm.c`   | `src/boot.rs`           |
 | `arch/x86/kernel/head_64.S`                      | `src/boot.rs`           |
-| `arch/x86/kernel/cpu/common.c` (GDT)             | `src/boot.rs`           |
-| `arch/x86/mm/init_64.c` (paginação)              | `src/boot.rs`           |
+| `arch/x86/kernel/cpu/common.c` (GDT/TSS)         | `src/gdt.rs`            |
+| `arch/x86/kernel/idt.c`, `arch/x86/kernel/traps.c` | `src/idt.rs`          |
+| `arch/x86/mm/fault.c` (demand paging/proteção)   | `src/paging.rs`         |
+| `arch/x86/mm/init_64.c` (paginação)              | `src/boot.rs`, `src/paging.rs` |
+| `kernel/entry/common.c` (retorno ao usuário)     | `src/user.rs`           |
 | `drivers/video/console/vgacon.c`                 | `src/vga.rs`            |
 | `drivers/input/serio/i8042.c`                    | `src/keyboard.rs`       |
 | `drivers/input/keyboard/atkbd.c`                 | `src/keyboard.rs`       |
@@ -184,18 +207,24 @@ em 1 MiB (endereços baixos); o código Rust é ligado em
 
 ## Limitações didáticas
 
-- Uma única CPU; interrupções desligadas.
-- Teclado por polling, sem IRQ1/IDT.
-- Sem heap, processos, syscalls, sistema de arquivos ou rede.
-- Sem tratamento de exceções: uma falha grave gera triple fault.
+- Uma única CPU; IRQ0 (timer) habilitada, mas IRQ1 do teclado continua
+  mascarada porque o driver usa polling.
+- Sem heap, processos, escalonador, sistema de arquivos ou rede.
+- O "processo" de usuário é um programa de máquina copiado para uma página e
+  executado uma vez; não há `fork`, `exec` nem troca de contexto preemptiva.
+- A única chamada de sistema é `int 0x80` com `rax = 0` (sair); não há
+  validação de ponteiros nem cópia segura entre espaços de endereço.
 - Apenas o primeiro GiB é mapeado por identidade; o kernel usa a metade alta.
+  As regiões de demand paging têm 2 MiB cada e ficam fora desse GiB.
 - Modo texto VGA depende de BIOS/CSM. Em PCs UEFI sem CSM, o vídeo VGA
   legado pode não existir; nesse caso seria necessário um driver GOP/framebuffer.
 
 ## Próximos passos naturais
 
-1. Criar IDT e handlers para exceções (evita triple fault).
-2. Programar o PIC/PIT e habilitar IRQ1 para teclado com interrupções.
+1. Criar um escalonador simples e processos de verdade com espaços de endereço
+   separados.
+2. Implementar mais syscalls (`read`, `write`, `exit`) com validação de
+   ponteiros do usuário.
 3. Adicionar um alocador de heap (`alloc` + linked list allocator).
-4. Implementar um driver de framebuffer (GOP/VBE) para PCs UEFI.
-5. Implementar um pequeno `init` e chamadas de sistema.
+4. Habilitar IRQ1 e transformar o teclado em entrada por interrupção.
+5. Implementar um driver de framebuffer (GOP/VBE) para PCs UEFI.

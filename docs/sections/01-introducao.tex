@@ -19,6 +19,9 @@ problema. Ele reimplementa, em Rust, o caminho m\'inimo necess\'ario para:
   \item configurar p\'aginas e uma pilha de kernel;
   \item inicializar um console de texto VGA 80$\times$25;
   \item ler teclas do controlador PS/2 8042 e da serial COM1;
+  \item instalar uma IDT, receber exce\c{c}\~oes e o timer do PIT;
+  \item alocar frames de 4 KiB e materializar p\'aginas sob demanda;
+  \item executar c\'odigo em ring 3 com separa\c{c}\~ao usu\'ario/kernel;
   \item oferecer um pequeno shell com comandos b\'asicos.
 \end{enumerate}
 
@@ -38,7 +41,7 @@ Esta documenta\c{c}\~ao tem quatro objetivos:
   \item \textbf{Documentar as principais fun\c{c}\~oes} de cada m\'odulo,
         incluindo contratos, pr\'e-condi\c{c}\~oes, efeitos colaterais e
         limita\c{c}\~oes. O Ap\^endice~\ref{ap:funcoes} traz o cat\'alogo
-        completo das 43 fun\c{c}\~oes do projeto.
+        completo das 96 fun\c{c}\~oes do projeto.
   \item \textbf{Registrar o processo de build, execu\c{c}\~ao e valida\c{c}\~ao},
         de forma que outra pessoa consiga reproduzir o ambiente e os testes.
   \item \textbf{Comparar o projeto com o kernel Linux}, apresentando
@@ -53,14 +56,19 @@ Esta documenta\c{c}\~ao tem quatro objetivos:
 \begin{itemize}
   \item Boot BIOS por CD/ISO usando GRUB e o protocolo Multiboot2.
   \item Transi\c{c}\~ao de 32 bits para modo longo (x86\_64).
-  \item GDT m\'inima, tabelas de p\'agina est\'aticas e mapeamento da metade
-        alta do espa\c{c}o de endere\c{c}amento.
+  \item GDT com segmentos ring 0/ring 3, TSS e pilhas de privil\'egio;
+        tabelas de p\'agina est\'aticas no boot e metade alta do kernel.
+  \item IDT com 256 portas, exce\c{c}\~oes, PIC remapeado e timer PIT em IRQ0.
+  \item Alocador de frames f\'isicos de 4 KiB e \emph{demand paging} para
+        regi\~oes de usu\'ario e de kernel.
+  \item Demos em ring 3 com prote\c{c}\~ao U/S e \emph{syscall} did\'atica
+        \code{int \$0x80}.
   \item Console VGA em modo texto, com cursor de hardware, rolagem e
         atributos de cor.
   \item Driver de teclado PS/2 por \emph{polling}, com Shift, Enter, Tab e
         Backspace.
   \item Driver da UART 16550 em COM1, usado para depura\c{c}\~ao e entrada.
-  \item Shell sem aloca\c{c}\~ao din\^amica com seis comandos.
+  \item Shell sem aloca\c{c}\~ao din\^amica com dez comandos.
   \item \emph{Panic handler} que imprime a falha e para a CPU.
   \item Build reprodut\'ivel com Cargo, \code{ld.lld}, \code{grub-mkrescue}
         e QEMU.
@@ -69,15 +77,14 @@ Esta documenta\c{c}\~ao tem quatro objetivos:
 \subsection*{O que n\~ao est\'a inclu\'ido}
 
 \begin{itemize}
-  \item Interrup\c{c}\~oes, IDT, PIC/PIT/APIC e temporizadores.
-  \item Gerenciamento de mem\'oria f\'isica ou virtual al\'em do mapeamento
-        est\'atico inicial.
-  \item Heap, alocador, \code{alloc} ou cole\c{c}\~oes din\^amicas.
-  \item Processos, threads, escalonador, espa\c{c}os de endere\c{c}amento ou
+  \item Heap, alocador de objetos, \code{alloc} ou cole\c{c}\~oes din\^amicas.
+  \item Processos completos, threads, escalonador, troca de contexto,
+        espa\c{c}os de endere\c{c}o por processo ou um conjunto amplo de
         chamadas de sistema.
   \item Sistema de arquivos, rede, USB, ACPI, SMP ou suporte UEFI nativo.
   \item Drivers para outros v\'ideos al\'em do VGA texto legado.
-  \item Seguran\c{c}a de ring 3, prote\c{c}\~ao de mem\'oria ou \emph{sandbox}.
+  \item Endurecimento de seguran\c{c}a como SMEP, SMAP, NX, KASLR ou
+        valida\c{c}\~ao de ponteiros de usu\'ario.
 \end{itemize}
 
 \section{P\'ublico-alvo}
@@ -125,8 +132,14 @@ Imagem & \code{vga-kernel.iso} El Torito, inicializ\'avel por BIOS. \\
 Boot & Validado em QEMU com SeaBIOS e GRUB Multiboot2. \\
 Console & VGA texto 80$\times$25, cursor, rolagem e cores. \\
 Entrada & PS/2 por polling e serial COM1. \\
-Shell & \code{help}, \code{clear}, \code{echo}, \code{info}, \code{reboot}, \code{halt}. \\
-Testes & Boot, comandos e entrada PS/2/serial verificados. \\
+Interrup\c{c}\~oes & IDT com 256 portas, exce\c{c}\~oes, PIC remapeado e PIT a
+~100 Hz. \\
+Mem\'oria & Alocador de frames de 4 KiB, tabelas de 4 KiB e demand paging. \\
+Prote\c{c}\~ao & GDT/TSS, ring 3 e bits U/S para usu\'ario e kernel. \\
+Shell & \code{help}, \code{clear}, \code{echo}, \code{info}, \code{demand},
+\code{usertest}, \code{userprot}, \code{mem}, \code{reboot}, \code{halt}. \\
+Testes & Boot, comandos, entrada PS/2/serial, timer, page faults e ring 3
+verificados. \\
 Cobertura Linux & Subconjunto pequeno; similaridade baixa (Cap\'itulo~\ref{cap:similaridade}). \\
 \bottomrule
 \end{tabularx}

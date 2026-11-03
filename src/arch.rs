@@ -46,6 +46,13 @@ pub fn halt_loop() -> ! {
     }
 }
 
+/// Liga interrupcoes mascaraeis (IF = 1).
+pub fn enable_interrupts() {
+    unsafe {
+        asm!("sti", options(nomem, nostack, preserves_flags));
+    }
+}
+
 /// Reinicia a maquina pulsando a linha de reset do controlador 8042.
 pub fn reboot() -> ! {
     unsafe {

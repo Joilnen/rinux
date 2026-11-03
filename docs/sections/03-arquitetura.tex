@@ -3,10 +3,10 @@
 
 \section{Vis\~ao em camadas}
 
-O kernel \'e organizado em cinco camadas conceituais. As camadas inferiores
+O kernel \'e organizado em seis camadas conceituais. As camadas inferiores
 dependem apenas de hardware e de \code{core}; as superiores usam as
-inferiores. N\~ao h\'a \code{std}, alocador, \emph{runtime} de Rust nem
-bibliotecas de terceiros.
+inferiores. N\~ao h\'a \code{std}, alocador de heap, \emph{runtime} de Rust
+nem bibliotecas de terceiros.
 
 \begin{figure}[H]
 \centering
@@ -19,13 +19,15 @@ bibliotecas de terceiros.
              align=center, font=\small},
   node distance=0.35cm
 ]
-\node[layer] (shell) {\textbf{Interface} --- shell: linha de comando, \code{help}, \code{echo}, \code{info}, \code{clear}};
+\node[layer] (shell) {\textbf{Interface} --- shell: linha de comando, \code{help}, \code{echo}, \code{info}, \code{demand}, \code{usertest}};
 \node[layer, below=of shell] (services) {\textbf{Servi\c{c}os} --- console VGA, entrada PS/2, serial, macros de impress\~ao};
-\node[layer, below=of services] (core) {\textbf{N\'ucleo} --- \code{kernel\_main}, panic handler, spinlock, portas de I/O};
-\node[layer, below=of core] (boot) {\textbf{Boot} --- stub 32/64 bits, GDT, PML4/PDPT/PD, Multiboot2};
-\node[hw, below=of boot] (hw) {\textbf{Hardware} --- CPU x86\_64, VGA, 8042, UART 16550, BIOS/GRUB};
+\node[layer, below=of services] (mem) {\textbf{Mem\'oria e interrup\c{c}\~oes} --- GDT/TSS, IDT/PIC/PIT, frames e \emph{demand paging}};
+\node[layer, below=of mem] (core) {\textbf{N\'ucleo} --- \code{kernel\_main}, panic handler, spinlock, portas de I/O};
+\node[layer, below=of core] (boot) {\textbf{Boot} --- stub 32/64 bits, GDT inicial, PML4/PDPT/PD, Multiboot2};
+\node[hw, below=of boot] (hw) {\textbf{Hardware} --- CPU x86\_64, VGA, 8042, UART 16550, PIC/PIT, BIOS/GRUB};
 \draw[-{Latex[length=2mm]}, thick, rinuxblue] (shell) -- (services);
-\draw[-{Latex[length=2mm]}, thick, rinuxblue] (services) -- (core);
+\draw[-{Latex[length=2mm]}, thick, rinuxblue] (services) -- (mem);
+\draw[-{Latex[length=2mm]}, thick, rinuxblue] (mem) -- (core);
 \draw[-{Latex[length=2mm]}, thick, rinuxblue] (core) -- (boot);
 \draw[-{Latex[length=2mm]}, thick, black!60] (boot) -- (hw);
 \end{tikzpicture}
@@ -48,13 +50,18 @@ usando \code{core::hint::spin\_loop()} quando n\~ao h\'a entrada.
 \toprule
 \textbf{Aspecto} & \textbf{Implementa\c{c}\~ao} \\
 \midrule
-Privil\'egio & Ring 0 \'unico; n\~ao h\'a modo usu\'ario. \\
+Privil\'egio & Ring 0 para o kernel; ring 3 apenas nos demos de
+\code{user.rs}, com GDT/TSS. \\
 CPUs & Uma CPU; SMP n\~ao \'e inicializado. \\
-Interrup\c{c}\~oes & Desligadas no stub (\code{cli}); nenhuma IDT instalada. \\
-Entrada & Polling de \code{0x60}/\code{0x64} e de COM1. \\
-Concorr\^encia & Spinlock apenas no console; n\~ao h\'a preemp\c{c}\~ao. \\
-Mem\'oria & Est\'atica; sem heap, \code{alloc} ou \code{Vec}. \\
-Pilhas & 8 KiB no stub (baixa) e 32 KiB no kernel (alta). \\
+Interrup\c{c}\~oes & IDT com 256 portas; PIC remapeado e timer IRQ0 a
+~100 Hz. IRQ1 (teclado) permanece mascarada. \\
+Entrada & Polling de \code{0x60}/\code{0x64} e de COM1; timer por IRQ. \\
+Concorr\^encia & Spinlock no console; o timer n\~ao preempta (n\~ao h\'a
+escalonador). \\
+Mem\'oria & Frames f\'isicos de 4 KiB, tabelas sob demanda e page faults;
+sem heap, \code{alloc} ou \code{Vec}. \\
+Pilhas & 8 KiB no stub (baixa), 32 KiB no kernel (alta), 16 KiB para
+interrup\c{c}\~oes de usu\'ario e 8 KiB de IST para double fault. \\
 Tempo de vida & O shell nunca retorna; \code{halt} e \code{reboot} encerram o fluxo. \\
 \bottomrule
 \end{tabularx}
@@ -62,42 +69,39 @@ Tempo de vida & O shell nunca retorna; \code{halt} e \code{reboot} encerram o fl
 
 \section{Depend\^encias entre m\'odulos}
 
-\begin{figure}[H]
+\begin{table}[H]
 \centering
-\begin{tikzpicture}[
-  mod/.style={draw=rinuxblue, fill=white, rounded corners=2pt,
-              minimum width=2.9cm, minimum height=1.0cm,
-              align=center, font=\small\ttfamily},
-  arrow/.style={-{Latex[length=2mm]}, thick, rinuxblue},
-  node distance=1.1cm and 1.2cm
-]
-\node[mod] (main) {main};
-\node[mod, below left=of main] (shell) {shell};
-\node[mod, below right=of main] (vga) {vga};
-\node[mod, below=of shell] (keyboard) {keyboard};
-\node[mod, right=of keyboard] (serial) {serial};
-\node[mod, below=of vga] (sync) {sync};
-\node[mod, left=of sync] (arch) {arch};
-\node[mod, above=of main] (boot) {boot};
+\caption{Depend\^encias principais entre m\'odulos.}
+\label{tab:dependencias}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule
+\textbf{M\'odulo} & \textbf{Usa / \'e usado por} \\
+\midrule
+\code{main.rs} & Declara todos os m\'odulos; chama \code{vga}, \code{serial},
+\code{paging}, \code{gdt}, \code{keyboard}, \code{idt}, \code{arch} e
+\code{shell}. \\
+\code{boot.rs} & Assembly que chama \code{kernel\_main}; n\~ao \'e chamado por
+Rust. \\
+\code{arch.rs} & Portas de I/O, \code{sti}, \code{halt} e \code{reboot};
+usado por v\'arios m\'odulos. \\
+\code{gdt.rs} & GDT/TSS e pilhas; usa apenas \code{core::arch}. \\
+\code{idt.rs} & Usa \code{arch}, \code{paging} e \code{user} para tratar
+exce\c{c}\~oes, IRQs e a \emph{syscall}. \\
+\code{paging.rs} & Frames, tabelas e \emph{page faults}; usa apenas
+\code{core::arch}. \\
+\code{user.rs} & Monta o programa, chama \code{paging} e retorna ao kernel
+por \code{user\_resume}. \\
+\code{shell.rs} & Usa \code{keyboard}, \code{serial}, \code{vga},
+\code{idt}, \code{paging}, \code{user} e \code{arch}. \\
+\code{vga.rs} & Usa \code{sync}, \code{serial} e \code{arch}. \\
+\code{keyboard.rs} & Usa \code{arch} para acessar o 8042. \\
+\code{serial.rs} & Usa \code{arch} para acessar a UART. \\
+\code{sync.rs} & Spinlock do console; usa apenas \code{core}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
-\draw[arrow] (main) -- (shell);
-\draw[arrow] (main) -- (vga);
-\draw[arrow] (main) -- (boot);
-\draw[arrow] (shell) -- (keyboard);
-\draw[arrow] (shell) -- (serial);
-\draw[arrow] (shell) -- (vga);
-\draw[arrow] (shell) -- (arch);
-\draw[arrow] (vga) -- (serial);
-\draw[arrow] (vga) -- (sync);
-\draw[arrow] (vga) -- (arch);
-\draw[arrow] (keyboard) -- (arch);
-\draw[arrow] (serial) -- (arch);
-\end{tikzpicture}
-\caption{Depend\^encias principais entre m\'odulos. Setas indicam ``usa''.}
-\label{fig:dependencias}
-\end{figure}
-
-A figura mostra apenas as depend\^encias relevantes. \code{boot.rs} \'e um
+A tabela mostra apenas as depend\^encias relevantes. \code{boot.rs} \'e um
 caso especial: ele cont\'em o c\'odigo de montagem que chama \code{kernel\_main}
 e n\~ao \'e chamado por Rust. \code{main.rs} declara todos os m\'odulos e
 exporta as macros \code{print!} e \code{println!}.
@@ -153,10 +157,12 @@ Kernel na metade alta & Conven\c{c}\~ao do Linux e do alvo; evita depender de
 endere\c{c}os baixos e deixa o stub separado. \\
 Stub em assembly & O controle inicial vem em 32 bits com pilha indefinida;
 a transi\c{c}\~ao para 64 bits exige c\'odigo posicional e controle exato. \\
-Tabelas de p\'agina est\'aticas & N\~ao h\'a alocador; 3 p\'aginas de 4 KiB
-s\~ao suficientes para mapear 1 GiB com \emph{huge pages} de 2 MiB. \\
-Polling & Evita IDT, PIC e handlers; simplifica o modelo e mant\'em o foco no
-console. \\
+Tabelas de p\'agina est\'aticas & O stub n\~ao tem alocador; 3 p\'aginas de
+4 KiB s\~ao suficientes para mapear 1 GiB com \emph{huge pages} de 2 MiB.
+Depois do boot, \code{paging.rs} aloca tabelas de 4 KiB para as regi\~oes sob
+demanda. \\
+Polling no teclado & Mant\'em IRQ1 mascarada e evita um buffer de scancodes;
+o timer IRQ0 j\'a demonstra o caminho de interrup\c{c}\~ao. \\
 Serial al\'em do VGA & Permite depura\c{c}\~ao e testes automatizados sem
 depender de captura gr\'afica. \\
 \emph{Panic abort} & N\~ao h\'a \emph{unwinding} nem runtime de p\^anico;
@@ -181,8 +187,10 @@ O kernel n\~ao possui um subsistema de erros. As estrat\'egias s\~ao:
         ignorados no shell; UTF-8 inv\'alido em \code{echo} vira uma
         mensagem fixa.
   \item \textbf{Panic}: o handler imprime \code{[PANIC]} no console e entra em
-        \code{halt\_loop()}. Como n\~ao h\'a IDT, uma exce\c{c}\~ao de CPU
-        (por exemplo, page fault) causa \emph{triple fault} e reset.
+        \code{halt\_loop()}. Exce\c{c}\~oes de CPU passam pela IDT; um
+        \code{\#PF} sob demanda pode ser resolvido, mas uma falha fora das
+        regi\~oes mapeadas imprime diagn\'ostico e para a CPU. Um
+        \code{\#DF} usa a pilha IST e tamb\'em para o sistema.
   \item \textbf{Sem recupera\c{c}\~ao}: n\~ao h\'a \emph{kernel oops},
         reinicializa\c{c}\~ao controlada ou despejo de pilha.
 \end{itemize}

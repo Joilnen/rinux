@@ -9,15 +9,16 @@ em linguagem de montagem, ligado em 1 MiB. Esse stub constr\'oi tabelas de
 p\'agina, ativa PAE e modo longo e salta para o c\'odigo Rust, ligado na metade
 alta em \code{0xFFFFFFFF80000000}.
 
-O c\'odigo Rust inicializa, nesta ordem, o console VGA, a serial COM1 e o
-teclado PS/2. Em seguida imprime um \emph{banner}, valida a assinatura
-Multiboot2 e entra no shell, que exibe o prompt \code{rinux>} e processa
-comandos lidos do teclado ou da serial.
+O c\'odigo Rust inicializa, nesta ordem, o console VGA, a serial COM1, o
+alocador de frames, a GDT com ring 3/TSS, o teclado PS/2 e a IDT com PIC/PIT.
+Em seguida liga as interrup\c{c}\~oes, imprime um \emph{banner}, valida a
+assinatura Multiboot2 e entra no shell, que exibe o prompt \code{rinux>} e
+processa comandos lidos do teclado ou da serial.
 
-O sistema inteiro cabe em cerca de 48 KiB de ELF e 1.035 linhas de Rust
-(773 linhas efetivas de c\'odigo, sem coment\'arios e linhas em branco).
-N\~ao h\'a aloca\c{c}\~ao din\^amica, interrup\c{c}\~oes, processos ou
-chamadas de sistema.
+O sistema inteiro cabe em cerca de 95 KiB de ELF e 2.508 linhas de Rust
+(1.939 linhas efetivas de c\'odigo, sem coment\'arios e linhas em branco).
+N\~ao h\'a aloca\c{c}\~ao din\^amica de heap, escalonador ou sistema de
+arquivos; h\'a IDT, timer, \emph{demand paging} e demos em ring 3.
 
 \section{Funcionalidades}
 
@@ -44,8 +45,10 @@ Serial & Entrada pelo terminal do QEMU & Completo \\
 Shell & \code{help}, \code{clear}, \code{echo} & Completo \\
 Shell & \code{info}, \code{reboot}, \code{halt} & Completo \\
 Sistema & Panic handler & Completo \\
-Sistema & IDT, exce\c{c}\~oes, IRQs & Ausente \\
-Sistema & Heap, processos, syscalls & Ausente \\
+Sistema & IDT, exce\c{c}\~oes e IRQ0 (timer) & Completo (subconjunto) \\
+Sistema & GDT/TSS, ring 3 e prote\c{c}\~ao U/S & Completo (demo) \\
+Mem\'oria & Frames, p\'aginas 4 KiB e demand paging & Completo (subconjunto) \\
+Sistema & Heap, processos e scheduler & Ausente \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -91,7 +94,11 @@ output/
 |-- src/
 |   |-- main.rs             entrada Rust, macros e panic handler
 |   |-- boot.rs             Multiboot2, GDT, paginacao e modo longo
-|   |-- arch.rs             portas de I/O, halt e reboot
+|   |-- arch.rs             portas de I/O, interrupcoes, halt e reboot
+|   |-- gdt.rs              GDT definitiva, TSS e pilhas de privilegio
+|   |-- idt.rs              IDT, stubs, PIC, PIT e syscall
+|   |-- paging.rs           frames, tabelas 4 KiB e demand paging
+|   |-- user.rs             entrada em ring 3 e demos de usuario
 |   |-- vga.rs              console VGA 80x25
 |   |-- keyboard.rs         teclado PS/2 (8042)
 |   |-- serial.rs           UART 16550 / COM1
@@ -117,21 +124,26 @@ output/
 \code{boot.rs}     & 202 & 0 & Stub de boot e tabelas de p\'agina \\
 \code{keyboard.rs} & 238 & 9 & Driver PS/2 8042 \\
 \code{vga.rs}      & 217 & 15 & Console VGA texto \\
-\code{shell.rs}    & 105 & 4 & Linha de comando \\
-\code{main.rs}     &  91 & 2 & Entrada Rust, macros, panic \\
+\code{shell.rs}    & 187 & 7 & Linha de comando e demos \\
+\code{main.rs}     & 111 & 2 & Entrada Rust, macros, panic \\
 \code{serial.rs}   &  64 & 4 & UART 16550 / COM1 \\
-\code{arch.rs}     &  62 & 4 & Portas de I/O, halt, reboot \\
+\code{arch.rs}     &  69 & 5 & Portas de I/O, \code{sti}, halt, reboot \\
 \code{sync.rs}     &  56 & 5 & Spinlock \\
+\code{gdt.rs}      & 159 & 6 & GDT, TSS e pilhas de privil\'egio \\
+\code{idt.rs}      & 511 & 14 & IDT, PIC, PIT, exce\c{c}\~oes e IRQs \\
+\code{paging.rs}   & 518 & 22 & Frames, tabelas e demand paging \\
+\code{user.rs}     & 176 & 7 & Entrada em ring 3 e demos \\
 \midrule
-\textbf{Total}     & \textbf{1.035} & \textbf{43} & 773 linhas efetivas de c\'odigo \\
+\textbf{Total}     & \textbf{2.508} & \textbf{96} & 1.939 linhas efetivas de c\'odigo \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{nota}[Sobre a contagem]
-A contagem inclui 124 linhas de coment\'ario e 138 linhas em branco. O n\'umero
-de fun\c{c}\~oes inclui m\'etodos de \code{impl} e fun\c{c}\~oes de trait
-(\code{Deref}, \code{DerefMut}, \code{Drop} e \code{fmt::Write}).
+A contagem inclui 253 linhas de coment\'ario e 316 linhas em branco. O n\'umero
+de fun\c{c}\~oes inclui m\'etodos de \code{impl}, fun\c{c}\~oes \code{const}
+e fun\c{c}\~oes de trait (\code{Deref}, \code{DerefMut}, \code{Drop} e
+\code{fmt::Write}); n\~ao inclui declara\c{c}\~oes \code{extern} sem corpo.
 \code{boot.rs} n\~ao possui fun\c{c}\~oes Rust porque sua l\'ogica est\'a em
 \code{global\_asm!}; o \emph{stub} \'e contado como bloco de montagem.
 \end{nota}
@@ -145,7 +157,9 @@ de fun\c{c}\~oes inclui m\'etodos de \code{impl} e fun\c{c}\~oes de trait
   \item O stub salva \code{eax} e \code{ebx}, monta as p\'aginas, carrega a
         GDT e ativa o modo longo.
   \item O stub salta para \code{kernel\_main(magic, info)} na metade alta.
-  \item O Rust limpa a tela VGA, configura a serial e inicializa o teclado.
-  \item O shell exibe \code{rinux>} e processa comandos at\'e
-        \code{halt}, \code{reboot} ou reset f\'isico.
+  \item O Rust limpa a tela VGA, configura a serial, inicializa o alocador de
+        frames e a GDT/TSS, inicializa o teclado e instala a IDT com PIC/PIT.
+  \item O Rust liga as interrup\c{c}\~oes e o shell exibe \code{rinux>},
+        processando comandos at\'e \code{halt}, \code{reboot} ou reset
+        f\'isico.
 \end{enumerate}

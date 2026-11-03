@@ -16,10 +16,14 @@ desligamento/reinicializa\c{c}\~ao e o spinlock do console.
 
 mod arch;
 mod boot;
+mod gdt;
+mod idt;
 mod keyboard;
+mod paging;
 mod serial;
 mod shell;
 mod sync;
+mod user;
 mod vga;
 \end{lstlisting}
 
@@ -41,7 +45,11 @@ mod vga;
 pub extern "C" fn kernel_main(multiboot_magic: u32, multiboot_info: u32) -> ! {
     vga::init();
     serial::init();
+    paging::init(multiboot_magic, multiboot_info);
+    gdt::init();
     keyboard::init();
+    idt::init();
+    arch::enable_interrupts();
 
     println!();
     println!("==============================================================");
@@ -76,16 +84,16 @@ Argumentos & \code{multiboot\_magic} (deve ser \code{0x36D76289}) e
 Retorno & \code{!}: nunca retorna; termina em \code{shell::run()}. \\
 Pr\'e-condi\c{c}\~oes & CPU em modo longo, pagina\c{c}\~ao ativa, pilha alta
 v\'alida, \code{.bss} zerada pelo carregador. \\
-Efeitos & Inicializa VGA, serial e teclado; imprime banner; entra no shell. \\
+Efeitos & Inicializa VGA, serial, alocador de frames, GDT/TSS, teclado,
+IDT/PIC/PIT e liga interrup\c{c}\~oes; imprime banner; entra no shell. \\
 Chamado por & Stub de assembly em \code{boot.rs}. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-O valor \code{multiboot\_info} \'e apenas impresso, n\~ao interpretado. Isso
-\'e suficiente para confirmar que o bootloader entregou uma estrutura
-v\'alida; an\'alises de mapa de mem\'oria ou m\'odulos exigiriam percorrer as
-tags Multiboot2.
+O valor \code{multiboot\_info} \'e usado por \code{paging::init} para
+percorrer as tags Multiboot2 e liberar os frames de RAM dispon\'ivel. A
+estrutura tamb\'em \'e reservada para n\~ao ser entregue pelo alocador.
 
 \subsection{Macros \code{print!} e \code{println!}}
 

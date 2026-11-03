@@ -29,6 +29,8 @@ SECTIONS
     . = ALIGN(4096);
     . += KERNEL_VMA;
 
+    __kernel_start = .;
+
     .text : AT(ADDR(.text) - KERNEL_VMA)
     {
         *(.text .text.*)
@@ -51,6 +53,9 @@ SECTIONS
         *(COMMON)
         __bss_end = .;
     }
+
+    /* Usado pelo alocador de frames para nao entregar memoria do kernel. */
+    __kernel_end = .;
 
     /DISCARD/ :
     {

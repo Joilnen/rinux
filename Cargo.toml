@@ -6,8 +6,6 @@ description = "Kernel minimalista em Rust: boot BIOS (multiboot2), console VGA 8
 license = "MIT OR Apache-2.0"
 
 # Sem dependencias externas: o kernel usa apenas core.
-[dependencies]
-rusty-tags = "3.11.0"
 
 [profile.dev]
 panic = "abort"

@@ -1,9 +1,9 @@
 # Documentação do Rust VGA Kernel
 
 Documentação técnica completa do kernel, escrita em LaTeX e compilada para
-PDF. O conteúdo cobre arquitetura, cadeia de boot, memória, drivers VGA/PS-2/
-serial, shell, build, testes e uma análise quantitativa da similaridade com o
-kernel Linux 7.3.1.
+PDF. O conteúdo cobre arquitetura, cadeia de boot, memória virtual, demand
+paging, IDT/PIC/PIT, ring 3, drivers VGA/PS-2/serial, shell, build, testes e
+uma análise quantitativa da similaridade com o kernel Linux 7.3.1.
 
 ## Arquivos
 
@@ -23,6 +23,7 @@ docs/
     |-- 07-keyboard.tex
     |-- 08-serial.tex
     |-- 09-shell.tex
+    |-- 09a-memoria-idt.tex
     |-- 10-build.tex
     |-- 11-testes.tex
     |-- 12-similaridade.tex
@@ -64,18 +65,21 @@ mesmo quando o `cargo` do sistema é o primeiro do `PATH`.
 7. Teclado PS/2 8042.
 8. Serial COM1 (UART 16550).
 9. Shell e comandos.
-10. Build, ISO, GRUB e execução no QEMU.
-11. Testes e evidências de execução.
-12. Similaridade com o Linux, com pontuação ponderada e comparação de LOC.
-13. Limitações, riscos e roadmap.
-14. Apêndices: catálogo das 43 funções, mapa de portas/memória, glossário e
+10. Memória virtual, alocador de frames, demand paging, GDT/TSS, IDT, PIC/PIT
+    e demos em ring 3.
+11. Build, ISO, GRUB e execução no QEMU.
+12. Testes e evidências de execução.
+13. Similaridade com o Linux, com pontuação ponderada e comparação de LOC.
+14. Limitações, riscos e roadmap.
+15. Apêndices: catálogo das 96 funções, mapa de portas/memória, glossário e
     referências.
 
 ## Nota sobre a similaridade
 
-A análise do Capítulo 12 estima **≈13,5%** de similaridade funcional
+A análise do Capítulo 13 estima **≈21,1%** de similaridade funcional
 ponderada no recorte de dez dimensões (boot, modo longo, paginação, console,
-teclado, serial e serviços ausentes). Em relação ao kernel Linux completo, a
-cobertura é muito menor; em linhas de código, o projeto tem cerca de
-**0,0027%** da árvore Linux usada como referência. Não há código copiado do
-Linux: a implementação é independente, em Rust.
+teclado, serial, interrupções, memória, processos e serviços ausentes). Em
+relação ao kernel Linux completo, a cobertura é muito menor; em linhas de
+código, o projeto tem cerca de **0,0066%** da árvore Linux usada como
+referência. Não há código copiado do Linux: a implementação é independente,
+em Rust.

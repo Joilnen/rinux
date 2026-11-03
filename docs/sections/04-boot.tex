@@ -325,11 +325,13 @@ argumentos inteiros v\~ao em \code{edi} e \code{esi}. O retorno \'e
         legado.
   \item N\~ao h\'a real-mode setup, \emph{protected mode} pr\'oprio nem
         descompress\~ao; o GRUB faz o carregamento.
-  \item O cabe\c{c}alho n\~ao solicita informa\c{c}\~oes de mem\'oria,
-        framebuffer ou m\'odulos; a estrutura Multiboot2 n\~ao \'e
-        interpretada al\'em do \code{magic}.
-  \item Apenas 1 GiB \'e mapeado e n\~ao h\'a \emph{demand paging},
-        prote\c{c}\~ao \code{NX}, \emph{user/kernel} ou \emph{guard pages}.
-  \item Sem IDT, qualquer exce\c{c}\~ao (incluindo \emph{page fault})
-        resulta em \emph{triple fault}.
+  \item O \emph{stub} n\~ao solicita informa\c{c}\~oes de mem\'oria,
+        framebuffer ou m\'odulos. A estrutura Multiboot2 s\'o \'e interpretada
+        depois, em Rust, por \code{paging::init}, para liberar frames.
+  \item O \emph{stub} mapeia apenas 1 GiB por identidade e n\~ao instala
+        demand paging, prote\c{c}\~ao \code{NX} ou \emph{guard pages}. Essas
+        estruturas s\~ao criadas depois por \code{paging.rs}.
+  \item O \emph{stub} n\~ao instala IDT; at\'e \code{idt::init()} rodar,
+        qualquer exce\c{c}\~ao (incluindo \emph{page fault}) resulta em
+        \emph{triple fault}.
 \end{itemize}

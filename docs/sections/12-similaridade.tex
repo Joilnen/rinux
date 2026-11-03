@@ -27,7 +27,7 @@ A compara\c{c}\~ao usa como refer\^encia a \'arvore Linux 7.3.1 presente em
 
 \begin{itemize}
   \item linhas f\'isicas dos 12 arquivos Linux mais pr\'oximos;
-  \item linhas f\'isicas dos 8 m\'odulos Rust;
+  \item linhas f\'isicas dos 12 m\'odulos Rust;
   \item funcionalidades presentes, ausentes e parciais;
   \item mecanismos de hardware usados (Multiboot2, GDT, PAE, long mode,
         VGA texto, 8042, UART 16550);
@@ -67,14 +67,14 @@ ing\^enua de que ``\'e um Linux em Rust'' quanto a conclus\~ao oposta de que
 \code{init/main.c} & 1.706 & \code{kernel\_main} em \code{main.rs} \\
 \midrule
 \textbf{Total Linux (12 arquivos)} & \textbf{22.352} & --- \\
-\textbf{Total Rust (8 m\'odulos)} & \textbf{1.035} & --- \\
+\textbf{Total Rust (12 m\'odulos)} & \textbf{2.508} & --- \\
 \bottomrule
 \end{longtable}
 
 A raz\~ao de linhas \'e:
 
 \[
-\frac{1.035}{22.352} \approx 4{,}63\%.
+\frac{2.508}{22.352} \approx 11{,}22\%.
 \]
 
 Em rela\c{c}\~ao \`a \'arvore Linux completa, que tem aproximadamente
@@ -82,7 +82,7 @@ Em rela\c{c}\~ao \`a \'arvore Linux completa, que tem aproximadamente
 raz\~ao \'e:
 
 \[
-\frac{1.035}{38.062.672} \approx 0{,}0027\%.
+\frac{2.508}{38.062.672} \approx 0{,}0066\%.
 \]
 
 \begin{atencao}[Linhas de c\'odigo n\~ao medem similaridade]
@@ -109,29 +109,29 @@ Linux. A \'ultima coluna \'e a contribui\c{c}\~ao ponderada.
 \textbf{Dimens\~ao} & \textbf{Peso} & \textbf{Linux} & \textbf{Projeto} & \textbf{Contrib.} \\
 \midrule
 Boot e protocolo de firmware & 10 & 100 & 30 & 3,00 \\
-Transi\c{c}\~ao de modo e GDT & 8 & 100 & 25 & 2,00 \\
-Pagina\c{c}\~ao e MMU & 12 & 100 & 10 & 1,20 \\
+Transi\c{c}\~ao de modo e GDT & 8 & 100 & 35 & 2,80 \\
+Pagina\c{c}\~ao e MMU & 12 & 100 & 25 & 3,00 \\
 Console e v\'ideo & 15 & 100 & 25 & 3,75 \\
 Teclado e entrada & 12 & 100 & 18 & 2,16 \\
 Serial e tty & 5 & 100 & 20 & 1,00 \\
-Interrup\c{c}\~oes e exce\c{c}\~oes & 12 & 100 & 0 & 0,00 \\
-Mem\'oria f\'isica e heap & 8 & 100 & 5 & 0,40 \\
-Processos, scheduler e syscalls & 12 & 100 & 0 & 0,00 \\
+Interrup\c{c}\~oes e exce\c{c}\~oes & 12 & 100 & 30 & 3,60 \\
+Mem\'oria f\'isica e heap & 8 & 100 & 15 & 1,20 \\
+Processos, scheduler e syscalls & 12 & 100 & 5 & 0,60 \\
 Arquivos, rede e outros drivers & 6 & 100 & 0 & 0,00 \\
 \midrule
-\textbf{Total} & \textbf{100} & --- & --- & \textbf{13,51} \\
+\textbf{Total} & \textbf{100} & --- & --- & \textbf{21,11} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-O \'indice ponderado \'e \textbf{13,5\%}. Ele deve ser lido como:
+O \'indice ponderado \'e \textbf{21,1\%}. Ele deve ser lido como:
 
 \begin{quote}
-``Dentro das dez dimens\~oes escolhidas, o projeto reproduz cerca de 13,5\%
+``Dentro das dez dimens\~oes escolhidas, o projeto reproduz cerca de 21,1\%
 do que o Linux oferece, com peso maior para boot, console e teclado.''
 \end{quote}
 
-N\~ao significa que 13,5\% do c\'odigo do Linux foi reimplementado. Em
+N\~ao significa que 21,1\% do c\'odigo do Linux foi reimplementado. Em
 n\'umero de subsistemas e servi\c{c}os, a fra\c{c}\~ao \'e muito menor: o
 projeto n\~ao tem, por exemplo, nenhum dos servi\c{c}os que ocupam a maior
 parte do kernel (scheduler, mem\'oria virtual completa, VFS, rede, drivers,
@@ -145,14 +145,14 @@ seguran\c{c}a, virtualiza\c{c}\~ao).
         descompress\~ao e stubs EFI. O conceito de ``carregar um ELF e
         transferir o controle'' \'e o mesmo; a implementa\c{c}\~ao \'e bem
         mais simples.
-  \item \textbf{Modo longo e GDT (25/100)}: a sequ\^encia PAE $\rightarrow$
-        LME $\rightarrow$ PG \'e a mesma do \code{head\_64.S}; faltam IDT,
-        \emph{per-CPU}, \emph{stack canary}, \emph{paravirt} e tratamento de
-        CPUs secund\'arias.
-  \item \textbf{Pagina\c{c}\~ao (10/100)}: h\'a tabelas est\'aticas e
-        \emph{huge pages} de 2 MiB, mas n\~ao h\'a buddy allocator,
-        \code{vmalloc}, \code{mmap}, \emph{demand paging}, COW, swap,
-        NUMA ou prote\c{c}\~ao \code{NX}.
+  \item \textbf{Modo longo e GDT (35/100)}: a sequ\^encia PAE $\rightarrow$
+        LME $\rightarrow$ PG \'e a mesma do \code{head\_64.S}; h\'a GDT com
+        ring 3 e TSS, mas faltam \emph{per-CPU}, \emph{stack canary},
+        \emph{paravirt} e tratamento de CPUs secund\'arias.
+  \item \textbf{Pagina\c{c}\~ao (25/100)}: h\'a \emph{huge pages} de 2 MiB no
+        boot, alocador de frames por bitmap, tabelas de 4 KiB e demand
+        paging; faltam buddy allocator, \code{vmalloc}, \code{mmap}, COW,
+        swap, NUMA e prote\c{c}\~ao \code{NX}.
   \item \textbf{Console (25/100)}: o modo texto VGA e a rolagem s\~ao
         an\'alogos ao \code{vgacon}, mas faltam console virtual, fontes,
         Unicode, \emph{fbcon}, \code{printk} com n\'iveis e buffer de log.
@@ -162,12 +162,15 @@ seguran\c{c}a, virtualiza\c{c}\~ao).
   \item \textbf{Serial (20/100)}: a programa\c{c}\~ao b\'asica da 16550 \'e
         parecida, mas faltam \emph{tty layer}, \emph{termios}, IRQs, FIFO
         de entrada, DMA e controle de fluxo.
-  \item \textbf{Interrup\c{c}\~oes (0/100)}: n\~ao h\'a IDT, PIC, APIC,
-        timers ou handlers. O kernel roda com \code{cli} e faz polling.
-  \item \textbf{Mem\'oria/heap (5/100)}: n\~ao h\'a alocador; a \'unica
-        ``mem\'oria'' gerenciada s\~ao as tabelas est\'aticas e as pilhas.
-  \item \textbf{Processos (0/100)}: n\~ao h\'a \code{task\_struct},
-        scheduler, context switch, espa\c{c}o de usu\'ario, sinais ou
+  \item \textbf{Interrup\c{c}\~oes (30/100)}: h\'a IDT, \emph{stubs} para
+        exce\c{c}\~oes, PIC remapeado e PIT em IRQ0; faltam APIC, IRQ1,
+        IRQs esp\'urias, \emph{softirq}, workqueues e preemp\c{c}\~ao.
+  \item \textbf{Mem\'oria/heap (15/100)}: h\'a alocador de frames e demand
+        paging, mas n\~ao h\'a heap, slab, page cache ou \code{vmalloc}.
+  \item \textbf{Processos (5/100)}: h\'a um demo em ring 3 com TSS e
+        \code{int 0x80}, mas n\~ao h\'a \code{task\_struct},
+        scheduler, context switch, espa\c{c}os de endere\c{c}o separados,
+        sinais ou
         syscalls.
   \item \textbf{FS/rede (0/100)}: n\~ao h\'a VFS, block layer, TCP/IP,
         netfilter ou drivers de dispositivos.
@@ -189,18 +192,23 @@ do c\'odigo.
 Carregamento & Protocolo Linux + setup + descompress\~ao & Multiboot2 via GRUB \\
 Entrada inicial & \code{startup\_32}/\code{startup\_64} & \code{\_start} em assembly \\
 Modo longo & PAE + LME + \code{CR0.PG} & Mesma sequ\^encia, simplificada \\
-GDT & \code{gdt\_table}, \emph{per-CPU}, TSS & 3 descritores est\'aticos \\
-Pagina\c{c}\~ao & 4/5 n\'iveis, alocadores, \code{vmalloc} & 4 n\'iveis, 3 tabelas,
-2 MiB \emph{huge pages} \\
+GDT & \code{gdt\_table}, \emph{per-CPU}, TSS & 7 descritores, ring 3 e
+TSS/IST \\
+Pagina\c{c}\~ao & 4/5 n\'iveis, alocadores, \code{vmalloc} & 4 n\'iveis,
+2 MiB \emph{huge pages} + folhas 4 KiB sob demanda \\
 Console & \code{vgacon}, VT, \code{fbcon}, \code{printk} & \code{vga.rs},
 texto 80x25 \\
-Teclado & i8042 + serio + atkbd + input & 8042 por polling \\
+Teclado & i8042 + serio + atkbd + input & 8042 por polling (IRQ1 mascarada) \\
 Serial & 8250 + tty + termios & 16550 por polling \\
-Entrada & IRQ1/IRQ4, \emph{softirq}, workqueues & Polling no shell \\
-Tempo & PIT/APIC, \code{jiffies}, timers & Nenhum \\
-Mem\'oria & buddy, slab, \code{vmalloc}, page cache & Est\'atica, sem heap \\
-Processos & CFS/EEVDF, namespaces, cgroups & Nenhum \\
-Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & Nenhuma \\
+Entrada & IRQ1/IRQ4, \emph{softirq}, workqueues & IRQ0 (timer) + polling no
+shell + \code{int 0x80} \\
+Tempo & PIT/APIC, \code{jiffies}, timers & PIT a ~100 Hz, contador de
+\emph{ticks} \\
+Mem\'oria & buddy, slab, \code{vmalloc}, page cache & Bitmap de frames,
+demand paging; sem heap \\
+Processos & CFS/EEVDF, namespaces, cgroups & Demo em ring 3; sem scheduler \\
+Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} com
+\code{rax = 0} (exit) \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -235,9 +243,9 @@ Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & Nenhuma \\
 \textbf{Medida} & \textbf{Resultado} \\
 \midrule
 C\'odigo copiado & 0\% (implementa\c{c}\~ao independente) \\
-Linhas vs.\ 12 arquivos an\'alogos & $\approx 4{,}63\%$ \\
-Linhas vs.\ \'arvore Linux completa & $\approx 0{,}0027\%$ \\
-Similaridade funcional ponderada (10 dimens\~oes) & $\approx 13{,}5\%$ \\
+Linhas vs.\ 12 arquivos an\'alogos & $\approx 11{,}22\%$ \\
+Linhas vs.\ \'arvore Linux completa & $\approx 0{,}0066\%$ \\
+Similaridade funcional ponderada (10 dimens\~oes) & $\approx 21{,}1\%$ \\
 Cobertura de subsistemas do kernel completo & muito baixa; ordem de 1\% \\
 Similaridade conceitual no boot & alta (mesmos mecanismos x86) \\
 Similaridade conceitual em drivers & m\'edia/baixa (subconjunto por polling) \\
@@ -258,7 +266,7 @@ Em uma escala qualitativa:
         VGA, PS/2 e serial; baixo para entender o Linux como sistema
         operacional completo.
   \item \textbf{Nota de 0 a 10 para ``quanto do Linux foi reimplementado''}:
-        aproximadamente \textbf{1,4/10} na pontua\c{c}\~ao ponderada; menos de
+        aproximadamente \textbf{2,1/10} na pontua\c{c}\~ao ponderada; menos de
         \textbf{0,1/10} se o crit\'erio for o kernel completo em
         funcionalidades.
 \end{itemize}
@@ -268,8 +276,8 @@ Se o objetivo for estudar o Linux, este projeto serve como ``mapa do
 caminho inicial'': ele mostra, em c\'odigo pequeno, o que acontece antes de
 o kernel Linux come\c{c}ar a usar seus subsistemas. Se o objetivo for
 substituir o Linux, o projeto est\'a a v\'arias ordens de grandeza de
-dist\^ancia: faltam mem\'oria virtual completa, interrup\c{c}\~oes,
-processos, syscalls, drivers e seguran\c{c}a.
+dist\^ancia: faltam escalonador, espa\c{c}os de endere\c{c}o por processo,
+heap, sistema de arquivos, drivers e endurecimento de seguran\c{c}a.
 \end{nota}
 
 \section{Diferen\c{c}as essenciais}
@@ -283,15 +291,16 @@ processos, syscalls, drivers e seguran\c{c}a.
 \textbf{Aspecto} & \textbf{Linux} & \textbf{Rust VGA Kernel} \\
 \midrule
 Linguagem & C e assembly & Rust e assembly \\
-Tamanho & $\sim$38 milh\~oes de linhas & 1.035 linhas \\
+Tamanho & $\sim$38 milh\~oes de linhas & 2.500 linhas \\
 Modelo de boot & Protocolo pr\'oprio, setup, EFI & Multiboot2/GRUB \\
-Interrup\c{c}\~oes & IDT, PIC/APIC, timers & Nenhuma; polling \\
+Interrup\c{c}\~oes & IDT, PIC/APIC, timers & IDT, PIC/PIT; teclado em polling \\
 Concorr\^encia & SMP, preemp\c{c}\~ao, RCU & Uma CPU, sem preemp\c{c}\~ao \\
-Mem\'oria & Buddy, slab, VM, page cache & Est\'atica, 1 GiB mapeado \\
-Processos & Scheduler, namespaces, cgroups & Nenhum \\
+Mem\'oria & Buddy, slab, VM, page cache & Bitmap de frames, demand paging,
+sem heap \\
+Processos & Scheduler, namespaces, cgroups & Apenas demo em ring 3 \\
 Entrada/sa\'ida & VFS, block, net, tty & Portas de I/O diretas \\
-Seguran\c{c}a & Rings, SMEP/SMAP, KASLR, LSM & Ring 0 \'unico, sem
-prote\c{c}\~ao \\
+Seguran\c{c}a & Rings, SMEP/SMAP, KASLR, LSM & Rings 0/3 e U/S; sem NX,
+SMEP ou SMAP \\
 Portabilidade & V\'arias arquiteturas & Apenas x86\_64 BIOS \\
 Licen\c{c}a & GPL-2.0 & MIT/Apache-2.0 \\
 \bottomrule
