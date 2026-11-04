@@ -5,12 +5,25 @@
 //! tabela de applets. Os comandos de arquivo usam o ramfs de `ramfs.rs`.
 //!
 //! Nao ha pipes, redirecionamento, variaveis de ambiente, `fork` ou `exec`.
-//! Tudo roda no kernel, de forma sincrona, sem heap e sem escalonador.
+//! O shell roda como a tarefa de PID 1 de `task.rs`; tarefas de kernel podem
+//! ser criadas com `spawn` e sao escalonadas de forma preemptiva (round-robin
+//! com quantum de ticks).
 
-use crate::{arch, idt, paging, println, ramfs, tty, user};
+use core::sync::atomic::{AtomicU64, Ordering};
+
+use crate::{arch, heap, idt, paging, println, proc, ramfs, task, tty, user, vfs};
 
 const LINE_MAX: usize = 128;
 const MAX_ARGS: usize = 24;
+
+/// Fila de espera de demonstracao do applet `notify`, no estilo
+/// `wait_queue_head_t` do Linux. Workers criados com `spawn ... wait` dormem
+/// nela ate alguem sinalizar o evento.
+static EVENT_QUEUE: task::WaitQueue = task::WaitQueue::new();
+
+/// Contador monotonico de eventos. A condicao de `wait_event` compara o valor
+/// atual com o observado antes de dormir, evitando wakeups espurios.
+static EVENT_COUNT: AtomicU64 = AtomicU64::new(0);
 
 /// Um argumento dentro da linha ja desquotada pelo parser.
 #[derive(Clone, Copy)]
@@ -241,6 +254,54 @@ static APPLETS: &[Applet] = &[
         run: applet_free,
     },
     Applet {
+        name: "heap",
+        usage: "heap",
+        summary: "testa e mostra o heap do kernel",
+        run: applet_heap,
+    },
+    Applet {
+        name: "vfs",
+        usage: "vfs",
+        summary: "testa open/read/write/lseek/close do VFS",
+        run: applet_vfs,
+    },
+    Applet {
+        name: "filetest",
+        usage: "filetest",
+        summary: "abre e le /etc/motd em ring 3 via syscalls",
+        run: applet_filetest,
+    },
+    Applet {
+        name: "ps",
+        usage: "ps",
+        summary: "lista as tarefas do escalonador",
+        run: applet_ps,
+    },
+    Applet {
+        name: "tasks",
+        usage: "tasks",
+        summary: "alias de ps",
+        run: applet_ps,
+    },
+    Applet {
+        name: "spawn",
+        usage: "spawn [nome] [n] [sleep|wait|timeout]",
+        summary: "cria tarefas de kernel preemptivas, dormentes ou em wait queue",
+        run: applet_spawn,
+    },
+    Applet {
+        name: "sleep",
+        usage: "sleep [segundos]",
+        summary: "bloqueia o shell por N segundos (schedule_timeout)",
+        run: applet_sleep,
+    },
+    Applet {
+        name: "notify",
+        usage: "notify [one]",
+        summary: "acorda tarefas em wait queue (wake_up/_all)",
+        run: applet_notify,
+    },
+    Applet {
         name: "whoami",
         usage: "whoami",
         summary: "mostra o usuario da sessao",
@@ -333,8 +394,9 @@ pub fn run() -> ! {
             let byte = match tty::read_byte() {
                 Some(byte) => byte,
                 None => {
-                    // Sem interrupcoes, apenas cede a CPU por um instante.
-                    core::hint::spin_loop();
+                    // Bloqueia por um tick e volta a pollar em ~10 ms; sem
+                    // outra tarefa, o `hlt` interno evita busy-wait.
+                    task::idle();
                     continue;
                 }
             };
@@ -507,8 +569,28 @@ fn applet_ls(command: &Command<'_>) -> Result<(), &'static str> {
         }
     }
 
+    if proc::is_dir(path) {
+        list_proc(long);
+        return Ok(());
+    }
+    if let Some(entry) = proc::lookup(path) {
+        print_proc_entry(entry, long);
+        return Ok(());
+    }
+
     let fs = ramfs::lock();
     let index = fs.resolve(path)?;
+
+    // O diretorio `/proc` existe no ramfs como ponto de montagem, mas seus
+    // filhos sao virtuais. Reconhece tanto `ls /proc` quanto `cd /proc; ls`.
+    let mut absolute = [0u8; LINE_MAX];
+    let absolute_len = fs.path(index, &mut absolute)?;
+    if &absolute[..absolute_len] == b"/proc" {
+        drop(fs);
+        list_proc(long);
+        return Ok(());
+    }
+
     let node = fs.node(index);
 
     if !node.is_dir() {
@@ -523,6 +605,29 @@ fn applet_ls(command: &Command<'_>) -> Result<(), &'static str> {
         child = entry.next_sibling();
     }
     Ok(())
+}
+
+fn list_proc(long: bool) {
+    for (name, entry) in proc::FILES {
+        if long {
+            println!("- {:>6} {}", proc::size(*entry), name);
+        } else {
+            println!("{}", name);
+        }
+    }
+}
+
+fn print_proc_entry(entry: proc::Entry, long: bool) {
+    let name = proc::FILES
+        .iter()
+        .find(|(_, candidate)| *candidate == entry)
+        .map(|(name, _)| *name)
+        .unwrap_or("?");
+    if long {
+        println!("- {:>6} {}", proc::size(entry), name);
+    } else {
+        println!("{}", name);
+    }
 }
 
 fn print_entry(node: &ramfs::Node, long: bool) {
@@ -552,36 +657,49 @@ fn applet_cat(command: &Command<'_>) -> Result<(), &'static str> {
     }
 
     let mut line_number = 1u64;
+    let mut line_start = true;
+
     for index in start..command.len() {
         let path = command.arg(index).unwrap();
+        let fd = vfs::open(path, vfs::O_RDONLY)?;
         let mut buffer = [0u8; ramfs::DATA_MAX];
-        let len = {
-            let fs = ramfs::lock();
-            fs.read(path, &mut buffer)?
-        };
 
-        if !number {
-            tty::write_bytes(&buffer[..len]);
-            continue;
+        loop {
+            let len = match vfs::read(fd, &mut buffer) {
+                Ok(len) => len,
+                Err(reason) => {
+                    let _ = vfs::close(fd);
+                    return Err(reason);
+                }
+            };
+            if len == 0 {
+                break;
+            }
+
+            if !number {
+                tty::write_bytes(&buffer[..len]);
+                continue;
+            }
+
+            let mut offset = 0;
+            for (position, &byte) in buffer[..len].iter().enumerate() {
+                if line_start {
+                    crate::print!("{:>6}\t", line_number);
+                    line_number += 1;
+                    line_start = false;
+                }
+                if byte == b'\n' {
+                    tty::write_bytes(&buffer[offset..=position]);
+                    offset = position + 1;
+                    line_start = true;
+                }
+            }
+            if offset < len {
+                tty::write_bytes(&buffer[offset..len]);
+            }
         }
 
-        let mut offset = 0;
-        let mut line_start = true;
-        for (position, &byte) in buffer[..len].iter().enumerate() {
-            if line_start {
-                crate::print!("{:>6}\t", line_number);
-                line_number += 1;
-                line_start = false;
-            }
-            if byte == b'\n' {
-                tty::write_bytes(&buffer[offset..=position]);
-                offset = position + 1;
-                line_start = true;
-            }
-        }
-        if offset < len {
-            tty::write_bytes(&buffer[offset..len]);
-        }
+        let _ = vfs::close(fd);
     }
     Ok(())
 }
@@ -880,6 +998,67 @@ fn applet_free(command: &Command<'_>) -> Result<(), &'static str> {
     Ok(())
 }
 
+fn applet_heap(command: &Command<'_>) -> Result<(), &'static str> {
+    no_args(command)?;
+
+    let mut values: alloc::vec::Vec<u64> = alloc::vec::Vec::new();
+    for index in 0..32 {
+        values.push((index * index) as u64);
+    }
+
+    let mut text = alloc::string::String::new();
+    text.push_str("rinux heap");
+    let sum: u64 = values.iter().sum();
+
+    let stats = heap::stats();
+    println!(
+        "heap: {} itens, soma {}, texto \"{}\"",
+        values.len(),
+        sum,
+        text
+    );
+    println!(
+        "  mapeado: {} KiB, usado: {} B, alocacoes: {}",
+        stats.mapped / 1024,
+        stats.used,
+        stats.allocs
+    );
+    Ok(())
+}
+
+fn applet_vfs(command: &Command<'_>) -> Result<(), &'static str> {
+    no_args(command)?;
+
+    let fd = vfs::open(b"/etc/motd", vfs::O_RDONLY)?;
+    let mut buffer = [0u8; ramfs::DATA_MAX];
+    let read = vfs::read(fd, &mut buffer)?;
+    vfs::close(fd)?;
+
+    crate::print!("vfs: li {} bytes de /etc/motd: ", read);
+    tty::write_bytes(&buffer[..read]);
+
+    let fd = vfs::open(
+        b"/vfs.txt",
+        vfs::O_CREAT | vfs::O_TRUNC | vfs::O_RDWR,
+    )?;
+    let written = vfs::write(fd, b"arquivo criado via VFS\n")?;
+    vfs::lseek(fd, 0, vfs::SEEK_SET)?;
+    let read = vfs::read(fd, &mut buffer)?;
+    vfs::close(fd)?;
+
+    crate::print!("vfs: {} bytes escritos e relidos: ", written);
+    tty::write_bytes(&buffer[..read]);
+
+    let fd = vfs::open(b"/proc/version", vfs::O_RDONLY)?;
+    let read = vfs::read(fd, &mut buffer)?;
+    vfs::close(fd)?;
+    crate::print!("vfs: /proc/version: ");
+    tty::write_bytes(&buffer[..read]);
+
+    println!("vfs: descritores abertos agora: {}", vfs::open_count());
+    Ok(())
+}
+
 fn applet_whoami(command: &Command<'_>) -> Result<(), &'static str> {
     no_args(command)?;
     println!("root");
@@ -912,7 +1091,18 @@ fn applet_info(command: &Command<'_>) -> Result<(), &'static str> {
     println!("IDT:    256 portas; excecoes + IRQ0 (timer ~100 Hz)");
     println!("Memoria: paginas de 4 KiB, demand paging e frames fisicos");
     println!("RAMFS:  {} nos, {} bytes em arquivos", nodes, bytes);
+    let heap_stats = heap::stats();
+    println!(
+        "HEAP:   {} KiB mapeados, {} B em uso",
+        heap_stats.mapped / 1024,
+        heap_stats.used
+    );
     println!("Usuario: ring 3 com GDT/TSS, protecao U/S e int 0x80");
+    let tasks = task::stats();
+    println!(
+        "Tarefas: {} na tabela, {} prontas, {} dormindo, {} encerradas (escalonador preemptivo)",
+        tasks.total, tasks.ready, tasks.blocked, tasks.exited
+    );
     println!("Ticks do timer: {}", idt::ticks());
     Ok(())
 }
@@ -969,10 +1159,195 @@ fn applet_usertest(command: &Command<'_>) -> Result<(), &'static str> {
     Ok(())
 }
 
+fn applet_filetest(command: &Command<'_>) -> Result<(), &'static str> {
+    no_args(command)?;
+    match user::run_file() {
+        Ok(0) => println!("[USER] filetest concluido"),
+        Ok(status) => println!("[USER] filetest encerrado com status {}", status),
+        Err(reason) => println!("[USER] filetest: {}", reason),
+    }
+    Ok(())
+}
+
 fn applet_userprot(command: &Command<'_>) -> Result<(), &'static str> {
     no_args(command)?;
     user_demo(true);
     Ok(())
+}
+
+/// Tarefa de kernel usada pelo applet `spawn`. Ha um yield inicial, mas o
+/// laco seguinte nao cede a CPU: a pausa apenas espera ticks do timer, entao a
+/// intercalacao vem da preempcao.
+fn worker_task() {
+    let pid = task::current_pid();
+    println!("[task {}] inicio (kernel thread, ppid={})", pid, task::current_ppid());
+    task::yield_now();
+    for round in 1..=3 {
+        println!("[task {}] passo {}/3", pid, round);
+        let start = idt::ticks();
+        while idt::ticks().wrapping_sub(start) < 10 {
+            core::hint::spin_loop();
+        }
+    }
+    println!("[task {}] fim", pid);
+}
+
+/// Variante de `worker_task` que dorme de verdade entre os passos. Diferente
+/// do *busy-wait*, a tarefa sai da CPU (`Blocked`) e so volta quando o prazo
+/// do escalonador vence, deixando o shell livre para responder.
+fn sleeper_task() {
+    let pid = task::current_pid();
+    println!("[task {}] inicio (dorminhoco, ppid={})", pid, task::current_ppid());
+    for round in 1..=3 {
+        println!("[task {}] dormindo {}/3", pid, round);
+        task::sleep(30);
+        println!("[task {}] acordou {}/3", pid, round);
+    }
+    println!("[task {}] fim", pid);
+}
+
+/// Worker que dorme em uma fila de espera ate o applet `notify` sinalizar.
+/// Equivale a `wait_event` sobre uma condicao compartilhada.
+fn waiter_task() {
+    let pid = task::current_pid();
+    let seen = EVENT_COUNT.load(Ordering::Acquire);
+    println!("[task {}] esperando evento (wait_event)", pid);
+    EVENT_QUEUE.wait_event(|| EVENT_COUNT.load(Ordering::Acquire) != seen);
+    println!("[task {}] evento recebido", pid);
+}
+
+/// Worker que espera por evento com prazo, como `wait_event_timeout`.
+fn waiter_timeout_task() {
+    let pid = task::current_pid();
+    let seen = EVENT_COUNT.load(Ordering::Acquire);
+    println!(
+        "[task {}] esperando evento por 1 s (wait_event_timeout)",
+        pid
+    );
+    if EVENT_QUEUE.wait_event_timeout(100, || EVENT_COUNT.load(Ordering::Acquire) != seen) {
+        println!("[task {}] evento recebido antes do timeout", pid);
+    } else {
+        println!("[task {}] timeout: nenhum evento em 1 s", pid);
+    }
+}
+
+fn applet_ps(command: &Command<'_>) -> Result<(), &'static str> {
+    no_args(command)?;
+    println!("  PID  PPID  ESTADO      YIELDS  PREEMP  NOME");
+    task::for_each(|pid, ppid, state, name, yields, preemptions, current| {
+        let marker = if current { '*' } else { ' ' };
+        println!(
+            "{}{:>5} {:>5}  {:<11} {:>6}  {:>6}  {}",
+            marker,
+            pid,
+            ppid,
+            state.as_str(),
+            yields,
+            preemptions,
+            name
+        );
+    });
+    Ok(())
+}
+
+fn applet_spawn(command: &Command<'_>) -> Result<(), &'static str> {
+    const USAGE: &str = "uso: spawn [nome] [n] [sleep|wait|timeout]";
+    if command.len() > 4 {
+        return Err(USAGE);
+    }
+    let name = command.arg(1).unwrap_or(b"worker");
+    let count = match command.arg(2) {
+        Some(arg) => parse_decimal(arg).ok_or(USAGE)?.clamp(1, 8),
+        None => 1,
+    };
+    // Terceiro argumento opcional escolhe a entrada da tarefa: sem ele, o
+    // worker preemptivo de sempre; "sleep" bloqueia por prazo; "wait" e
+    // "timeout" bloqueiam em uma fila de espera acordada por `notify`.
+    let entry: fn() = match command.arg(3) {
+        None => worker_task,
+        Some(mode) if mode == b"sleep" => sleeper_task,
+        Some(mode) if mode == b"wait" => waiter_task,
+        Some(mode) if mode == b"timeout" => waiter_timeout_task,
+        Some(_) => return Err(USAGE),
+    };
+
+    for _ in 0..count {
+        let pid = task::spawn(name, entry)?;
+        println!(
+            "tarefa criada: pid={} nome={}",
+            pid,
+            core::str::from_utf8(name).unwrap_or("?")
+        );
+    }
+    Ok(())
+}
+
+/// Bloqueia o shell por `segundos` (1 tick = 10 ms a 100 Hz), demonstrando o
+/// caminho de `schedule_timeout`: durante a espera a tarefa nao consome CPU e
+/// o timer continua contando.
+fn applet_sleep(command: &Command<'_>) -> Result<(), &'static str> {
+    if command.len() > 2 {
+        return Err("uso: sleep [segundos]");
+    }
+    let seconds = match command.arg(1) {
+        Some(arg) => parse_decimal(arg).ok_or("uso: sleep [segundos]")?.clamp(1, 60),
+        None => 1,
+    };
+
+    let start = idt::ticks();
+    task::sleep(seconds as u64 * 100);
+    let elapsed = idt::ticks().wrapping_sub(start);
+    println!(
+        "dormiu {} ticks (~{} ms, pedido: {} s)",
+        elapsed,
+        elapsed * 10,
+        seconds
+    );
+    Ok(())
+}
+
+/// Sinaliza o evento global e acorda as tarefas bloqueadas na fila de espera.
+/// `notify one` usa `wake_up` (uma tarefa); sem argumento usa `wake_up_all`.
+fn applet_notify(command: &Command<'_>) -> Result<(), &'static str> {
+    const USAGE: &str = "uso: notify [one]";
+    if command.len() > 2 {
+        return Err(USAGE);
+    }
+    let only_one = match command.arg(1) {
+        None => false,
+        Some(arg) if arg == b"one" => true,
+        Some(_) => return Err(USAGE),
+    };
+
+    let waiting = EVENT_QUEUE.waiters();
+    let count = EVENT_COUNT.fetch_add(1, Ordering::AcqRel) + 1;
+    let woken = if only_one {
+        EVENT_QUEUE.wake_up_one()
+    } else {
+        EVENT_QUEUE.wake_up_all()
+    };
+    println!(
+        "evento #{} sinalizado; {} esperando, {} acordada(s) ({})",
+        count,
+        waiting,
+        woken,
+        if only_one { "wake_up" } else { "wake_up_all" }
+    );
+    Ok(())
+}
+
+fn parse_decimal(arg: &[u8]) -> Option<usize> {
+    if arg.is_empty() {
+        return None;
+    }
+    let mut value = 0usize;
+    for &byte in arg {
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        value = value.checked_mul(10)?.checked_add((byte - b'0') as usize)?;
+    }
+    Some(value)
 }
 
 fn applet_mem(command: &Command<'_>) -> Result<(), &'static str> {
@@ -1064,6 +1439,21 @@ fn memory_info() {
     println!("  livres   : {}", stats.free);
     println!("  page faults atendidos: {}", stats.faults);
     println!("  ticks do timer       : {}", idt::ticks());
+
+    let heap_stats = heap::stats();
+    println!("Heap do kernel:");
+    println!("  mapeado : {} KiB", heap_stats.mapped / 1024);
+    println!("  em uso  : {} B", heap_stats.used);
+    println!("  alocacoes: {}", heap_stats.allocs);
+
+    let tasks = task::stats();
+    println!("Escalonador de tarefas:");
+    println!("  na tabela: {}", tasks.total);
+    println!("  prontas  : {}", tasks.ready);
+    println!("  dormindo : {}", tasks.blocked);
+    println!("  encerradas: {}", tasks.exited);
+    println!("  criadas  : {}", tasks.spawned);
+    println!("  preempcoes: {}", tasks.preemptions);
 
     let user = paging::page_flags(paging::USER_CODE);
     let kernel = paging::page_flags(paging::KERNEL_VMA);

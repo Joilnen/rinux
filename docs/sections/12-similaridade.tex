@@ -26,7 +26,7 @@ The comparison uses as reference the Linux 7.3.1 tree present in
 
 \begin{itemize}
   \item physical lines of the 12 closest Linux files;
-  \item physical lines of the 12 Rust modules;
+  \item physical lines of the 19 Rust modules;
   \item features present, missing, and partial;
   \item hardware mechanisms used (Multiboot2, GDT, PAE, long mode,
         VGA text, 8042, UART 16550);
@@ -63,16 +63,26 @@ in Rust'' and the opposite conclusion that ``it has nothing to do with it''.
 \code{kernel/printk/printk.c} & 5,188 & macros + \code{tty.rs} \\
 \code{kernel/panic.c} & 1,274 & \emph{panic handler} in \code{main.rs} \\
 \code{init/main.c} & 1,706 & \code{kernel\_main} in \code{main.rs} \\
+\code{mm/slab\_common.c}, \code{mm/slub.c} & --- & \code{heap.rs} \\
+\code{fs/ramfs/inode.c} & --- & \code{ramfs.rs} \\
+\code{fs/open.c}, \code{fs/file\_table.c} & --- & \code{vfs.rs} \\
+\code{fs/proc/} & --- & \code{proc.rs} \\
+\code{kernel/sched/core.c} & --- & \code{task.rs} \\
+\code{arch/x86/entry/syscalls/syscall\_64.tbl} & --- & \code{syscall.rs} \\
 \midrule
-\textbf{Linux total (12 files)} & \textbf{22,352} & --- \\
-\textbf{Rust total (14 modules)} & \textbf{3,223} & --- \\
+\textbf{Linux total (first 12 files)} & \textbf{22,352} & --- \\
+\textbf{Rust total (19 modules)} & \textbf{6,797} & --- \\
 \bottomrule
 \end{longtable}
+
+The rows marked \code{---} extend the conceptual mapping after the heap, VFS,
+\code{/proc}, tasks and file syscalls were added; they are not part of the
+line-count comparison, which still uses the first twelve Linux files.
 
 The line ratio is:
 
 \[
-\frac{3{,}223}{22{,}352} \approx 14.42\%.
+\frac{6{,}797}{22{,}352} \approx 30.41\%.
 \]
 
 Relative to the complete Linux tree, which has approximately
@@ -80,11 +90,11 @@ Relative to the complete Linux tree, which has approximately
 the ratio is:
 
 \[
-\frac{3{,}223}{38{,}062{,}672} \approx 0.00847\%.
+\frac{6{,}797}{38{,}062{,}672} \approx 0.0179\%.
 \]
 
 \begin{atencao}[Lines of code do not measure similarity]
-The 12 Linux files do not have the same scope as the 14 Rust modules.
+The 12 Linux files do not have the same scope as the 19 Rust modules.
 \code{vgacon.c}, for example, supports several architectures, virtual
 consoles, and graphics modes; \code{vga.rs} implements only 80x25 text.
 Moreover, a large part of the Linux lines consists of comments,
@@ -113,27 +123,29 @@ Console and video & 15 & 100 & 25 & 3.75 \\
 Keyboard and input & 12 & 100 & 18 & 2.16 \\
 Serial and tty & 5 & 100 & 20 & 1.00 \\
 Interrupts and exceptions & 12 & 100 & 30 & 3.60 \\
-Physical memory and heap & 8 & 100 & 15 & 1.20 \\
-Processes, scheduler, and syscalls & 12 & 100 & 5 & 0.60 \\
-Files, networking, and other drivers & 6 & 100 & 0 & 0.00 \\
+Memory and heap & 8 & 100 & 25 & 2.00 \\
+Processes, scheduler, and syscalls & 12 & 100 & 30 & 3.60 \\
+Files, networking, and other drivers & 6 & 100 & 10 & 0.60 \\
 \midrule
-\textbf{Total} & \textbf{100} & --- & --- & \textbf{21.11} \\
+\textbf{Total} & \textbf{100} & --- & --- & \textbf{25.51} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The weighted index is \textbf{21.1\%}. It should be read as:
+The weighted index is \textbf{25.5\%}. It should be read as:
 
 \begin{quote}
-``Within the ten chosen dimensions, the project reproduces about 21.1\% of
+``Within the ten chosen dimensions, the project reproduces about 25.5\% of
 what Linux offers, with greater weight on boot, console, and keyboard.''
 \end{quote}
 
-It does not mean that 21.1\% of the Linux code was reimplemented. In
+It does not mean that 25.5\% of the Linux code was reimplemented. In
 number of subsystems and services, the fraction is much smaller: the
-project does not have, for example, any of the services that occupy most
-of the kernel (scheduler, complete virtual memory, VFS, networking, drivers,
-security, virtualization).
+project has only a first-fit heap, a timer-preemptive round-robin scheduler
+with a blocking \code{sleep} and event wait queues, an in-memory filesystem
+and a synthetic \code{/proc}, while Linux also has a buddy allocator, slab,
+CFS/EEVDF with real-time classes, a much richer wait queue and locking
+infrastructure, a full VFS with block devices, and networking.
 
 \subsection{Reading by dimension}
 
@@ -162,14 +174,22 @@ security, virtualization).
   \item \textbf{Interrupts (30/100)}: there is an IDT, \emph{stubs} for
         exceptions, a remapped PIC, and the PIT on IRQ0; APIC, IRQ1,
         spurious IRQs, \emph{softirq}, workqueues, and preemption are missing.
-  \item \textbf{Memory/heap (15/100)}: there is a frame allocator and demand
-        paging, but there is no heap, slab, page cache, or \code{vmalloc}.
-  \item \textbf{Processes (5/100)}: there are ring 3 demos and a login with
-        TSS and \code{int 0x80}, but there is no \code{task\_struct},
-        scheduler, context switch, separate address spaces,
-        signals, or a larger syscall table.
-  \item \textbf{FS/networking (0/100)}: there is no VFS, block layer, TCP/IP,
-        netfilter, or device drivers.
+  \item \textbf{Memory/heap (25/100)}: there is a frame bitmap allocator,
+        demand paging and a 1 MiB first-fit heap behind
+        \code{\#[global\_allocator]}, but there is no buddy allocator, slab,
+        page cache, \code{vmalloc}, swap or NUMA.
+  \item \textbf{Processes (30/100)}: there is a task table with PID/PPID and
+        states, a context switch that preserves \code{RFLAGS}, a
+        timer-preemptive round-robin scheduler with a five-tick quantum, a
+        blocking \code{sleep} with \code{schedule\_timeout} semantics, event
+        wait queues with \code{wait\_event}/\code{wait\_event\_timeout} and
+        \code{wake\_up}, and eleven syscalls; there is no
+        \code{fork}/\code{exec}/\code{wait}, separate address spaces, signals,
+        priorities or CFS/EEVDF.
+  \item \textbf{FS/networking (10/100)}: there is a ramfs, a VFS with sixteen
+        descriptors and a synthetic \code{/proc}, but there is no block layer,
+        disk driver, mount table, permission model, page cache, TCP/IP or
+        netfilter.
 \end{itemize}
 
 \section{Architectural similarity}
@@ -198,12 +218,17 @@ Serial & 8250 + tty + termios & 16550 by polling \\
 Input & IRQ1/IRQ4, \emph{softirq}, workqueues & IRQ0 (timer) + polling in the
 shell + \code{int 0x80} \\
 Time & PIT/APIC, \code{jiffies}, timers & PIT at ~100 Hz, tick
-counter \\
+counter, preemptive quantum \\
 Memory & buddy, slab, \code{vmalloc}, page cache & Frame bitmap,
-demand paging; no heap \\
-Processes & CFS/EEVDF, namespaces, cgroups & Ring 3 demo; no scheduler \\
+demand paging, first-fit heap \\
+Processes & CFS/EEVDF, namespaces, cgroups & Task table, preemptive
+round-robin, blocking \code{sleep} and wait queues; no \code{fork} or
+namespaces \\
 Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} with
-\code{exit/write/read/get\_tty} \\
+eleven calls (\code{exit}..\code{getppid}) \\
+Files & VFS, inodes, dentries, page cache & ramfs, 16 descriptors,
+synthetic \code{/proc}; no block layer \\
+Networking & sockets, TCP/IP, netfilter & Absent \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -238,13 +263,13 @@ Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} with
 \textbf{Measure} & \textbf{Result} \\
 \midrule
 Copied code & 0\% (independent implementation) \\
-Lines vs.\ 12 analogous files & $\approx 11.22\%$ \\
-Lines vs.\ complete Linux tree & $\approx 0.0066\%$ \\
-Weighted functional similarity (10 dimensions) & $\approx 21.1\%$ \\
-Coverage of complete kernel subsystems & very low; on the order of 1\% \\
+Lines vs.\ 12 analogous files & $\approx 30.41\%$ \\
+Lines vs.\ complete Linux tree & $\approx 0.0179\%$ \\
+Weighted functional similarity (10 dimensions) & $\approx 25.5\%$ \\
+Coverage of complete kernel subsystems & very low; on the order of 2\% \\
 Conceptual similarity in boot & high (same x86 mechanisms) \\
 Conceptual similarity in drivers & medium/low (polling subset) \\
-Conceptual similarity in services & none (no MM, scheduler, FS, networking) \\
+Conceptual similarity in services & low (basic MM, scheduler, VFS; no net) \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -261,7 +286,7 @@ On a qualitative scale:
         VGA, PS/2, and serial; low for understanding Linux as a complete
         operating system.
   \item \textbf{Score from 0 to 10 for ``how much of Linux was reimplemented''}:
-        approximately \textbf{2.1/10} on the weighted score; less than
+        approximately \textbf{2.5/10} on the weighted score; less than
         \textbf{0.1/10} if the criterion is the complete kernel in
         terms of features.
 \end{itemize}
@@ -270,9 +295,9 @@ On a qualitative scale:
 If the goal is to study Linux, this project serves as a ``map of the initial
 path'': it shows, in a small amount of code, what happens before the Linux
 kernel begins to use its subsystems. If the goal is to replace Linux, the
-project is several orders of magnitude away: it lacks a scheduler,
-per-process address spaces, heap, filesystem, drivers, and security
-hardening.
+project is several orders of magnitude away: it lacks CFS/EEVDF,
+\code{fork}/\code{exec}, per-process address spaces, a disk filesystem,
+networking, drivers, and security hardening.
 \end{nota}
 
 \section{Essential differences}
@@ -286,14 +311,16 @@ hardening.
 \textbf{Aspect} & \textbf{Linux} & \textbf{Rust VGA Kernel} \\
 \midrule
 Language & C and assembly & Rust and assembly \\
-Size & $\sim$38 million lines & 2,500 lines \\
+Size & $\sim$38 million lines & 6,797 lines \\
 Boot model & Proprietary protocol, setup, EFI & Multiboot2/GRUB \\
 Interrupts & IDT, PIC/APIC, timers & IDT, PIC/PIT; keyboard by polling \\
-Concurrency & SMP, preemption, RCU & One CPU, no preemption \\
+Concurrency & SMP, preemption, RCU & One CPU, timer-preemptive round-robin
+with blocking sleep and wait queues \\
 Memory & Buddy, slab, VM, page cache & Frame bitmap, demand paging,
-no heap \\
-Processes & Scheduler, namespaces, cgroups & Ring 3 demo only \\
-Input/output & VFS, block, net, tty & Direct I/O ports \\
+first-fit heap \\
+Processes & Scheduler, namespaces, cgroups & Task table, preemptive
+round-robin, wait queues; no namespaces \\
+Input/output & VFS, block, net, tty & ramfs, VFS, \code{/proc}, direct I/O ports \\
 Security & Rings, SMEP/SMAP, KASLR, LSM & Rings 0/3 and U/S; no NX,
 SMEP, or SMAP \\
 Portability & Several architectures & x86\_64 BIOS only \\

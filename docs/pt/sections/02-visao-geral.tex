@@ -10,17 +10,22 @@ p\'agina, ativa PAE e modo longo e salta para o c\'odigo Rust, ligado na metade
 alta em \code{0xFFFFFFFF80000000}.
 
 O c\'odigo Rust inicializa, nesta ordem, o renderizador VGA, a serial COM1, a
-camada TTY com oito consoles virtuais, o alocador de frames, a GDT com ring
-3/TSS, o teclado PS/2 e a IDT com PIC/PIT. Em seguida liga as
-interrup\c{c}\~oes, imprime um \emph{banner}, valida a assinatura Multiboot2 e
-entra no shell, que exibe o prompt \code{rinux>} no console ativo e processa
-comandos lidos do teclado ou da serial.
+camada TTY com oito consoles virtuais, o alocador de frames, o heap do kernel,
+o ramfs e o VFS, a GDT com ring 3/TSS, o teclado PS/2 e a IDT com PIC/PIT. Em
+seguida liga as interrup\c{c}\~oes, cria a tabela de tarefas com o shell como
+PID 1, imprime um \emph{banner}, valida a assinatura Multiboot2 e entra no
+shell, que exibe o prompt \code{rinux>} no console ativo e processa comandos
+lidos do teclado ou da serial.
 
-O sistema inteiro cabe em cerca de 95 KiB de ELF e 3.223 linhas de Rust
-(2.477 linhas efetivas de c\'odigo, sem coment\'arios e linhas em branco).
-N\~ao h\'a aloca\c{c}\~ao din\^amica de heap, escalonador ou sistema de
-arquivos; h\'a IDT, timer, \emph{demand paging}, oito consoles virtuais,
-quatro chamadas de sistema e um \code{getty}/login em ring 3.
+O sistema inteiro cabe em cerca de 250 KiB de ELF e 6.797 linhas de Rust
+(5.365 linhas efetivas de c\'odigo, sem coment\'arios e linhas em branco).
+Inclui um heap \emph{first-fit} atr\'as de \code{\#[global\_allocator]}, um VFS
+com dezesseis descritores sobre o ramfs e um \code{/proc} sint\'etico, um
+escalonador \emph{round-robin} preemptivo por timer com \code{sleep}
+bloqueante (\code{schedule\_timeout}) e filas de espera por evento
+(\code{wait\_event}/\code{wake\_up}), e onze chamadas de sistema. Ainda
+n\~ao h\'a \code{fork}/\code{exec}, espa\c{c}o de endere\c{c}os por processo
+nem sistema de arquivos em disco.
 
 \section{Funcionalidades}
 
@@ -48,15 +53,27 @@ Teclado & IRQ1, Caps Lock, AltGr, setas & Ausente \\
 Serial & COM1 16550, 38400 8N1 & Completo (subconjunto) \\
 Serial & Entrada pelo terminal do QEMU & Completo \\
 Shell & \code{help}, \code{clear}, \code{echo} & Completo \\
+Shell & \code{ls}, \code{cat}, \code{cp}, \code{mv}, \code{tree} & Completo \\
 Shell & \code{info}, \code{tty}, \code{getty} & Completo \\
 Shell & \code{reboot}, \code{halt} & Completo \\
 Sistema & Panic handler & Completo \\
 Sistema & IDT, exce\c{c}\~oes e IRQ0 (timer) & Completo (subconjunto) \\
 Sistema & GDT/TSS, ring 3 e prote\c{c}\~ao U/S & Completo (demo) \\
 Sistema & Syscalls \code{exit/write/read/get\_tty} & Completo (subconjunto) \\
+Sistema & Syscalls de arquivo \code{open/close/read/write/lseek} & Completo (subconjunto) \\
+Sistema & \code{getpid}/\code{getppid} vindos da tabela de tarefas & Completo \\
 Usu\'ario & \code{getty}/login em ring 3 & Completo (demo) \\
 Mem\'oria & Frames, p\'aginas 4 KiB e demand paging & Completo (subconjunto) \\
-Sistema & Heap, processos e scheduler & Ausente \\
+Mem\'oria & Heap do kernel, crate \code{alloc} e \code{Vec}/\code{String} & Completo (subconjunto) \\
+Armazenamento & Ramfs em mem\'oria (48 n\'os, arquivos de 1 KiB) & Completo (subconjunto) \\
+Armazenamento & VFS, 16 descritores e \code{lseek} & Completo (subconjunto) \\
+Armazenamento & \code{/proc} sint\'etico (version, uptime, meminfo, ps) & Completo (subconjunto) \\
+Processos & Tabela de tarefas, PID/PPID e estados & Completo (subconjunto) \\
+Processos & Escalonador \emph{round-robin} preemptivo por timer & Completo (subconjunto) \\
+Processos & \code{sleep} bloqueante (\code{schedule\_timeout}) & Completo (subconjunto) \\
+Processos & Filas de espera por evento (\code{wait\_event}/\code{wake\_up}) & Completo (subconjunto) \\
+Processos & \code{fork}/\code{exec}/\code{wait}, CFS/EEVDF & Ausente \\
+Armazenamento & Driver de disco, mounts e permiss\~oes & Ausente \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -105,14 +122,19 @@ Sistema & Heap, processos e scheduler & Ausente \\
 |   |-- gdt.rs              GDT definitiva, TSS e pilhas de privilegio
 |   |-- idt.rs              IDT, stubs, PIC, PIT e porta int 0x80
 |   |-- paging.rs           frames, tabelas 4 KiB e demand paging
+|   |-- heap.rs             heap do kernel e #[global_allocator]
+|   |-- ramfs.rs            sistema de arquivos em memoria
+|   |-- proc.rs             /proc virtual (uptime, meminfo, ps, ...)
+|   |-- vfs.rs              VFS minimo e tabela de descritores
+|   |-- task.rs             tarefas, escalonador, sleep e wait queues
 |   |-- user.rs             ring 3, demos e getty/login
-|   |-- syscall.rs          exit/write/read/get_tty
+|   |-- syscall.rs          exit/write/read/open/close/lseek/getpid
 |   |-- vga.rs              renderizador VGA 80x25
 |   |-- tty.rs              consoles virtuais tty0..tty7
 |   |-- keyboard.rs         teclado PS/2 (8042)
 |   |-- serial.rs           UART 16550 / COM1
 |   |-- shell.rs            prompt e comandos
-|   `-- sync.rs             spinlock do console
+|   `-- sync.rs             spinlocks (console, ramfs, heap, VFS, tarefas)
 |-- docs/                   esta documentacao (LaTeX e PDF)
 |-- build/                  arvore temporaria da ISO (gerada)
 |-- target/                 artefatos do Cargo (gerado)
@@ -130,28 +152,33 @@ Sistema & Heap, processos e scheduler & Ausente \\
 \toprule
 \textbf{M\'odulo} & \textbf{Linhas} & \textbf{Fun\c{c}\~oes} & \textbf{Responsabilidade} \\
 \midrule
-\code{boot.rs}     & 202 & 0 & Stub de boot e tabelas de p\'agina \\
-\code{keyboard.rs} & 271 & 10 & Driver PS/2 8042 \\
-\code{vga.rs}      &  74 & 5 & Renderizador VGA texto \\
-\code{tty.rs}      & 448 & 31 & Consoles virtuais e filas \\
-\code{shell.rs}    & 245 & 9 & Linha de comando e demos \\
-\code{main.rs}     & 119 & 2 & Entrada Rust, macros, panic \\
-\code{serial.rs}   &  70 & 5 & UART 16550 / COM1 \\
-\code{syscall.rs}  & 129 & 3 & exit/write/read/get\_tty \\
-\code{arch.rs}     &  69 & 5 & Portas de I/O, \code{sti}, halt, reboot \\
-\code{sync.rs}     &  56 & 5 & Spinlock \\
-\code{gdt.rs}      & 159 & 7 & GDT, TSS e pilhas de privil\'egio \\
-\code{idt.rs}      & 504 & 14 & IDT, PIC, PIT, exce\c{c}\~oes e IRQs \\
-\code{paging.rs}   & 559 & 23 & Frames, tabelas e demand paging \\
-\code{user.rs}     & 318 & 10 & Ring 3, demos e getty \\
+\code{boot.rs}     &  202 &  0 & Stub de boot e tabelas de p\'agina \\
+\code{arch.rs}     &  101 &  7 & Portas de I/O, \code{irqsave}, halt, reboot \\
+\code{gdt.rs}      &  159 &  6 & GDT, TSS e pilhas de privil\'egio \\
+\code{idt.rs}      &  507 & 14 & IDT, PIC, PIT, exce\c{c}\~oes e IRQs \\
+\code{paging.rs}   &  559 & 23 & Frames, tabelas e demand paging \\
+\code{heap.rs}     &  270 &  9 & Heap do kernel e alocador global \\
+\code{ramfs.rs}    &  534 & 31 & Sistema de arquivos em mem\'oria \\
+\code{proc.rs}     &  191 &  9 & \code{/proc} sint\'etico \\
+\code{vfs.rs}      &  302 & 11 & VFS e tabela de descritores \\
+\code{task.rs}     &  746 & 29 & Tarefas, escalonador, sleep e wait queues \\
+\code{user.rs}     &  446 &  9 & Ring 3, demos e getty \\
+\code{syscall.rs}  &  244 &  9 & Syscalls de arquivo e processo \\
+\code{vga.rs}      &   74 &  5 & Renderizador VGA texto \\
+\code{tty.rs}      &  448 & 31 & Consoles virtuais e filas \\
+\code{keyboard.rs} &  271 & 10 & Driver PS/2 8042 \\
+\code{serial.rs}   &   70 &  5 & UART 16550 / COM1 \\
+\code{shell.rs}    & 1468 & 61 & Linha de comando e applets \\
+\code{main.rs}     &  139 &  2 & Entrada Rust, macros, panic \\
+\code{sync.rs}     &   66 &  5 & Spinlocks seguros para IRQ \\
 \midrule
-\textbf{Total}     & \textbf{3.223} & \textbf{129} & 2.477 linhas efetivas de c\'odigo \\
+\textbf{Total}     & \textbf{6.797} & \textbf{276} & 5.365 linhas efetivas de c\'odigo \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{nota}[Sobre a contagem]
-A contagem inclui 351 linhas de coment\'ario e 395 linhas em branco. O n\'umero
+A contagem inclui 654 linhas de coment\'ario e 778 linhas em branco. O n\'umero
 de fun\c{c}\~oes inclui m\'etodos de \code{impl}, fun\c{c}\~oes \code{const}
 e fun\c{c}\~oes de trait (\code{Deref}, \code{DerefMut}, \code{Drop} e
 \code{fmt::Write}); n\~ao inclui declara\c{c}\~oes \code{extern} sem corpo.
@@ -169,9 +196,10 @@ e fun\c{c}\~oes de trait (\code{Deref}, \code{DerefMut}, \code{Drop} e
         GDT e ativa o modo longo.
   \item O stub salta para \code{kernel\_main(magic, info)} na metade alta.
   \item O Rust limpa a tela VGA, configura a serial, inicializa a camada TTY
-        com oito consoles virtuais, inicializa o alocador de frames e a
-        GDT/TSS, inicializa o teclado e instala a IDT com PIC/PIT.
-  \item O Rust liga as interrup\c{c}\~oes e o shell exibe \code{rinux>} no
-        console ativo, processando comandos at\'e \code{halt}, \code{reboot}
-        ou reset f\'isico.
+        com oito consoles virtuais, o alocador de frames, o heap do kernel, o
+        ramfs e o VFS, a GDT/TSS e o teclado, e instala a IDT com PIC/PIT.
+  \item O Rust liga as interrup\c{c}\~oes, cria a tabela de tarefas com o
+        shell como PID 1 e o shell exibe \code{rinux>} no console ativo,
+        processando comandos at\'e \code{halt}, \code{reboot} ou reset
+        f\'isico.
 \end{enumerate}

@@ -302,10 +302,12 @@ user read from a present, supervisor page.
 \begin{itemize}
   \item there are no separate address spaces per process: the
         user program uses the same PML4 as the kernel;
-  \item there is no scheduler or context switching; the timer only counts
-        \emph{ticks};
-  \item the only \emph{syscall} is \code{exit} (\code{rax = 0}); there is
-        no validation of user pointers;
+  \item preemption is disabled while a ring 3 program is active, because it
+        uses the shared TSS interrupt stack; there is no per-process kernel
+        stack or \code{fork};
+  \item the syscalls are the original four plus the file and PID calls;
+        user pointers are range-checked, but there is no
+        \code{copy\_from\_user} helper;
   \item SMEP/SMAP and NX are not yet enabled; the separation
         depends only on U/S;
   \item the keyboard remains in \emph{polling} and IRQ1 remains masked;

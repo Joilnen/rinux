@@ -22,22 +22,31 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+
 use core::panic::PanicInfo;
 
 mod arch;
 mod boot;
 mod gdt;
+mod heap;
 mod idt;
 mod keyboard;
 mod paging;
+mod proc;
 mod ramfs;
 mod serial;
 mod shell;
 mod sync;
 mod syscall;
+mod task;
 mod tty;
 mod user;
+mod vfs;
 mod vga;
+
+#[global_allocator]
+static ALLOCATOR: heap::KernelAllocator = heap::KernelAllocator;
 
 /// Imprime sem alocar memoria.
 #[macro_export]
@@ -79,15 +88,21 @@ pub extern "C" fn kernel_main(multiboot_magic: u32, multiboot_info: u32) -> ! {
     // 5. Ramfs didatico em memoria (sem heap) usado pelos applets do shell.
     ramfs::init();
 
-    // 6. GDT de 64 bits com segmentos de usuario e TSS.
+    // 6. Tabela de descritores do VFS (stdin/stdout/stderr no console).
+    vfs::init();
+
+    // 7. GDT de 64 bits com segmentos de usuario e TSS.
     gdt::init();
 
-    // 7. Teclado PS/2 (ainda por polling; IRQ1 fica mascarada).
+    // 8. Teclado PS/2 (ainda por polling; IRQ1 fica mascarada).
     keyboard::init();
 
-    // 8. IDT, PIC e timer. Depois disso as interrupcoes podem ser ligadas.
+    // 9. IDT, PIC e timer. Depois disso as interrupcoes podem ser ligadas.
     idt::init();
     arch::enable_interrupts();
+
+    // 10. Tabela de tarefas e escalonador preemptivo (tarefa do shell = PID 1).
+    task::init();
 
     println!();
     println!("==============================================================");

@@ -114,6 +114,7 @@ impl Fs {
         let _ = self.create(b"/etc", true);
         let _ = self.create(b"/home", true);
         let _ = self.create(b"/home/root", true);
+        let _ = self.create(b"/proc", true);
         let _ = self.create(b"/README", false);
         let _ = self.write(
             b"/README",
@@ -308,14 +309,76 @@ impl Fs {
     /// copiados (pode ser menor que o arquivo se `out` for pequeno).
     pub fn read(&self, path: &[u8], out: &mut [u8]) -> Result<usize, &'static str> {
         let index = self.resolve(path)?;
+        self.read_at(index, 0, out)
+    }
+
+    /// Le a partir de um deslocamento, como um `read(2)` de arquivo regular.
+    /// Um deslocamento no fim do arquivo devolve zero bytes.
+    pub fn read_at(
+        &self,
+        index: usize,
+        offset: usize,
+        out: &mut [u8],
+    ) -> Result<usize, &'static str> {
+        if index >= MAX_NODES || !self.nodes[index].used {
+            return Err("no invalido");
+        }
         let node = &self.nodes[index];
         if node.is_dir {
             return Err("e um diretorio");
         }
+        if offset >= node.len {
+            return Ok(0);
+        }
 
-        let len = node.len.min(out.len());
-        out[..len].copy_from_slice(&node.data[..len]);
+        let len = (node.len - offset).min(out.len());
+        out[..len].copy_from_slice(&node.data[offset..offset + len]);
         Ok(len)
+    }
+
+    /// Escreve a partir de um deslocamento, sem redimensionar o arquivo para
+    /// tras. Lacunas sao preenchidas com zero, como em um arquivo esparso.
+    pub fn write_at(
+        &mut self,
+        index: usize,
+        offset: usize,
+        data: &[u8],
+    ) -> Result<usize, &'static str> {
+        if index >= MAX_NODES || !self.nodes[index].used {
+            return Err("no invalido");
+        }
+        let node = &mut self.nodes[index];
+        if node.is_dir {
+            return Err("e um diretorio");
+        }
+        if offset > DATA_MAX || data.len() > DATA_MAX - offset {
+            return Err("arquivo cheio");
+        }
+        if offset > node.len {
+            for byte in &mut node.data[node.len..offset] {
+                *byte = 0;
+            }
+            node.len = offset;
+        }
+
+        node.data[offset..offset + data.len()].copy_from_slice(data);
+        if offset + data.len() > node.len {
+            node.len = offset + data.len();
+        }
+        Ok(data.len())
+    }
+
+    /// Trunca um arquivo para zero bytes.
+    pub fn truncate(&mut self, index: usize) -> Result<(), &'static str> {
+        if index >= MAX_NODES || !self.nodes[index].used {
+            return Err("no invalido");
+        }
+        let node = &mut self.nodes[index];
+        if node.is_dir {
+            return Err("e um diretorio");
+        }
+        node.len = 0;
+        Ok(())
     }
 
     /// Remove um arquivo ou diretorio. Diretorios nao vazios exigem

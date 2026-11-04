@@ -78,18 +78,18 @@ command works even when the system `cargo` is first in `PATH`.
 9. Shell and commands.
 10. Virtual memory, frame allocator, demand paging, GDT/TSS, IDT, PIC/PIT and
     ring 3 demos.
-11. Build, ISO, GRUB and execution in QEMU.
-12. Tests and execution evidence.
-13. Similarity with Linux, with weighted scoring and LOC comparison.
-14. Limitations, risks and roadmap.
-15. Appendices: catalog of the 96 functions, port/memory map, glossary and
+10. Build, ISO, GRUB and execution in QEMU.
+11. Tests and execution evidence.
+12. Similarity with Linux, with weighted scoring and LOC comparison.
+13. Limitations, risks and roadmap.
+14. Appendices: catalog of the 276 functions, port/memory map, glossary and
     references.
 
 ## Note on similarity
 
-The analysis in Chapter 13 estimates **≈21.1%** weighted functional similarity
+The analysis in Chapter 12 estimates **≈25.5%** weighted functional similarity
 across ten dimensions (boot, long mode, paging, console, keyboard, serial,
 interrupts, memory, processes and missing services). Compared with the complete
 Linux kernel, coverage is much smaller; in lines of code, the project has about
-**0.0066%** of the Linux tree used as reference. No code was copied from Linux:
+**0.0179%** of the Linux tree used as reference. No code was copied from Linux:
 the implementation is independent and written in Rust.

@@ -1,10 +1,15 @@
-//! Spinlock simples. O kernel roda com interrupcoes desligadas em uma unica
-//! CPU, mas o lock evita acesso concorrente ao console e deixa o codigo seguro
-//! para o dia em que interrupcoes forem habilitadas.
+//! Spinlock com desabilitacao de interrupcoes locais (estilo `irqsave`).
+//!
+//! Em uma unica CPU, desligar interrupcoes enquanto o lock esta preso impede
+//! que o timer tente preemptar uma tarefa que esta dentro da regiao critica.
+//! Sem isso, o tratador do timer poderia tentar adquirir a mesma trava e
+//! travar para sempre, pois a tarefa interrompida nao consegue libera-la.
 
 use core::cell::UnsafeCell;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, Ordering};
+
+use crate::arch;
 
 pub struct SpinLock<T> {
     locked: AtomicBool,
@@ -24,15 +29,19 @@ impl<T> SpinLock<T> {
     }
 
     pub fn lock(&self) -> SpinLockGuard<'_, T> {
+        // `irq_save` tambem e correto quando o lock e adquirido dentro de uma
+        // interrupcao: o valor salvo ja tem IF = 0 e sera restaurado assim.
+        let flags = arch::irq_save();
         while self.locked.swap(true, Ordering::Acquire) {
             core::hint::spin_loop();
         }
-        SpinLockGuard { lock: self }
+        SpinLockGuard { lock: self, flags }
     }
 }
 
 pub struct SpinLockGuard<'a, T> {
     lock: &'a SpinLock<T>,
+    flags: u64,
 }
 
 impl<T> Deref for SpinLockGuard<'_, T> {
@@ -52,5 +61,6 @@ impl<T> DerefMut for SpinLockGuard<'_, T> {
 impl<T> Drop for SpinLockGuard<'_, T> {
     fn drop(&mut self) {
         self.lock.locked.store(false, Ordering::Release);
+        arch::irq_restore(self.flags);
     }
 }

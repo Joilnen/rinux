@@ -3,15 +3,25 @@
 
 \section{Overview}
 
-The \code{src/shell.rs} implements a command-line terminal without dynamic
-allocation. It is not a POSIX shell and does not interpret pipes,
-redirections, variables, quotes, or scripts. It is a loop that:
+The \code{src/shell.rs} implements a BusyBox-style command line on top of the
+VFS, the ramfs, \code{/proc} and the task table. It is not a POSIX shell:
+it does not interpret pipes, redirections, environment variables or scripts,
+but it does parse quoted arguments and dispatches to a static applet table.
+
+The shell runs as task 1 of the preemptive scheduler. While it waits for a
+byte, it calls \code{task::idle}, which now blocks for one tick
+(\code{task::sleep(1)}) and polls the keyboard and serial port again about
+every 10 ms. With no other runnable task the CPU executes \code{hlt} instead
+of spinning, so the prompt stays responsive without burning the quantum.
+
+The main loop:
 
 \begin{enumerate}
   \item prints the \code{rinux> } prompt;
   \item reads bytes from the PS/2 keyboard or the serial port;
   \item echoes printable characters and handles Backspace;
-  \item upon receiving Enter, executes the command;
+  \item upon receiving Enter, parses the line into arguments and executes the
+        matching applet;
   \item returns to the beginning.
 \end{enumerate}
 
@@ -36,13 +46,13 @@ pub fn run() -> ! {
 
             let byte = match tty::read_byte() {
                 Some(byte) => byte,
-                None => { core::hint::spin_loop(); continue; }
+                None => { task::idle(); continue; }
             };
 
             match byte {
                 b'\n' | b'\r' => {
                     println!();
-                    execute(&line[..len]);
+                    execute(&mut line[..len]);
                     break;
                 }
                 0x08 | 0x7F => {
@@ -77,7 +87,8 @@ let mut len = 0usize;
 \end{lstlisting}
 
 When the line is full, new characters are silently ignored. There is no
-beep, error message, or dynamic growth.
+beep, error message, or dynamic growth. The parser dequotes in place inside
+the same buffer, so no allocation is needed.
 
 \subsection{Input and echo}
 
@@ -86,8 +97,8 @@ the COM1 serial port into the input queue of the active virtual console. It
 also interprets \code{Alt+F1}..\code{Alt+F8} as console switches. The shell
 then consumes bytes from the active console with \code{tty::read\_byte}.
 
-If no byte is available, the shell executes \code{spin\_loop()} and tries
-again. There is no \emph{sleep}, since the wait is implemented by polling.
+If no byte is available, the shell calls \code{task::idle()}, which yields to
+a ready task when one exists and otherwise spins. There is no \emph{sleep}.
 
 Printable characters (0x20 to 0x7E) are stored in the buffer and echoed to
 the console. Backspace (\code{0x08} or \code{0x7F}) decrements the length and
@@ -99,25 +110,36 @@ discarded and the shell prints a new prompt on the selected console.
 
 \section{Parsing}
 
-\subsection{Trim}
+\subsection{Argument spans}
 
-Before comparing, the line goes through \code{trim}, which removes ASCII
-whitespace at the beginning and end. The function returns a \emph{slice} of
-the line itself, without copying:
+\code{Command::parse} splits the line into at most 24 arguments
+(\code{MAX\_ARGS}). Each argument is stored as a pair of offsets
+(\code{Span}) into the same line buffer, and dequoting is done in place by
+writing behind the read cursor:
 
-\begin{lstlisting}[caption={Removal of whitespace at the edges.},label={lst:trim}]
-fn trim(bytes: &[u8]) -> &[u8] {
-    let start = bytes.iter()
-        .position(|byte| !byte.is_ascii_whitespace())
-        .unwrap_or(bytes.len());
-    let end = bytes.iter()
-        .rposition(|byte| !byte.is_ascii_whitespace())
-        .map_or(start, |index| index + 1);
-    &bytes[start..end]
+\begin{lstlisting}[caption={Argument parsing with quotes and escapes.},label={lst:parse}]
+struct Span { start: usize, end: usize }
+
+struct Command<'a> {
+    line: &'a [u8],
+    spans: [Span; MAX_ARGS],
+    count: usize,
 }
 \end{lstlisting}
 
-An empty line or one consisting only of spaces executes nothing.
+The rules are:
+
+\begin{itemize}
+  \item whitespace separates arguments and is collapsed;
+  \item single quotes preserve the literal text until the closing quote;
+  \item double quotes also allow \code{\textbackslash "} and
+        \code{\textbackslash \textbackslash};
+  \item outside quotes, \code{\textbackslash} escapes the next byte;
+  \item an unterminated quote is reported as \code{"aspas sem fechamento"};
+  \item more than 24 arguments is reported as \code{"argumentos demais"}.
+\end{itemize}
+
+An empty line, or one made only of spaces, executes nothing.
 
 \subsection{Text conversion}
 
@@ -125,45 +147,77 @@ An empty line or one consisting only of spaces executes nothing.
 accepts ASCII, in practice the conversion always succeeds for typed text; if
 it fails, it returns the fixed string \code{"<bytes invalidos>"}.
 
-\subsection{Commands}
+\subsection{Applet dispatch}
 
-Execution is a chain of \code{if}/\code{else if} comparisons. There is no
-dispatch table, argument \emph{parsing}, or syntax analysis.
+Execution is a lookup in the static \code{APPLETS} table, not a chain of
+comparisons. Each entry holds the name, usage, summary and a function pointer:
+
+\begin{lstlisting}[caption={Applet table entry.},label={lst:applet}]
+struct Applet {
+    name: &'static str,
+    usage: &'static str,
+    summary: &'static str,
+    run: fn(&Command<'_>) -> Result<(), &'static str>,
+}
+\end{lstlisting}
+
+\code{find\_applet} compares the first argument with the table and
+\code{execute} calls the function. An applet returns \code{Result}; on error
+the shell prints \code{name: reason}. Unknown commands produce two lines of
+message.
+
+\section{Commands}
 
 \begin{table}[H]
 \centering
-\caption{Implemented commands.}
+\caption{Main applets (see \code{help} for the full list).}
 \label{tab:comandos}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
 \textbf{Command} & \textbf{Effect} \\
 \midrule
-\code{help} & Lists the available commands. \\
+\code{help [comando]} & Lists the applets or shows one usage line. \\
+\code{echo [-n] [texto...]} & Prints the arguments separated by spaces. \\
 \code{clear} & Clears the active virtual console with \code{ESC[2J ESC[H}. \\
-\code{echo <texto>} & Prints the text after the first space. \\
-\code{info} & Shows kernel, TTY and input model information. \\
-\code{tty} & Shows the active virtual console. \\
-\code{tty [0..7]} & Switches to the selected virtual console. \\
-\code{getty} & Runs the ring 3 login on the active console. \\
-\code{getty [0..7]} & Switches console and runs the login there. \\
-\code{demand} & Exercises kernel demand paging. \\
-\code{usertest} & Runs the ring 3 demand paging demo. \\
-\code{userprot} & Attempts a kernel access from ring 3. \\
-\code{mem} & Shows frame, fault and U/S statistics. \\
-\code{reboot} & Restarts the PC via command \code{0xFE} to the 8042. \\
-\code{halt} & Prints a message and stops the CPU with \code{cli; hlt}. \\
+\code{pwd}, \code{cd}, \code{ls [-l]} & Walk the current directory of the ramfs. \\
+\code{cat [-n] <arquivo>...} & Reads files through the VFS; supports \code{/proc}. \\
+\code{mkdir}, \code{touch}, \code{write [-a]} & Create directories, create files
+and write or append text. \\
+\code{rm [-r]}, \code{rmdir}, \code{cp}, \code{mv} & Modify the ramfs tree. \\
+\code{tree [dir]} & Prints the directory tree. \\
+\code{uname [-asnrm]}, \code{uptime}, \code{free} & System and memory information. \\
+\code{heap} & Allocates a \code{Vec}/\code{String} and shows heap counters. \\
+\code{vfs} & Exercises \code{open/read/write/lseek/close} and reads
+\code{/proc/version}. \\
+\code{filetest} & Opens and reads \code{/etc/motd} from ring 3 via syscalls. \\
+\code{ps}, \code{tasks} & Lists PID, PPID, state, yields, preemptions and
+name of every task. \\
+\code{spawn [nome] [n] [sleep|wait|timeout]} & Creates up to eight kernel
+workers; the mode selects timed sleep, an event wait queue or a wait with
+timeout. \\
+\code{sleep [segundos]} & Blocks the shell with \code{schedule\_timeout}
+semantics. \\
+\code{notify [one]} & Signals the demo event queue; \code{one} wakes a single
+task (\code{wake\_up}) instead of all (\code{wake\_up\_all}). \\
+\code{whoami}, \code{hostname} & Show the session user and host name. \\
+\code{info} & Shows kernel, TTY, ramfs, heap and task statistics. \\
+\code{tty}, \code{getty} & Show or switch virtual consoles; run ring 3 login. \\
+\code{demand}, \code{usertest}, \code{userprot} & Demand paging and U/S demos. \\
+\code{mem} & Shows frame, heap and scheduler statistics. \\
+\code{reboot}, \code{halt} & Restart the PC or stop the CPU. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 \begin{nota}[Behavior details]
 \begin{itemize}
-  \item \code{echo} without an argument is not recognized as a command; only
-        \code{echo } followed by text matches the prefix.
-  \item \code{echo   ola} preserves the internal spaces after the
-        \code{"echo "} prefix; \emph{trim} removes only the edges.
+  \item \code{echo   ola} preserves the internal spacing only if it is quoted
+        or escaped; otherwise the parser collapses the whitespace.
   \item Comparison is case-sensitive: \code{HELP} does not work.
-  \item Unknown commands produce two lines of message.
+  \item \code{cat} uses \code{vfs::open/read/close}, so it works for the ramfs
+        and for \code{/proc}; errors close the descriptor.
+  \item \code{ls /proc} lists the synthetic entries, and \code{ls -l /proc}
+        shows their current sizes.
 \end{itemize}
 \end{nota}
 
@@ -179,12 +233,16 @@ TTY:    8 consoles virtuais, ativo = tty0 (Alt+F1..Alt+F8)
 Entrada: teclado PS/2 e serial COM1 (polling)
 IDT:    256 portas; excecoes + IRQ0 (timer ~100 Hz)
 Memoria: paginas de 4 KiB, demand paging e frames fisicos
+RAMFS:  17 nos, 186 bytes em arquivos
+HEAP:   4 KiB mapeados, 266 B em uso
 Usuario: ring 3 com GDT/TSS, protecao U/S e int 0x80
+Tarefas: 1 na tabela, 0 prontas, 0 dormindo, 0 encerradas (escalonador preemptivo)
 Ticks do timer: 366
 \end{lstlisting}
 
-Most lines are static; the active console number and the timer tick count are
-read at the moment the command runs.
+Most lines are static; the active console number, the ramfs usage, the heap
+counters, the task counters and the timer tick count are read at the moment
+the command runs.
 
 \section{Special commands}
 
@@ -202,29 +260,35 @@ ends up in \code{halt\_loop()}.
 
 \section{How to extend}
 
-To add a command:
+To add an applet:
 
 \begin{enumerate}
-  \item add an \code{else if line == b"meucomando"} branch in
-        \code{execute};
-  \item use \code{println!} for output;
-  \item if you need arguments, use \code{strip\_prefix} as in
-        \code{echo};
-  \item keep the command allocation-free and non-blocking;
-  \item update the \code{help} list and this documentation.
+  \item add an \code{Applet} entry to \code{APPLETS} with name, usage, summary
+        and function;
+  \item implement \code{fn applet\_x(command: \&Command<'\_>) -> Result<(),
+        \&'static str>};
+  \item read arguments with \code{command.arg(index)} and validate the count;
+  \item use \code{println!}, \code{tty::write\_bytes} or the VFS for output;
+  \item update the \code{help} list (it is generated from the table) and this
+        documentation.
 \end{enumerate}
 
 Example:
 
-\begin{lstlisting}[caption={Skeleton of a new command.},label={lst:novocomando}]
-} else if line == b"versao" {
+\begin{lstlisting}[caption={Skeleton of a new applet.},label={lst:novocomando}]
+fn applet_versao(command: &Command<'_>) -> Result<(), &'static str> {
+    no_args(command)?;
     println!("Rust VGA Kernel 0.1.0");
-} else if let Some(arg) = line.strip_prefix(b"upper ") {
-    for byte in arg {
-        crate::print!("{}", byte.to_ascii_uppercase() as char);
-    }
-    println!();
+    Ok(())
 }
+
+// and, in APPLETS:
+Applet {
+    name: "versao",
+    usage: "versao",
+    summary: "mostra a versao do kernel",
+    run: applet_versao,
+},
 \end{lstlisting}
 
 \section{Limitations}
@@ -232,10 +296,13 @@ Example:
 \begin{itemize}
   \item No history, arrows, Ctrl+C, Ctrl+D, or editing in the middle of the
         line.
-  \item No quotes, escaping, pipes, redirection, or variables.
-  \item No structured arguments: each command decides how to interpret the
-        remainder.
-  \item No program execution: there is no \emph{loader} or processes.
+  \item No pipes, redirection, variables, globbing, or scripts.
+  \item No program execution: there is no \emph{loader}, \code{fork} or
+        \code{exec}; applets are kernel functions.
+  \item Tasks are timer-preemptive kernel threads and share the kernel
+        address space; preemption is suspended during ring 3 programs. Sleep
+        and event wait queues exist, but there are no signals, priorities or
+        per-task address spaces.
   \item No UTF-8 translation: typed accents may become \code{?}.
   \item The line is limited to 128 bytes and excess is silently discarded.
 \end{itemize}

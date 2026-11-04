@@ -12,22 +12,34 @@
 \textbf{\'Area} & \textbf{Limita\c{c}\~ao e consequ\^encia} \\
 \midrule
 Interrup\c{c}\~oes & IDT com 256 portas, PIC remapeado e timer IRQ0. IRQ1
-do teclado continua mascarada; n\~ao h\'a APIC, SMP nem preemp\c{c}\~ao. \\
-Mem\'oria & Alocador de frames e p\'aginas de 4 KiB sob demanda. Sem heap;
-n\~ao h\'a \code{Vec}, \code{String} nem buffers din\^amicos. \\
-Processos & Sem scheduler, context switch ou espa\c{c}os de endere\c{c}o
-separados. Os programas em ring 3 n\~ao s\~ao processos; h\'a apenas quatro
-syscalls (\code{exit/write/read/get\_tty}). \\
-Armazenamento & Sem VFS, block layer, FAT, ext2 ou qualquer sistema de
-arquivos. A ISO \'e s\'o o meio de boot. \\
+do teclado continua mascarada; n\~ao h\'a APIC nem SMP, e a IRQ0 alimenta o
+escalonador preemptivo. \\
+Mem\'oria & Alocador de frames, p\'aginas de 4 KiB sob demanda e um heap
+\emph{first-fit} de 1 MiB com \code{Vec}/\code{String}. Sem slab ou buddy
+allocator, sem swap, sem reclaim e sem NUMA. \\
+Processos & Tabela de tarefas, PID/PPID, troca de contexto, escalonador
+\emph{round-robin} preemptivo por timer com quantum de cinco ticks,
+\code{sleep} bloqueante (\code{schedule\_timeout}) e filas de espera por
+evento (\code{wait\_event}/\code{wake\_up}). N\~ao h\'a
+\code{fork}/\code{exec}/\code{wait}, CFS/EEVDF, prioridades nem espa\c{c}o de
+endere\c{c}o por processo; os programas em ring 3 ainda n\~ao s\~ao processos
+escalonados. Onze syscalls
+(\code{exit/write/read/get\_tty/open/close/read\_fd/write\_fd/lseek/
+getpid/getppid}). \\
+Armazenamento & VFS com dezesseis descritores sobre o ramfs em mem\'oria e um
+\code{/proc} sint\'etico. Sem driver de disco, block layer, mounts,
+permiss\~oes, page cache, FAT ou ext2; a ISO \'e s\'o o meio de boot. \\
 Rede & Sem pilha TCP/IP, netdevice ou drivers de rede. \\
 V\'ideo & Apenas VGA texto legado. UEFI sem CSM, GPUs e modos gr\'aficos
 n\~ao s\~ao suportados. \\
 Entrada & Teclado PS/2 por polling, sem USB-HID nativo, Caps Lock, AltGr,
 setas ou layout ABNT2. \\
 Serial & Apenas COM1, polling, sem IRQ, DMA ou controle de fluxo. \\
-Concorr\^encia & Uma CPU; o timer incrementa \emph{ticks} mas n\~ao
-preempta. O spinlock n\~ao desabilita interrup\c{c}\~oes. \\
+Concorr\^encia & Uma CPU; o escalonador \'e preemptivo por timer com quantum de
+cinco ticks, \code{sleep} bloqueante e filas de espera por evento, mas a
+preemp\c{c}\~ao fica suspensa enquanto um programa de ring 3 est\'a ativo. Os
+spinlocks usam \code{irqsave}, ent\~ao a tabela de tarefas \'e segura contra a
+IRQ0. \\
 Seguran\c{c}a & U/S separa usu\'ario e kernel, mas n\~ao h\'a ASLR, NX,
 SMEP/SMAP, \emph{stack canary} nem espa\c{c}os de endere\c{c}o por processo.
 Ponteiros do usu\'ario s\~ao validados por intervalo, mas n\~ao h\'a um
@@ -81,21 +93,21 @@ adicionar complexidade.
 \toprule
 \textbf{Prior.} & \textbf{Item} & \textbf{Objetivo} \\
 \midrule
-1 & Processos e syscalls & \code{task\_struct}, scheduler round-robin,
-espa\c{c}os de endere\c{c}o separados e uma tabela de syscalls maior. \\
-2 & Robustez de IRQ e teclado & IRQ1 com buffer de scancodes, \code{irqsave}
-no console e trata\-mento de IRQs esp\'urias. \\
-3 & Heap simples & \code{alloc} + alocador de blocos; habilitar
-\code{Vec}/\code{String}. \\
-4 & Framebuffer GOP/VBE & Suporte a UEFI e modos gr\'aficos; fonte bitmap. \\
+1 & Prioridades e sinais & Classes de escalonamento ponderadas e entrega de
+sinais (al\'em de pilhas de kernel por tarefa para ring 3). \\
+2 & Processos de verdade & \code{fork}/\code{exec}/\code{wait}, tabelas de
+p\'agina por processo e tarefas de ring 3 escalonadas pelo kernel. \\
+3 & VFS e sistema de arquivos & Inodes, dentries, mounts e permiss\~oes;
+driver de disco e initramfs. \\
+4 & Robustez de IRQ e teclado & IRQ1 com buffer de scancodes e tratamento de
+IRQs esp\'urias. \\
 5 & Disciplina de linha TTY & Modo can\^onico, sinais, controle de jobs,
 \code{Ctrl+C}/\code{Ctrl+D} e um \code{getty} por console. \\
-6 & Driver de teclado completo & USB-HID, Caps Lock, AltGr, layout ABNT2,
-teclas estendidas. \\
+6 & Framebuffer GOP/VBE & Suporte a UEFI e modos gr\'aficos; fonte bitmap. \\
 7 & Endurecimento de mem\'oria & NX, SMEP/SMAP, valida\c{c}\~ao de ponteiros
 de usu\'ario e ASLR. \\
-8 & Sistema de arquivos & Leitura de FAT ou initramfs; \emph{loader} de
-programas. \\
+8 & Driver de teclado completo & USB-HID, Caps Lock, AltGr, layout ABNT2,
+teclas estendidas. \\
 9 & Rede & NE2000/virtio-net, ARP/IP/ICMP/UDP, testes com QEMU. \\
 10 & Testes automatizados & CI com QEMU headless, dumps VGA e asserts. \\
 \bottomrule
@@ -110,13 +122,13 @@ de um sistema operacional utiliz\'avel, ainda faltam, no m\'inimo:
 
 \begin{itemize}
   \item isolamento de processos e espa\c{c}o de usu\'ario por processo;
-  \item escalonador e preemp\c{c}\~ao;
-  \item aloca\c{c}\~ao din\^amica de mem\'oria (heap);
-  \item sistema de arquivos e \emph{loader};
+  \item prioridades de escalonamento, sinais e pilhas de kernel por tarefa para
+        ring 3 (sleep e filas de espera por evento j\'a existem);
+  \item sistema de arquivos persistente e \emph{loader} de programas;
   \item drivers de entrada/sa\'ida al\'em de VGA/PS/2/serial;
   \item tratamento de erros e recupera\c{c}\~ao.
 \end{itemize}
 
 O projeto atual \'e melhor classificado como \textbf{kernel monol\'itico
-m\'inimo de demonstra\c{c}\~ao}, focado em boot, mem\'oria, interrup\c{c}\~oes
-e console.
+m\'inimo de demonstra\c{c}\~ao}, focado em boot, mem\'oria,
+interrup\c{c}\~oes, arquivos, tarefas e console.

@@ -12,22 +12,33 @@
 \textbf{Area} & \textbf{Limitation and consequence} \\
 \midrule
 Interrupts & IDT with 256 gates, remapped PIC, and IRQ0 timer. The keyboard's
-IRQ1 remains masked; there is no APIC, SMP, or preemption. \\
-Memory & Frame allocator and 4 KiB pages on demand. No heap;
-there is no \code{Vec}, \code{String}, or dynamic buffers. \\
-Processes & No scheduler, context switch, or separate address
-spaces. The ring 3 programs are not processes; there are only four
-syscalls (\code{exit/write/read/get\_tty}). \\
-Storage & No VFS, block layer, FAT, ext2, or any filesystem.
-The ISO is only the boot medium. \\
+IRQ1 remains masked; there is no APIC or SMP, and IRQ0 drives the preemptive
+scheduler. \\
+Memory & Frame allocator, 4 KiB pages on demand, and a 1 MiB first-fit kernel
+heap with \code{Vec}/\code{String}. No slab or buddy allocator, no swap, no
+reclaim, and no NUMA. \\
+Processes & Task table, PID/PPID, context switch, a timer-preemptive
+round-robin scheduler with a five-tick quantum, blocking \code{sleep}
+(\code{schedule\_timeout}) and event wait queues
+(\code{wait\_event}/\code{wake\_up}). There is no
+\code{fork}/\code{exec}/\code{wait}, no CFS/EEVDF, no priorities and no
+per-process address space; the ring 3 programs are still not scheduled
+processes. Eleven syscalls
+(\code{exit/write/read/get\_tty/open/close/read\_fd/write\_fd/lseek/getpid/
+getppid}). \\
+Storage & VFS with sixteen descriptors over the in-memory ramfs and a synthetic
+\code{/proc}. No disk driver, block layer, mounts, permissions, page cache,
+FAT, or ext2; the ISO is only the boot medium. \\
 Networking & No TCP/IP stack, netdevice, or network drivers. \\
 Video & Legacy VGA text only. UEFI without CSM, GPUs, and graphics
 modes are not supported. \\
 Input & PS/2 keyboard by polling, with no native USB-HID, Caps Lock, AltGr,
 arrow keys, or ABNT2 layout. \\
 Serial & COM1 only, polling, no IRQ, DMA, or flow control. \\
-Concurrency & One CPU; the timer increments \emph{ticks} but does not
-preempt. The spinlock does not disable interrupts. \\
+Concurrency & One CPU; the scheduler is timer-preemptive with a five-tick
+quantum, a blocking \code{sleep} and event wait queues, but preemption is
+suspended while a ring 3 program is active. The spinlocks use \code{irqsave},
+so the task table is safe against IRQ0. \\
 Security & U/S separates user and kernel, but there is no ASLR, NX,
 SMEP/SMAP, \emph{stack canary}, or per-process address spaces. User pointers
 are range-checked, but there is no \code{copy\_from\_user}-style helper. \\
@@ -80,21 +91,21 @@ adding complexity.
 \toprule
 \textbf{Prior.} & \textbf{Item} & \textbf{Goal} \\
 \midrule
-1 & Processes and syscalls & \code{task\_struct}, round-robin scheduler,
-separate address spaces, and a larger syscall table. \\
-2 & IRQ and keyboard robustness & IRQ1 with a scancode buffer, \code{irqsave}
-in the console, and handling of spurious IRQs. \\
-3 & Simple heap & \code{alloc} + block allocator; enable
-\code{Vec}/\code{String}. \\
-4 & GOP/VBE framebuffer & Support for UEFI and graphics modes; bitmap font. \\
+1 & Priorities and signals & Weighted scheduling classes and signal delivery
+(plus per-task kernel stacks for scheduled ring 3 tasks). \\
+2 & Real processes & \code{fork}/\code{exec}/\code{wait}, per-process page
+tables, and ring 3 tasks scheduled by the kernel. \\
+3 & VFS and filesystem & Inodes, dentries, mounts and permissions; a disk
+driver and an initramfs. \\
+4 & IRQ and keyboard robustness & IRQ1 with a scancode buffer and handling of
+spurious IRQs. \\
 5 & TTY line discipline & Canonical mode, signals, job control,
 \code{Ctrl+C}/\code{Ctrl+D} and one \code{getty} per console. \\
-6 & Complete keyboard driver & USB-HID, Caps Lock, AltGr, ABNT2 layout,
-extended keys. \\
+6 & GOP/VBE framebuffer & Support for UEFI and graphics modes; bitmap font. \\
 7 & Memory hardening & NX, SMEP/SMAP, validation of user
 pointers, and ASLR. \\
-8 & Filesystem & Reading FAT or initramfs; program
-\emph{loader}. \\
+8 & Complete keyboard driver & USB-HID, Caps Lock, AltGr, ABNT2 layout,
+extended keys. \\
 9 & Networking & NE2000/virtio-net, ARP/IP/ICMP/UDP, tests with QEMU. \\
 10 & Automated tests & CI with headless QEMU, VGA dumps, and asserts. \\
 \bottomrule
@@ -109,13 +120,13 @@ of a usable operating system, the following are still missing, at a minimum:
 
 \begin{itemize}
   \item process isolation and a per-process user space;
-  \item scheduler and preemption;
-  \item dynamic memory allocation (heap);
-  \item filesystem and \emph{loader};
+  \item scheduling priorities, signals and per-task kernel stacks for ring 3
+        tasks (blocking sleep and event wait queues already exist);
+  \item a persistent filesystem and a program \emph{loader};
   \item input/output drivers beyond VGA/PS/2/serial;
   \item error handling and recovery.
 \end{itemize}
 
 The current project is best classified as a \textbf{minimal monolithic
-demonstration kernel}, focused on boot, memory, interrupts,
+demonstration kernel}, focused on boot, memory, interrupts, files, tasks,
 and console.

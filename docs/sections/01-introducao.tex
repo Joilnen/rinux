@@ -38,7 +38,7 @@ This documentation has four objectives:
   \item \textbf{Document the main functions} of each module, including
         contracts, preconditions, side effects and limitations.
         Appendix~\ref{ap:funcoes} contains the complete catalog of the
-        project's 129 functions.
+        project's 276 functions.
   \item \textbf{Record the build, execution and validation process}, so that
         another person can reproduce the environment and the tests.
   \item \textbf{Compare the project with the Linux kernel}, presenting
@@ -65,7 +65,15 @@ This documentation has four objectives:
   \item PS/2 keyboard driver by \emph{polling}, with Shift, Enter, Tab and
         Backspace.
   \item UART 16550 driver on COM1, used for debugging and input.
-  \item Shell without dynamic allocation with ten commands.
+  \item Shell with quoted-argument parsing and 37 applets, dispatched through
+        a static table.
+  \item Kernel heap behind \code{\#[global\_allocator]}, with \code{Vec} and
+        \code{String}.
+  \item 48-node ramfs, a VFS with sixteen descriptors and a synthetic
+        \code{/proc}.
+  \item Task table with PID/PPID states, a timer-preemptive round-robin
+        scheduler, blocking \code{sleep} with \code{schedule\_timeout}
+        semantics and event wait queues (\code{wait\_event}/\code{wake\_up}).
   \item \emph{Panic handler} that prints the failure and halts the CPU.
   \item Reproducible build with Cargo, \code{ld.lld}, \code{grub-mkrescue}
         and QEMU.
@@ -74,13 +82,13 @@ This documentation has four objectives:
 \subsection*{What is not included}
 
 \begin{itemize}
-  \item Heap, object allocator, \code{alloc} or dynamic collections.
-  \item Complete processes, threads, scheduler, context switching, per-process
-        address spaces or a broad set of system calls.
-  \item Filesystem, networking, USB, ACPI, SMP or native UEFI support.
+  \item \code{fork}/\code{exec}/\code{wait}, per-process address spaces,
+        signals, CFS/EEVDF or a broad set of system calls.
+  \item Persistent disk filesystem, block layer, mounts, networking, USB,
+        ACPI, SMP or native UEFI support.
   \item Drivers for video modes other than the legacy VGA text mode.
-  \item Security hardening such as SMEP, SMAP, NX, KASLR or validation of
-        user pointers.
+  \item Security hardening such as SMEP, SMAP, NX or KASLR; user pointers are
+        only range-checked.
 \end{itemize}
 
 \section{Target audience}

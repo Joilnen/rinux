@@ -295,3 +295,208 @@ diretamente. \\
   \item \code{read} espera com interrup\c{c}\~oes desligadas; o timer congela
         durante um prompt de login.
 \end{itemize}
+
+\section{Heap do kernel}
+
+\code{src/heap.rs} adiciona o alocador din\^amico que faltava. O heap fica em
+\code{0xFFFFFFFFE0000000}, em um PDPT separado da imagem do kernel e das
+regi\~oes de demand paging, e registra um \code{\#[global\_allocator]} para que
+\code{alloc::vec::Vec}, \code{alloc::string::String} e o restante da crate
+\code{alloc} funcionem dentro do kernel.
+
+O alocador \'e uma lista encadeada \emph{first-fit} com um cabe\c{c}alho de 16
+bytes imediatamente antes do ponteiro devolvido:
+
+\begin{lstlisting}[caption={Cabe\c{c}alho de bloco e n\'o da lista livre.},label={lst:heapblockpt}]
+#[repr(C, align(16))]
+struct Block {
+    size: usize,
+    next: *mut Block,
+}
+\end{lstlisting}
+
+Os blocos ficam em ordem de endere\c{c}o e s\~ao coalescidos quando vizinhos
+est\~ao livres. Quando a lista n\~ao atende um pedido, o heap cresce uma
+p\'agina de 4 KiB por vez com \code{paging::alloc\_frame} e
+\code{paging::map\_page}. O limite \'e 1 MiB (256 p\'aginas). N\~ao h\'a slab,
+buddy allocator, cache por CPU nem NUMA; o objetivo \'e explicar a interface e
+o caminho de crescimento. O applet \code{heap} aloca um \code{Vec<u64>} e uma
+\code{String} e mostra os contadores de mem\'oria mapeada, usada e
+aloca\c{c}\~oes.
+
+\section{VFS e descritores de arquivo}
+
+\code{src/vfs.rs} introduz os dois objetos centrais de uma camada de arquivos
+Unix: a descri\c{c}\~ao de arquivo aberto (aqui uma entrada com deslocamento e
+flags) e o descritor, um \'indice em uma tabela fixa de 16 entradas. Os
+descritores 0, 1 e 2 s\~ao pr\'e-abertos no console; \code{/dev/tty} e
+\code{/dev/console} s\~ao aceitos como caminhos de console.
+
+As flags e constantes de seek espelham a ABI do Linux:
+
+\begin{lstlisting}[caption={Subconjunto das constantes do VFS.},label={lst:vfsflagspt}]
+pub const O_RDONLY: u64 = 0;
+pub const O_WRONLY: u64 = 1;
+pub const O_RDWR:   u64 = 2;
+pub const O_CREAT:  u64 = 0x40;
+pub const O_TRUNC:  u64 = 0x200;
+pub const O_APPEND: u64 = 0x400;
+pub const SEEK_SET: u64 = 0;
+pub const SEEK_CUR: u64 = 1;
+pub const SEEK_END: u64 = 2;
+\end{lstlisting}
+
+\code{open}, \code{close}, \code{read}, \code{write} e \code{lseek} s\~ao
+implementados sobre o ramfs, o console e o \code{/proc}. Leituras atualizam o
+deslocamento; \code{O\_APPEND} recalcula o fim do arquivo a cada escrita;
+\code{lseek} aceita \code{SEEK\_SET}, \code{SEEK\_CUR} e \code{SEEK\_END}.
+Ainda n\~ao h\'a inodes, dentries, mounts, permiss\~oes ou page cache, e a
+tabela \'e global, n\~ao por processo.
+
+\section{O pseudo-sistema /proc}
+
+\code{src/proc.rs} implementa um sistema de arquivos sint\'etico. Nada \'e
+armazenado: cada leitura formata o estado atual do kernel em um buffer fixo de
+2 KiB e copia a fatia pedida de acordo com o deslocamento do descritor. Os
+arquivos dispon\'iveis s\~ao:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Caminho} & \textbf{Conte\'udo} \\
+\midrule
+\code{/proc/version} & vers\~ao, arquitetura e \code{\#1 SMP} \\
+\code{/proc/uptime}  & segundos e cent\'esimos a partir dos ticks do PIT \\
+\code{/proc/meminfo} & contadores de frames, heap e tarefas \\
+\code{/proc/ps}      & tabela de tarefas no formato do applet \code{ps} \\
+\code{/proc/cpuinfo} & uma pequena descri\c{c}\~ao est\'atica da CPU \\
+\code{/proc/mounts}  & linhas de ramfs, proc e devtmpfs \\
+\code{/proc/cmdline} & linha de comando do boot \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\code{cat /proc/ps}, \code{ls -l /proc} e o applet \code{vfs} exercitam o mesmo
+caminho de c\'odigo usado pelas syscalls de ring 3. N\~ao h\'a
+\code{seq\_file}, \code{proc\_dir\_entry}, checagem de permiss\~ao nem
+namespace.
+
+\section{Tarefas e escalonador preemptivo}
+
+\code{src/task.rs} adiciona PID/PPID, estados de tarefa e um escalonador
+\emph{round-robin}. O shell \'e a tarefa 1 e roda na pilha de boot.
+\code{spawn} cria uma thread de kernel com pilha de 16 KiB vinda do heap, uma
+c\'opia do nome e uma fun\c{c}\~ao de entrada. Cada tarefa tem seu pr\'oprio
+ponteiro de pilha salvo e um frame inicial consumido pela rotina assembly
+abaixo; al\'em dos registradores \emph{callee-saved}, a rotina salva e
+restaura \code{RFLAGS}, para que o flag de interrup\c{c}\~ao acompanhe a
+tarefa na troca:
+
+\begin{lstlisting}[caption={Troca de contexto com \code{RFLAGS}.},label={lst:ctxswitchpt}]
+task_switch:
+    pushfq
+    pushq %rbx
+    pushq %rbp
+    pushq %r12
+    pushq %r13
+    pushq %r14
+    pushq %r15
+    movq %rsp, (%rdi)
+    movq %rsi, %rsp
+    popq %r15
+    popq %r14
+    popq %r13
+    popq %r12
+    popq %rbp
+    popq %rbx
+    popfq
+    ret
+\end{lstlisting}
+
+Uma tarefa nova come\c{c}a em \code{task\_trampoline}, que chama a fun\c{c}\~ao
+de entrada e depois \code{exit\_current}. O escalonador roda sobre as tarefas
+\code{Ready}; \code{yield\_now} marca a atual como pronta e troca,
+\code{exit\_current} a marca como \code{Exited}. Slots encerrados s\~ao
+reutilizados pelo pr\'oximo \code{spawn}, como um zumbi sendo colhido, e a
+pilha antiga volta ao heap.
+
+A pol\'itica \'e \emph{round-robin} preemptivo por timer. Cada tarefa tem um
+quantum de \code{QUANTUM\_TICKS = 5} interrup\c{c}\~oes do timer (cerca de
+50 ms a 100 Hz). A IRQ0 incrementa o contador de ticks, envia o EOI do PIC e
+chama \code{task::on\_tick}; quando o quantum termina e h\'a outra tarefa
+\code{Ready}, \code{on\_tick} salva o contexto corrente e troca sem qualquer
+coopera\c{c}\~ao da tarefa. A varredura come\c{c}a depois do slot atual, de
+modo que uma tarefa nunca \'e escolhida para trocar consigo mesma.
+\code{yield\_now} continua dispon\'ivel para ceder a CPU explicitamente e
+reinicia o quantum.
+
+Como o pr\'oprio tratador do timer pode pegar a trava da tabela de tarefas,
+os spinlocks de \code{sync.rs} seguem o modelo \code{irqsave}: adquirir o
+lock desabilita interrup\c{c}\~oes locais e o \emph{guard} restaura o
+\code{RFLAGS} anterior ao sair. A preemp\c{c}\~ao fica suspensa enquanto um
+programa de ring 3 est\'a ativo, pois ele roda na pilha de interrup\c{c}\~ao
+compartilhada do TSS, n\~ao em uma pilha por tarefa. Todas as tarefas
+compartilham o espa\c{c}o de endere\c{c}os do kernel; n\~ao h\'a \code{fork},
+\code{exec}, \code{wait} nem tabela de p\'aginas por processo.
+
+O escalonador tamb\'em tem um estado de bloqueio real. \code{task::sleep(ticks)}
+\'e o equivalente de \code{schedule\_timeout}: a tarefa corrente guarda um
+prazo absoluto em \code{wake\_at}, muda para \code{Blocked} e troca de
+contexto, deixando de disputar a CPU. A cada IRQ0, \code{on\_tick} avança o
+rel\'ogio do escalonador e devolve tarefas vencidas para \code{Ready}; quando
+n\~ao h\'a tarefa execut\'avel, o laço ocioso executa \code{hlt} em vez de
+girar. O caminho de despertar por timer \'e o equivalente moral do
+\emph{timer wheel} usado por \code{schedule\_timeout}.
+
+O bloqueio tamb\'em suporta eventos. \code{WaitQueue} espelha o contrato de
+\code{wait\_queue\_head\_t} de \code{include/linux/wait.h}: a tarefa guarda a
+fila em \code{wait\_queue}, muda para \code{Blocked} e s\'o volta a
+\code{Ready} quando outro contexto chama \code{wake\_up\_one} ou
+\code{wake\_up\_all}. \code{wait\_event} reavalia uma condi\c{c}\~ao ap\'os
+cada despertar, e \code{wait\_event\_timeout} acrescenta um prazo, como
+\code{wait\_event\_timeout} no Linux. A identidade da fila \'e o endere\c{c}o
+da estrutura est\'atica e os waiters ficam na tabela de tarefas, uma vers\~ao
+simplificada das listas intrusivas do Linux.
+
+O applet \code{spawn [nome] [n] [sleep|wait|timeout]} cria at\'e oito
+workers. Cada worker cede a CPU uma vez e depois espera ticks do timer em
+\emph{busy wait}, sem novos yields, ent\~ao a intercala\c{c}\~ao observada vem
+da preemp\c{c}\~ao. Com o modo \code{sleep} (\code{spawn nap 2 sleep}), o
+worker chama \code{task::sleep} entre as rodadas. Com \code{wait}, ele dorme
+na fila de eventos at\'e o applet \code{notify} chamar \code{wake\_up\_all}
+(ou \code{notify one} para \code{wake\_up}); \code{timeout} usa
+\code{wait\_event\_timeout} e informa se o evento chegou em um segundo. Em
+todos os modos de bloqueio o \code{ps} mostra a tarefa como \code{dormindo}
+e o shell continua responsivo. \code{ps} mostra PID, PPID, estado, contagem
+de yields, contagem de preemp\c{c}\~oes (\code{PREEMP}) e nome. Por exemplo,
+dois workers ocupados avan\c{c}am um passo por vez e cada um acumula tr\^es
+preemp\c{c}\~oes.
+
+\section{Novas chamadas de sistema}
+
+A tabela de \code{int 0x80} foi estendida com chamadas de arquivo e processo:
+
+\begin{center}
+\begin{tabular}{@{}cll@{}}
+\toprule
+\textbf{N\'umero} & \textbf{Nome} & \textbf{Argumentos} \\
+\midrule
+0  & \code{exit}     & \code{status} \\
+1  & \code{write}    & \code{buf, len} \\
+2  & \code{read}     & \code{buf, len, flags} \\
+3  & \code{get\_tty} & -- \\
+4  & \code{open}     & \code{path, len, flags} \\
+5  & \code{close}    & \code{fd} \\
+6  & \code{read\_fd} & \code{fd, buf, len} \\
+7  & \code{write\_fd}& \code{fd, buf, len} \\
+8  & \code{lseek}    & \code{fd, offset, whence} \\
+9  & \code{getpid}   & -- \\
+10 & \code{getppid}  & -- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\code{filetest} roda um blob de ring 3 que abre \code{/etc/motd} com
+\code{open}, l\^e com \code{read\_fd}, escreve o conte\'udo com
+\code{write\_fd} e fecha o descritor. \code{getpid} e \code{getppid} leem a
+tarefa atual do escalonador em vez de devolver constantes.

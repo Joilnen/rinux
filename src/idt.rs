@@ -392,6 +392,9 @@ pub extern "C" fn interrupt_dispatch(frame: *mut InterruptFrame) {
         32 => {
             TICKS.fetch_add(1, Ordering::Relaxed);
             unsafe { eoi(0) };
+            // Depois do EOI, o PIC ja pode entregar o proximo tick. O
+            // escalonador decide se o quantum acabou e troca de tarefa.
+            crate::task::on_tick();
         }
         33..=47 => {
             unsafe { eoi((frame.vector - 32) as u8) };

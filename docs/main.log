@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.10.20)  3 NOV 2026 19:18
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026/Arch Linux) (preloaded format=pdflatex 2026.10.20)  4 NOV 2026 06:06
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1138,47 +1138,47 @@ pdfTeX warning (ext4): destination with the same identifier (name{page.1}) has
 been already used, duplicate ignored
 <to be read again> 
                    \relax 
-l.45 ...5.1.4}Panic handler}{25}{subsection.5.1.4}
+l.45 ...5.1.4}Panic handler}{26}{subsection.5.1.4}
                                                   % [1
 
-] [2] [3])
+] [2] [3] [4])
 \tf@toc=\write5
 \openout5 = `main.toc'.
 
- [4]
+ [5]
 (./main.lof)
 \tf@lof=\write6
 \openout6 = `main.lof'.
 
- [5
+ [6
 
-] (./main.lot [6
+] (./main.lot [7
 
 ])
 \tf@lot=\write7
 \openout7 = `main.lot'.
 
- [7] (./sections/01-introducao.tex
+ [8] (./sections/01-introducao.tex
 Chapter 1.
 LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 3
 6.
 (/usr/share/texmf-dist/tex/latex/lm/ts1lmr.fd
 File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
-) [8
+) [9
 
 
 {/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}{/usr/share/texmf-dist/
-fonts/enc/dvips/lm/lm-ts1.enc}]) (./sections/02-visao-geral.tex [9] [10]
+fonts/enc/dvips/lm/lm-ts1.enc}]) (./sections/02-visao-geral.tex [10] [11]
 Chapter 2.
-[11
+[12
 
-] [12]
+] [13]
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <9> on input line 94.
+(Font)              <9> on input line 111.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <5> on input line 94.
+(Font)              <5> on input line 111.
 LaTeX Font Info:    Trying to load font information for TS1+lmtt on input line 
-116.
+138.
  (/usr/share/texmf-dist/tex/latex/lm/ts1lmtt.fd
 File: ts1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
@@ -1189,31 +1189,31 @@ Package microtype Info: Loading generic protrusion settings for font family
 Package microtype Info: Character `texttrademark ' is missing
 (microtype)             in font `TS1/lmtt/m/n/9'.
 (microtype)             Ignoring protrusion settings for this character.
- [13])
-(./sections/03-arquitetura.tex [14]
+ [14])
+(./sections/03-arquitetura.tex [15]
 Chapter 3.
-[15
+[16
 
-] [16]
-Underfull \hbox (badness 10000) in paragraph at lines 177--177
+] [17]
+Underfull \hbox (badness 10000) in paragraph at lines 191--191
 []|\T1/lmr/m/n/10.95 (+20) Target
  []
 
 
-Overfull \hbox (15.04431pt too wide) in paragraph at lines 177--177
+Overfull \hbox (15.04431pt too wide) in paragraph at lines 191--191
 \T1/lmtt/m/n/10.95 x86_64-unknown-none| 
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 177--177
+Underfull \hbox (badness 10000) in paragraph at lines 191--191
 []|\T1/lmr/m/n/10.95 (+20) LTO and
  []
 
-[17]) (./sections/04-boot.tex [18]
+[18]) (./sections/04-boot.tex [19]
 Chapter 4.
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <14.4> not available
 (Font)              Font shape `T1/lmtt/b/n' tried instead on input line 4.
-[19
+[20
 
 ]
 Overfull \hbox (16.26337pt too wide) in paragraph at lines 71--73
@@ -1231,51 +1231,58 @@ T1/lmtt/m/n/10.95 CR4.OSFXSR \T1/lmr/m/n/10.95 (-20) and \T1/lmtt/m/n/10.95 CR4
 .OSXMMEXCPT\T1/lmr/m/n/10.95 (-20) . 
  []
 
-[20] [21{/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}{/usr/share/texmf-d
+[21] [22{/usr/share/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc}{/usr/share/texmf-d
 ist/fonts/enc/dvips/lm/lm-mathex.enc}{/usr/share/texmf-dist/fonts/enc/dvips/lm/
 lm-mathit.enc}]
 Package hyperref Info: bookmark level for unknown lstlisting defaults to 0 on i
 nput line 242.
- [22]) (./sections/05-base.tex [23]
+ [23]) (./sections/05-base.tex [24]
 Chapter 5.
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <9> not available
 (Font)              Font shape `T1/lmtt/b/n' tried instead on input line 17.
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <12> not available
 (Font)              Font shape `T1/lmtt/b/n' tried instead on input line 41.
-[24
+[25
 
-] [25] [26]) (./sections/06-vga.tex [27]
+] [26] [27]) (./sections/06-vga.tex [28]
 Chapter 6.
-[28
+[29
 
-] [29] [30]) (./sections/07-keyboard.tex [31]
+] [30] [31]) (./sections/07-keyboard.tex [32]
 Chapter 7.
-[32
+[33
 
-] [33] [34] [35]) (./sections/08-serial.tex [36]
+] [34] [35] [36]) (./sections/08-serial.tex [37]
 Chapter 8.
-[37
+[38
 
-] [38]) (./sections/09-shell.tex [39]
+] [39]) (./sections/09-shell.tex [40]
 Chapter 9.
-[40
+[41
 
-] [41] [42]) (./sections/09a-memoria-idt.tex [43]
+] [42] [43] [44] [45]) (./sections/09a-memoria-idt.tex [46]
 Chapter 10.
-[44
+[47
 
-] [45] [46] [47]) (./sections/09b-tty.tex [48]
+] [48] [49] [50]) (./sections/09b-tty.tex [51]
 Chapter 11.
-[49
+[52
 
-] [50] [51]
+] [53] [54]
 Overfull \hbox (38.6596pt too wide) in paragraph at lines 203--207
 \T1/lmtt/m/n/10.95 PAGE_USER | PAGE_WRITE\T1/lmr/m/n/10.95 (-20) . This is the 
 di-dac-tic equiv-a-lent of the care-ful \T1/lmtt/m/n/10.95 copy_from_user\T1/lm
 r/m/n/10.95 (-20) /\T1/lmtt/m/n/10.95 copy_to_user
  []
 
-[52]) (./sections/10-build.tex [53]
+[55] [56] [57]
+Overfull \hbox (3.76523pt too wide) in paragraph at lines 408--414
+[]\T1/lmr/m/n/10.95 (-20) A new task starts at \T1/lmtt/m/n/10.95 task_trampoli
+ne\T1/lmr/m/n/10.95 (-20) , which calls the en-try func-tion and then \T1/lmtt/
+m/n/10.95 exit_current\T1/lmr/m/n/10.95 (-20) .
+ []
+
+[58]) (./sections/10-build.tex [59]
 Chapter 12.
 
 Overfull \hbox (0.40475pt too wide) in paragraph at lines 13--15
@@ -1283,9 +1290,9 @@ Overfull \hbox (0.40475pt too wide) in paragraph at lines 13--15
 ary, with \T1/lmtt/m/n/10.95 relocation-model=static\T1/lmr/m/n/10.95 (-20) . 
  []
 
-[54
+[60
 
-] [55] [56] [57]
+] [61] [62] [63]
 Underfull \hbox (badness 10000) in paragraph at lines 331--331
 []|\T1/lmtt/m/n/10.95 can't find crate for
  []
@@ -1300,23 +1307,23 @@ Underfull \hbox (badness 10000) in paragraph at lines 331--331
 []|\T1/lmtt/m/n/10.95 grub-mkrescue:
  []
 
-[58]) (./sections/11-testes.tex [59]
+[64]) (./sections/11-testes.tex [65]
 Chapter 13.
-[60
+[66
 
-] [61] (/usr/share/texmf-dist/tex/latex/listings/lstlang1.sty
+] [67] (/usr/share/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2025/11/14 1.11b listings language file
 )
 LaTeX Font Info:    Font shape `T1/lmtt/bx/n' in size <10.95> not available
 (Font)              Font shape `T1/lmtt/b/n' tried instead on input line 175.
- [62]
+ [68]
 Overfull \hbox (10.87672pt too wide) in paragraph at lines 195--197
 []\T1/lmtt/m/n/10.95 readelf -h \T1/lmr/m/n/10.95 (-20) shows \T1/lmtt/m/n/10.9
 5 Type: EXEC\T1/lmr/m/n/10.95 (-20) , \T1/lmtt/m/n/10.95 Machine: Advanced Micr
 o Devices X86-64 \T1/lmr/m/n/10.95 (-20) and \T1/lmtt/m/n/10.95 Entry
  []
 
-[63]) (./sections/12-similaridade.tex [64]
+[69]) (./sections/12-similaridade.tex [70]
 Chapter 14.
 
 Underfull \hbox (badness 10000) in paragraph at lines 57--58
@@ -1324,56 +1331,91 @@ Underfull \hbox (badness 10000) in paragraph at lines 57--58
  []
 
 
-ignored: Infinite glue shrinkage found in box being split [65
+Overfull \hbox (13.59213pt too wide) in paragraph at lines 71--71
+[]|\T1/lmtt/m/n/10.95 arch/x86/entry/syscalls/syscall_64.tbl| 
+ []
 
-] [66]
-Underfull \hbox (badness 10000) in paragraph at lines 208--208
+
+ignored: Infinite glue shrinkage found in box being split [71
+
+] [72] [73]
+Underfull \hbox (badness 10000) in paragraph at lines 233--233
 []|\T1/lmr/m/n/10.95 (+20) 4/5 lev-els, al-lo-ca-tors,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 208--208
+Underfull \hbox (badness 10000) in paragraph at lines 233--233
 []|\T1/lmr/m/n/10.95 (+20) IRQ1/IRQ4, \T1/lmr/m/it/10.95 (+20) softirq\T1/lmr/m
 /n/10.95 (+20) ,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 208--208
-[]|\T1/lmtt/m/n/10.95 int 0x80 \T1/lmr/m/n/10.95 (+20) with
+Underfull \hbox (badness 1527) in paragraph at lines 233--233
+[]|\T1/lmr/m/n/10.95 (+20) Task ta-ble, pre-emp-tive round-robin,
  []
 
-[67] [68]
-Underfull \hbox (badness 7649) in paragraph at lines 302--302
+
+Underfull \hbox (badness 10000) in paragraph at lines 233--233
+[]|\T1/lmtt/m/n/10.95 int 0x80 \T1/lmr/m/n/10.95 (+20) with eleven calls
+ []
+
+[74]
+Underfull \hbox (badness 7649) in paragraph at lines 329--329
 []|\T1/lmr/m/n/10.95 (+20) Rings, SMEP/SMAP, KASLR,
  []
 
-) (./sections/13-limitacoes.tex [69] [70]
+) (./sections/13-limitacoes.tex [75] [76]
 Chapter 15.
 
-Underfull \hbox (badness 1038) in paragraph at lines 39--39
-[]|\T1/lmr/m/n/10.95 (+20) No sched-uler, con-text switch, or sep-a-rate ad-dre
-ss spaces. The
+Underfull \hbox (badness 10000) in paragraph at lines 50--50
+[]|\T1/lmr/m/n/10.95 (+20) Task ta-ble, PID/PPID, con-text switch, a timer-pree
+mptive
  []
 
 
-Underfull \hbox (badness 1062) in paragraph at lines 39--39
-\T1/lmr/m/n/10.95 (+20) ring 3 pro-grams are not pro-cesses; there are only fou
-r syscalls
+Underfull \hbox (badness 1603) in paragraph at lines 50--50
+\T1/lmr/m/n/10.95 (+20) round-robin sched-uler with a five-tick quan-tum, block
+-ing \T1/lmtt/m/n/10.95 sleep
  []
 
 
-Underfull \hbox (badness 4378) in paragraph at lines 67--67
+Underfull \hbox (badness 10000) in paragraph at lines 50--50
+\T1/lmr/m/n/10.95 (+20) There is no \T1/lmtt/m/n/10.95 fork\T1/lmr/m/n/10.95 (+
+20) /\T1/lmtt/m/n/10.95 exec\T1/lmr/m/n/10.95 (+20) /\T1/lmtt/m/n/10.95 wait\T1
+/lmr/m/n/10.95 (+20) , no CFS/EEVDF, no pri-or-
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 50--50
+\T1/lmr/m/n/10.95 (+20) i-ties and no per-process ad-dress space; the ring 3 pr
+o-
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 50--50
+\T1/lmr/m/n/10.95 (+20) grams are still not sched-uled pro-cesses. Eleven sysca
+lls
+ []
+
+
+Overfull \hbox (31.75102pt too wide) in paragraph at lines 50--50
+\T1/lmr/m/n/10.95 (-20) (\T1/lmtt/m/n/10.95 exit/write/read/get_tty/open/close/
+read_fd/write_fd/lseek/getpid/
+ []
+
+
+Underfull \hbox (badness 4378) in paragraph at lines 78--78
 []|\T1/lmr/m/n/10.95 (+20) Keyboard does not
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 67--67
+Underfull \hbox (badness 10000) in paragraph at lines 78--78
 []|\T1/lmr/m/n/10.95 (+20) High with-out
  []
 
-[71
+[77
 
-] [72]) (./sections/14-apendices.tex [73]
+] [78]) (./sections/14-apendices.tex [79]
 Appendix A.
 
 Underfull \hbox (badness 10000) in paragraph at lines 24--24
@@ -1391,403 +1433,633 @@ Underfull \hbox (badness 10000) in paragraph at lines 45--45
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
+Underfull \hbox (badness 10000) in paragraph at lines 72--72
 []|\T1/lmtt/m/n/10.95 SpinLock::new(data: T) ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 70--70
+Underfull \hbox (badness 10000) in paragraph at lines 74--74
 []|\T1/lmtt/m/n/10.95 SpinLock::lock(&self) ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 72--72
+Underfull \hbox (badness 10000) in paragraph at lines 76--76
 []|\T1/lmtt/m/n/10.95 SpinLockGuard::deref(&self)
  []
 
 
-Overfull \hbox (4.53265pt too wide) in paragraph at lines 74--74
+Overfull \hbox (4.53265pt too wide) in paragraph at lines 78--78
 []|\T1/lmtt/m/n/10.95 SpinLockGuard::deref_mut(&mut
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 76--76
+Underfull \hbox (badness 10000) in paragraph at lines 80--80
 []|\T1/lmtt/m/n/10.95 SpinLockGuard::drop(&mut
  []
 
 
-ignored: Infinite glue shrinkage found in box being split [74
+ignored: Infinite glue shrinkage found in box being split [80
 
 ]
-Underfull \hbox (badness 10000) in paragraph at lines 122--122
+Underfull \hbox (badness 10000) in paragraph at lines 126--126
 []|\T1/lmtt/m/n/10.95 Tty::push_input(&mut self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 124--124
+Underfull \hbox (badness 10000) in paragraph at lines 128--128
 []|\T1/lmtt/m/n/10.95 Tty::pop_input(&mut self) ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 126--126
+Underfull \hbox (badness 10000) in paragraph at lines 130--130
 []|\T1/lmtt/m/n/10.95 Tty::write_bytes(&mut self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 128--128
+Underfull \hbox (badness 10000) in paragraph at lines 132--132
 []|\T1/lmtt/m/n/10.95 Tty::write_byte(&mut self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 130--130
+Underfull \hbox (badness 10000) in paragraph at lines 134--134
 []|\T1/lmtt/m/n/10.95 Tty::write_plain(&mut self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 132--132
+Underfull \hbox (badness 10000) in paragraph at lines 136--136
 []|\T1/lmtt/m/n/10.95 Tty::write_csi(&mut self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 134--134
+Underfull \hbox (badness 10000) in paragraph at lines 138--138
 []|\T1/lmtt/m/n/10.95 Tty::push_csi_param(&mut
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 136--136
+Underfull \hbox (badness 10000) in paragraph at lines 140--140
 []|\T1/lmtt/m/n/10.95 Tty::csi_param(&self, index,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 138--138
+Underfull \hbox (badness 10000) in paragraph at lines 142--142
 []|\T1/lmtt/m/n/10.95 Tty::csi_count_param(&self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 140--140
+Underfull \hbox (badness 10000) in paragraph at lines 144--144
 []|\T1/lmtt/m/n/10.95 Tty::execute_csi(&mut self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 142--142
+Underfull \hbox (badness 10000) in paragraph at lines 146--146
 []|\T1/lmtt/m/n/10.95 Tty::erase_display(&mut self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 144--144
+Underfull \hbox (badness 10000) in paragraph at lines 148--148
 []|\T1/lmtt/m/n/10.95 Tty::erase_line(&mut self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 146--146
+Underfull \hbox (badness 10000) in paragraph at lines 150--150
 []|\T1/lmtt/m/n/10.95 Tty::blank_row(&mut self, row:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 148--148
+Underfull \hbox (badness 10000) in paragraph at lines 152--152
 []|\T1/lmtt/m/n/10.95 Tty::write_char(&mut self, ch:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 166--166
+Underfull \hbox (badness 10000) in paragraph at lines 170--170
 []|\T1/lmtt/m/n/10.95 write_to(index: usize, bytes:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 170--170
+Underfull \hbox (badness 10000) in paragraph at lines 174--174
 []|\T1/lmtt/m/n/10.95 read_byte_from(index: usize)
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 177--177
+Underfull \hbox (badness 10000) in paragraph at lines 181--181
 []|\T1/lmtt/m/n/10.95 <TtyWriter as
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 179--179
+Underfull \hbox (badness 10000) in paragraph at lines 183--183
 []|\T1/lmtt/m/n/10.95 _print(args:
  []
 
 
-ignored: Infinite glue shrinkage found in box being split [75]
-Underfull \hbox (badness 10000) in paragraph at lines 196--196
+ignored: Infinite glue shrinkage found in box being split [81]
+Underfull \hbox (badness 10000) in paragraph at lines 200--200
 []|\T1/lmtt/m/n/10.95 build_keymap() -> [u8;
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 198--198
+Underfull \hbox (badness 10000) in paragraph at lines 202--202
 []|\T1/lmtt/m/n/10.95 apply_shift(byte: u8) ->
  []
 
 
-ignored: Infinite glue shrinkage found in box being split [76]
-Underfull \hbox (badness 10000) in paragraph at lines 233--233
+ignored: Infinite glue shrinkage found in box being split [82]
+Underfull \hbox (badness 10000) in paragraph at lines 237--237
 []|\T1/lmtt/m/n/10.95 read_byte() ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 237--237
+Underfull \hbox (badness 10000) in paragraph at lines 241--241
 []|\T1/lmtt/m/n/10.95 write_bytes(bytes:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 258--258
-[]|\T1/lmtt/m/n/10.95 trim(bytes: &[u8]) ->
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 260--260
-[]|\T1/lmtt/m/n/10.95 as_text(bytes: &[u8])
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 264--264
-[]|\T1/lmtt/m/n/10.95 parse_console(arg:
+Underfull \hbox (badness 10000) in paragraph at lines 266--266
+[]|\T1/lmtt/m/n/10.95 Command::parse(line: &mut
  []
 
 
 Underfull \hbox (badness 10000) in paragraph at lines 266--266
-[]|\T1/lmtt/m/n/10.95 getty_demo(console:
+\T1/lmtt/m/n/10.95 [u8]) -> Result<Command,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 270--270
-[]|\T1/lmtt/m/n/10.95 user_demo(protection:
+Underfull \hbox (badness 10000) in paragraph at lines 268--268
+[]|\T1/lmtt/m/n/10.95 Command::arg(index) ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 289--289
+Underfull \hbox (badness 10000) in paragraph at lines 272--272
+[]|\T1/lmtt/m/n/10.95 find_applet(name: &[u8])
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 274--274
+[]|\T1/lmtt/m/n/10.95 applet_help\T1/lmr/m/n/10.95 (+20) , \T1/lmtt/m/n/10.95 a
+pplet_echo\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 281--283
+[]|\T1/lmr/m/n/10.95 (+20) Advances the demo event counter and calls
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 291--291
+[]|\T1/lmtt/m/n/10.95 waiter_task()\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+ignored: Infinite glue shrinkage found in box being split [83]
+Underfull \hbox (badness 10000) in paragraph at lines 311--311
 []|\T1/lmtt/m/n/10.95 stack_top<const N:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 289--289
+Underfull \hbox (badness 10000) in paragraph at lines 311--311
 \T1/lmtt/m/n/10.95 usize>(stack: *mut Stack<N>)
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 293--293
+Underfull \hbox (badness 10000) in paragraph at lines 313--313
 []|\T1/lmtt/m/n/10.95 user_kernel_stack_top() ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 295--295
+Underfull \hbox (badness 10000) in paragraph at lines 315--315
 []|\T1/lmtt/m/n/10.95 double_fault_stack_top() ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 297--297
+Underfull \hbox (badness 10000) in paragraph at lines 317--317
 []|\T1/lmtt/m/n/10.95 descriptor(base, limit,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 299--299
+Underfull \hbox (badness 10000) in paragraph at lines 319--319
 []|\T1/lmtt/m/n/10.95 tss_descriptor(base: u64,
  []
 
-[77]
-Underfull \hbox (badness 10000) in paragraph at lines 319--319
+
+Underfull \hbox (badness 10000) in paragraph at lines 339--339
 []|\T1/lmtt/m/n/10.95 set_gate(idt, vector, handler,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 331--331
+Underfull \hbox (badness 10000) in paragraph at lines 351--351
 []|\T1/lmtt/m/n/10.95 exception_name(vector: u64)
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 333--333
+Underfull \hbox (badness 10000) in paragraph at lines 353--353
 []|\T1/lmtt/m/n/10.95 interrupt_dispatch(frame:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 336--336
+Underfull \hbox (badness 10000) in paragraph at lines 356--356
 []|\T1/lmtt/m/n/10.95 page_fault(frame: &mut
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 337--339
+Underfull \hbox (badness 10000) in paragraph at lines 357--359
 []|\T1/lmr/m/n/10.95 (+20) Reads \T1/lmtt/m/n/10.95 CR2 \T1/lmr/m/n/10.95 (+20)
  and del-e-gates to
  []
 
 
-Underfull \hbox (badness 3118) in paragraph at lines 337--339
+Underfull \hbox (badness 3118) in paragraph at lines 357--359
 \T1/lmtt/m/n/10.95 paging::handle_page_fault\T1/lmr/m/n/10.95 (+20) ; may ter-m
 i-nate
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 339--339
+Underfull \hbox (badness 10000) in paragraph at lines 359--359
 []|\T1/lmtt/m/n/10.95 general_protection(frame:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 341--341
+Underfull \hbox (badness 10000) in paragraph at lines 361--361
 []|\T1/lmtt/m/n/10.95 user_fault(frame: &mut
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 343--343
+Underfull \hbox (badness 10000) in paragraph at lines 363--363
 []|\T1/lmtt/m/n/10.95 syscall(frame: &mut
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 345--345
+Underfull \hbox (badness 10000) in paragraph at lines 365--365
 []|\T1/lmtt/m/n/10.95 fatal(frame: &InterruptFrame)
  []
 
 
-ignored: Infinite glue shrinkage found in box being split [78]
-Underfull \hbox (badness 10000) in paragraph at lines 364--364
+ignored: Infinite glue shrinkage found in box being split [84]
+Underfull \hbox (badness 10000) in paragraph at lines 384--384
 []|\T1/lmtt/m/n/10.95 frame_is_used(frame: usize)
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 370--370
+Underfull \hbox (badness 10000) in paragraph at lines 390--390
 []|\T1/lmtt/m/n/10.95 free_range(start, end,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 372--372
+Underfull \hbox (badness 10000) in paragraph at lines 392--392
 []|\T1/lmtt/m/n/10.95 reserve_range(start: u64, end:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 374--374
+Underfull \hbox (badness 10000) in paragraph at lines 394--394
 []|\T1/lmtt/m/n/10.95 init(multiboot_magic,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 388--388
+Underfull \hbox (badness 10000) in paragraph at lines 408--408
 []|\T1/lmtt/m/n/10.95 next_table(entry, user)
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 388--388
+Underfull \hbox (badness 10000) in paragraph at lines 408--408
 \T1/lmtt/m/n/10.95 -> Result<*mut PageTable,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 390--390
+Underfull \hbox (badness 10000) in paragraph at lines 410--410
 []|\T1/lmtt/m/n/10.95 map_page(virt, phys, flags,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 392--392
+Underfull \hbox (badness 10000) in paragraph at lines 412--412
 []|\T1/lmtt/m/n/10.95 page_flags(virt: u64) ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 394--394
+Underfull \hbox (badness 10000) in paragraph at lines 414--414
 []|\T1/lmtt/m/n/10.95 unmap_page(virt: u64) ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 396--396
+Underfull \hbox (badness 10000) in paragraph at lines 416--416
 []|\T1/lmtt/m/n/10.95 ensure_user_range(addr, len)
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 400--400
+Underfull \hbox (badness 10000) in paragraph at lines 420--420
 []|\T1/lmtt/m/n/10.95 paging_page(address: u64) ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 402--402
+Underfull \hbox (badness 10000) in paragraph at lines 422--422
 []|\T1/lmtt/m/n/10.95 handle_page_fault(addr, error)
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 404--404
+Underfull \hbox (badness 10000) in paragraph at lines 424--424
 []|\T1/lmtt/m/n/10.95 kernel_demand_addr(index:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 406--406
+Underfull \hbox (badness 10000) in paragraph at lines 426--426
 []|\T1/lmtt/m/n/10.95 install_user_code(bytes:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 406--406
+Underfull \hbox (badness 10000) in paragraph at lines 426--426
 \T1/lmtt/m/n/10.95 &[u8]) -> Result<(), &'static
  []
 
 
-ignored: Infinite glue shrinkage found in box being split [79]
-Underfull \hbox (badness 10000) in paragraph at lines 425--425
+ignored: Infinite glue shrinkage found in box being split [85]
+Underfull \hbox (badness 10000) in paragraph at lines 445--445
 []|\T1/lmtt/m/n/10.95 Program::push(&mut self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 427--427
+Underfull \hbox (badness 10000) in paragraph at lines 447--447
 []|\T1/lmtt/m/n/10.95 Program::movabs_rax(&mut self,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 429--429
+Underfull \hbox (badness 10000) in paragraph at lines 449--449
 []|\T1/lmtt/m/n/10.95 program(demo: Demo) ->
  []
 
 
-Underfull \hbox (badness 1400) in paragraph at lines 430--431
+Underfull \hbox (badness 1400) in paragraph at lines 450--451
 []|\T1/lmr/m/n/10.95 (+20) Builds the ma-chine code of the \T1/lmtt/m/n/10.95 D
 emand \T1/lmr/m/n/10.95 (+20) and
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 433--433
+Underfull \hbox (badness 10000) in paragraph at lines 453--453
 []|\T1/lmtt/m/n/10.95 run(demo: Demo) ->
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 435--435
+Underfull \hbox (badness 10000) in paragraph at lines 455--455
 []|\T1/lmtt/m/n/10.95 run_getty(console:
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 435--435
+Underfull \hbox (badness 10000) in paragraph at lines 455--455
 \T1/lmtt/m/n/10.95 Option<usize>) -> Result<i32,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 454--454
+Underfull \hbox (badness 10000) in paragraph at lines 457--457
+[]|\T1/lmtt/m/n/10.95 run_file() -> Result<i32,
+ []
+
+
+Underfull \hbox (badness 1348) in paragraph at lines 458--459
+[]|\T1/lmr/m/n/10.95 (+20) Runs the ring 3 blob that opens and reads
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 476--476
 []|\T1/lmtt/m/n/10.95 dispatch(frame: &mut
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 456--456
+Underfull \hbox (badness 10000) in paragraph at lines 480--480
 []|\T1/lmtt/m/n/10.95 sys_write(frame: &mut
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 458--458
+Underfull \hbox (badness 10000) in paragraph at lines 482--482
 []|\T1/lmtt/m/n/10.95 sys_read(frame: &mut
  []
 
-[80]
+
+Underfull \hbox (badness 10000) in paragraph at lines 484--484
+[]|\T1/lmtt/m/n/10.95 read_line(ptr, len, echo)
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 486--486
+[]|\T1/lmtt/m/n/10.95 sys_open(frame: &mut
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 488--488
+[]|\T1/lmtt/m/n/10.95 sys_close(frame: &mut
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 490--490
+[]|\T1/lmtt/m/n/10.95 sys_read_fd(frame: &mut
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 492--492
+[]|\T1/lmtt/m/n/10.95 sys_write_fd(frame: &mut
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 494--494
+[]|\T1/lmtt/m/n/10.95 sys_lseek(frame: &mut
+ []
+
+[86]
+Underfull \hbox (badness 10000) in paragraph at lines 513--513
+[]|\T1/lmtt/m/n/10.95 Heap::grow() -> Result<(),
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 515--515
+[]|\T1/lmtt/m/n/10.95 Heap::insert_free(block:
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 517--517
+[]|\T1/lmtt/m/n/10.95 Heap::take(layout: Layout)
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 519--519
+[]|\T1/lmtt/m/n/10.95 Heap::give_back(ptr: *mut
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 521--521
+[]|\T1/lmtt/m/n/10.95 align_up(value, align) ->
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 523--523
+[]|\T1/lmtt/m/n/10.95 GlobalAlloc::alloc\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 545--545
+[]|\T1/lmtt/m/n/10.95 init()\T1/lmr/m/n/10.95 (+20) , \T1/lmtt/m/n/10.95 lock()
+ ->
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 550--550
+[]|\T1/lmtt/m/n/10.95 Fs::resolve(path) ->
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 552--552
+[]|\T1/lmtt/m/n/10.95 Fs::create(path, is_dir)\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 554--554
+[]|\T1/lmtt/m/n/10.95 Fs::read\T1/lmr/m/n/10.95 (+20) , \T1/lmtt/m/n/10.95 Fs::
+write\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 558--558
+[]|\T1/lmtt/m/n/10.95 Fs::path(index, out) ->
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 560--560
+[]|\T1/lmtt/m/n/10.95 Fs::usage() -> (usize,
+ []
+
+[87]
+Underfull \hbox (badness 10000) in paragraph at lines 577--577
+[]|\T1/lmtt/m/n/10.95 lookup(path: &[u8]) ->
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 581--581
+[]|\T1/lmtt/m/n/10.95 size(entry) -> usize\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 581--581
+\T1/lmtt/m/n/10.95 read(entry, offset, out)
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 583--583
+[]|\T1/lmtt/m/n/10.95 Buffer::new\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 1117) in paragraph at lines 586--587
+[]|\T1/lmr/m/n/10.95 (+20) Formats ver-sion, up-time, mem-info, ps, cpuinfo,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 606--606
+[]|\T1/lmtt/m/n/10.95 open(path, flags) ->
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 608--608
+[]|\T1/lmtt/m/n/10.95 close(fd)\T1/lmr/m/n/10.95 (+20) , \T1/lmtt/m/n/10.95 ope
+n_count() ->
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 610--610
+[]|\T1/lmtt/m/n/10.95 read(fd, out) ->
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 612--612
+[]|\T1/lmtt/m/n/10.95 write(fd, data) ->
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 614--614
+[]|\T1/lmtt/m/n/10.95 lseek(fd, offset, whence)
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 616--616
+[]|\T1/lmtt/m/n/10.95 Fd::free()\T1/lmr/m/n/10.95 (+20) , \T1/lmtt/m/n/10.95 Fd
+::console()\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 618--618
+[]|\T1/lmtt/m/n/10.95 is_console_path(path) ->
+ []
+
+
+ignored: Infinite glue shrinkage found in box being split [88]
+Underfull \hbox (badness 10000) in paragraph at lines 637--637
+[]|\T1/lmtt/m/n/10.95 spawn(name, entry) ->
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 639--639
+[]|\T1/lmtt/m/n/10.95 current_pid()\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 649--649
+[]|\T1/lmtt/m/n/10.95 block_current(queue,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 654--654
+[]|\T1/lmtt/m/n/10.95 wait_event(condition)\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 654--654
+\T1/lmtt/m/n/10.95 wait_event_timeout(ticks,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 672--674
+[]|\T1/lmtt/m/n/10.95 State::as_str\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 672--674
+\T1/lmtt/m/n/10.95 Task::free\T1/lmr/m/n/10.95 (+20) , \T1/lmtt/m/n/10.95 Task:
+:name\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 672--674
+\T1/lmtt/m/n/10.95 Task::set_name\T1/lmr/m/n/10.95 (+20) , \T1/lmtt/m/n/10.95 n
+ext_ready\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 672--674
+\T1/lmtt/m/n/10.95 kernel_stack_layout\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 672--674
+\T1/lmtt/m/n/10.95 current_pid_locked\T1/lmr/m/n/10.95 (+20) ,
+ []
+
+
+ignored: Infinite glue shrinkage found in box being split [89] [90]
 Appendix B.
-[81
+[91
 
 ]
 Appendix C.
-[82
+[92
 
-] [83]
-Underfull \hbox (badness 1668) in paragraph at lines 590--594
+] [93]
+Underfull \hbox (badness 1668) in paragraph at lines 808--812
 []\T1/lmr/m/n/10.95 (+20) Linux Ker-nel Or-ga-ni-za-tion.  \T1/lmr/m/it/10.95 (
 +20) Linux Ker-nel 7.3.1 Source Tree\T1/lmr/m/n/10.95 (+20) .  Files \T1/lmtt/m
 /n/10.95 arch/x86\T1/lmr/m/n/10.95 (+20) ,
  []
 
 
-Underfull \hbox (badness 2213) in paragraph at lines 590--594
+Underfull \hbox (badness 2213) in paragraph at lines 808--812
 \T1/lmtt/m/n/10.95 drivers/video/console/vgacon.c\T1/lmr/m/n/10.95 (+20) , \T1/
 lmtt/m/n/10.95 drivers/input\T1/lmr/m/n/10.95 (+20) , \T1/lmtt/m/n/10.95 driver
 s/tty/serial/8250 \T1/lmr/m/n/10.95 (+20) and
  []
 
-) [84
+) [94
 
 ] (./main.aux)
  ***********
@@ -1795,14 +2067,14 @@ LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
 Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: C38EA4DC96FE80229BDA04C335C33B29;27258.
+(rerunfilecheck)             Checksum: EB5D04C568236763B320EE954B5E6638;29201.
  ) 
 Here is how much of TeX's memory you used:
- 37637 strings out of 469495
- 724956 string characters out of 5470097
- 1923805 words of memory out of 5000000
- 64306 multiletter control sequences out of 15000+600000
- 724450 words of font info for 233 fonts, out of 8000000 for 9000
+ 37781 strings out of 469495
+ 726800 string characters out of 5470097
+ 2058251 words of memory out of 5000000
+ 64377 multiletter control sequences out of 15000+600000
+ 724096 words of font info for 230 fonts, out of 8000000 for 9000
  16 hyphenation exceptions out of 8191
  98i,13n,108p,1001b,2062s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></usr/share/texmf-dis
@@ -1819,10 +2091,10 @@ m/lmsy9.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmtk10.pfb></usr/share
 /public/lm/lmtt8.pfb></usr/share/texmf-dist/fonts/type1/public/lm/lmtt9.pfb></u
 sr/share/texmf-dist/fonts/type1/public/lm/lmtti10.pfb></usr/share/texmf-dist/fo
 nts/type1/public/amsfonts/symbols/msam10.pfb>
-Output written on main.pdf (86 pages, 682056 bytes).
+Output written on main.pdf (96 pages, 717596 bytes).
 PDF statistics:
- 2590 PDF objects out of 2984 (max. 8388607)
- 2409 compressed objects within 25 object streams
- 1099 named destinations out of 1200 (max. 500000)
- 56397 words of extra memory for PDF output out of 61914 (max. 10000000)
+ 2765 PDF objects out of 2984 (max. 8388607)
+ 2573 compressed objects within 26 object streams
+ 1178 named destinations out of 1200 (max. 500000)
+ 56485 words of extra memory for PDF output out of 61914 (max. 10000000)
 

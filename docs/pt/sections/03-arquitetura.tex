@@ -56,10 +56,13 @@ CPUs & Uma CPU; SMP n\~ao \'e inicializado. \\
 Interrup\c{c}\~oes & IDT com 256 portas; PIC remapeado e timer IRQ0 a
 ~100 Hz. IRQ1 (teclado) permanece mascarada. \\
 Entrada & Polling de \code{0x60}/\code{0x64} e de COM1; timer por IRQ. \\
-Concorr\^encia & Spinlock no console; o timer n\~ao preempta (n\~ao h\'a
-escalonador). \\
-Mem\'oria & Frames f\'isicos de 4 KiB, tabelas sob demanda e page faults;
-sem heap, \code{alloc} ou \code{Vec}. \\
+Concorr\^encia & Spinlocks seguros para IRQ no console, ramfs, heap, VFS e
+tabela de tarefas. O escalonador \emph{round-robin} preempta no quantum do
+timer (5 ticks), troca em yield expl\'icito, bloqueia tarefas em \code{sleep}
+at\'e um tick de prazo e as suspende em filas de espera at\'e um
+\code{wake\_up}. \\
+Mem\'oria & Frames f\'isicos de 4 KiB, tabelas sob demanda e page faults, um
+heap \emph{first-fit} de 1 MiB e \code{alloc}/\code{Vec}/\code{String}. \\
 Pilhas & 8 KiB no stub (baixa), 32 KiB no kernel (alta), 16 KiB para
 interrup\c{c}\~oes de usu\'ario e 8 KiB de IST para double fault. \\
 Tempo de vida & O shell nunca retorna; \code{halt} e \code{reboot} encerram o fluxo. \\
@@ -78,29 +81,42 @@ Tempo de vida & O shell nunca retorna; \code{halt} e \code{reboot} encerram o fl
 \textbf{M\'odulo} & \textbf{Usa / \'e usado por} \\
 \midrule
 \code{main.rs} & Declara todos os m\'odulos; chama \code{vga}, \code{serial},
-\code{tty}, \code{paging}, \code{gdt}, \code{keyboard}, \code{idt},
-\code{arch} e \code{shell}; implementa as macros de impress\~ao. \\
+\code{tty}, \code{paging}, \code{heap}, \code{ramfs}, \code{vfs}, \code{gdt},
+\code{keyboard}, \code{idt}, \code{task}, \code{arch} e \code{shell};
+implementa as macros de impress\~ao. \\
 \code{boot.rs} & Assembly que chama \code{kernel\_main}; n\~ao \'e chamado por
 Rust. \\
-\code{arch.rs} & Portas de I/O, \code{sti}, \code{halt} e \code{reboot};
-usado por v\'arios m\'odulos. \\
+\code{arch.rs} & Portas de I/O, \code{irq\_save}/\code{irq\_restore},
+\code{sti}, \code{halt} e \code{reboot}; usado por v\'arios m\'odulos. \\
 \code{gdt.rs} & GDT/TSS e pilhas; usa apenas \code{core::arch}. \\
 \code{idt.rs} & Usa \code{arch}, \code{paging}, \code{syscall} e
 \code{user} para tratar exce\c{c}\~oes, IRQs e a \emph{syscall}. \\
 \code{paging.rs} & Frames, tabelas e \emph{page faults}; usa apenas
 \code{core::arch}. \\
+\code{heap.rs} & Heap \emph{first-fit} e \code{\#[global\_allocator]}; usa
+\code{paging} e \code{sync}. \\
+\code{ramfs.rs} & \'Arvore em mem\'oria de 48 n\'os; usa \code{sync}. \\
+\code{proc.rs} & \code{/proc} sint\'etico; renderiza a partir de \code{heap},
+\code{idt}, \code{paging} e \code{task}. \\
+\code{vfs.rs} & Tabela de descritores sobre ramfs, \code{/proc} e consoles;
+usa \code{proc}, \code{ramfs}, \code{tty} e \code{sync}. \\
+\code{task.rs} & Tabela de tarefas, pilhas, troca preemptiva por timer,
+\code{sleep} bloqueante e filas de espera por evento; usa \code{sync} e
+\code{arch}. \\
 \code{user.rs} & Monta os programas, chama \code{paging} e \code{tty} e
 retorna ao kernel por \code{user\_resume}. \\
-\code{syscall.rs} & Implementa \code{exit/write/read/get\_tty}; usa
-\code{paging}, \code{tty} e \code{user}. \\
-\code{shell.rs} & Usa \code{tty}, \code{idt}, \code{paging}, \code{user} e
+\code{syscall.rs} & Implementa as onze chamadas; usa \code{paging},
+\code{task}, \code{tty}, \code{user} e \code{vfs}. \\
+\code{shell.rs} & Usa \code{tty}, \code{idt}, \code{paging}, \code{heap},
+\code{ramfs}, \code{vfs}, \code{proc}, \code{task}, \code{user} e
 \code{arch}. \\
 \code{tty.rs} & Mant\'em os oito consoles; usa \code{vga}, \code{keyboard},
 \code{serial} e \code{sync}. \\
 \code{vga.rs} & Renderizador de baixo n\'ivel; usa \code{arch}. \\
 \code{keyboard.rs} & Usa \code{arch} para acessar o 8042. \\
 \code{serial.rs} & Usa \code{arch} para acessar a UART. \\
-\code{sync.rs} & Spinlock do console; usa apenas \code{core}. \\
+\code{sync.rs} & Spinlocks seguros para IRQ no console, ramfs, heap, VFS e
+tarefas; usa \code{core} e \code{arch}. \\
 \bottomrule
 \end{tabularx}
 \end{table}

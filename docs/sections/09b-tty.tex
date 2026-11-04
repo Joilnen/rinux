@@ -290,3 +290,202 @@ switching. \\
   \item \code{read} waits with interrupts disabled; the timer freezes during a
         login prompt.
 \end{itemize}
+
+\section{Kernel heap}
+
+\code{src/heap.rs} adds the missing dynamic allocator. It places the heap at
+\code{0xFFFFFFFFE0000000}, a separate PDPT from the kernel image and from the
+demand-paging regions, and installs a \code{\#[global\_allocator]} so that
+\code{alloc::vec::Vec}, \code{alloc::string::String} and the rest of the
+\code{alloc} crate work inside the kernel.
+
+The allocator is a first-fit free list with a 16-byte header immediately
+before the returned pointer:
+
+\begin{lstlisting}[caption={Block header and free-list node.},label={lst:heapblock}]
+#[repr(C, align(16))]
+struct Block {
+    size: usize,
+    next: *mut Block,
+}
+\end{lstlisting}
+
+Blocks are kept in address order and coalesced when neighbours are free.
+When the list cannot satisfy a request, the heap grows one 4 KiB page at a
+time through \code{paging::alloc\_frame} and \code{paging::map\_page}. The
+limit is 1 MiB (256 pages). There is no slab, buddy allocator, per-CPU cache
+or NUMA support; the goal is to explain the interface and the growth path.
+The \code{heap} applet allocates a \code{Vec<u64>} and a \code{String} and
+prints the mapped/used/allocations counters.
+
+\section{VFS and file descriptors}
+
+\code{src/vfs.rs} introduces the two central objects of a Unix file layer:
+the open file description (here a table entry with an offset and flags) and
+the descriptor, an index into a fixed table of 16 entries. Descriptors 0, 1
+and 2 are pre-opened on the console; \code{/dev/tty} and \code{/dev/console}
+are accepted as console paths.
+
+The flag and seek constants mirror the Linux ABI:
+
+\begin{lstlisting}[caption={Subset of the VFS constants.},label={lst:vfsflags}]
+pub const O_RDONLY: u64 = 0;
+pub const O_WRONLY: u64 = 1;
+pub const O_RDWR:   u64 = 2;
+pub const O_CREAT:  u64 = 0x40;
+pub const O_TRUNC:  u64 = 0x200;
+pub const O_APPEND: u64 = 0x400;
+pub const SEEK_SET: u64 = 0;
+pub const SEEK_CUR: u64 = 1;
+pub const SEEK_END: u64 = 2;
+\end{lstlisting}
+
+\code{open}, \code{close}, \code{read}, \code{write} and \code{lseek} are
+implemented over the ramfs, the console and \code{/proc}. Reads update the
+descriptor offset; \code{O\_APPEND} recomputes the end of the file on each
+write; \code{lseek} supports \code{SEEK\_SET}, \code{SEEK\_CUR} and
+\code{SEEK\_END}. There are still no inodes, dentries, mounts, permissions or
+page cache, and the table is global rather than per process.
+
+\section{The /proc pseudo-filesystem}
+
+\code{src/proc.rs} implements a synthetic filesystem. Nothing is stored:
+each read formats the current kernel state into a fixed 2 KiB buffer and
+copies the requested slice according to the descriptor offset. The available
+files are:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Path} & \textbf{Content} \\
+\midrule
+\code{/proc/version} & version, architecture and \code{\#1 SMP} \\
+\code{/proc/uptime}  & seconds and centiseconds from the PIT ticks \\
+\code{/proc/meminfo} & frames, heap and task counters \\
+\code{/proc/ps}      & task table in the same format as the \code{ps} applet \\
+\code{/proc/cpuinfo} & a small static CPU description \\
+\code{/proc/mounts}  & ramfs, proc and devtmpfs lines \\
+\code{/proc/cmdline} & boot command line \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\code{cat /proc/ps}, \code{ls -l /proc} and the \code{vfs} applet exercise the
+same code path used by the ring 3 syscalls. There is no \code{seq\_file},
+\code{proc\_dir\_entry}, permission check or namespace.
+
+\section{Tasks and preemptive scheduler}
+
+\code{src/task.rs} adds PID/PPID, task states and a round-robin scheduler.
+The shell is task 1 and runs on the boot stack. \code{spawn} creates a kernel
+thread with a 16 KiB stack from the heap, a copy of the name and an entry
+function. Each task has its own saved stack pointer and a start frame
+consumed by the assembly routine below; besides the callee-saved registers,
+the routine saves and restores \code{RFLAGS}, so the interrupt flag follows
+the task across a switch:
+
+\begin{lstlisting}[caption={Context switch with \code{RFLAGS}.},label={lst:ctxswitch}]
+task_switch:
+    pushfq
+    pushq %rbx
+    pushq %rbp
+    pushq %r12
+    pushq %r13
+    pushq %r14
+    pushq %r15
+    movq %rsp, (%rdi)
+    movq %rsi, %rsp
+    popq %r15
+    popq %r14
+    popq %r13
+    popq %r12
+    popq %rbp
+    popq %rbx
+    popfq
+    ret
+\end{lstlisting}
+
+A new task starts at \code{task\_trampoline}, which calls the entry function
+and then \code{exit\_current}. The scheduler rotates over the \code{Ready}
+tasks; \code{yield\_now} marks the current task ready and switches, while
+\code{exit\_current} marks it \code{Exited}. Exited slots are reused by the
+next \code{spawn}, like a zombie being reaped, and the old stack is returned
+to the heap.
+
+The policy is timer-preemptive round-robin. Each task owns a quantum of
+\code{QUANTUM\_TICKS = 5} timer interrupts (about 50 ms at 100 Hz). IRQ0
+increments the tick counter, sends the PIC EOI and calls
+\code{task::on\_tick}; when the quantum expires and another task is
+\code{Ready}, \code{on\_tick} saves the current context and switches without
+any cooperation from the task. The scan starts after the current slot, so a
+task can never be selected to switch to itself. \code{yield\_now} remains
+available for explicit hand-off and resets the quantum.
+
+Because the timer handler itself can take the task-table lock, the spinlocks
+of \code{sync.rs} follow the \code{irqsave} model: acquiring a lock disables
+local interrupts and the guard restores the previous \code{RFLAGS} on drop.
+Preemption is suspended while a ring 3 program is active, since that program
+runs on the shared TSS interrupt stack instead of a per-task stack. All tasks
+share the kernel address space; there is no \code{fork}, \code{exec},
+\code{wait} or per-process page table.
+
+The scheduler also has a real blocking state. \code{task::sleep(ticks)} is the
+equivalent of \code{schedule\_timeout}: the current task stores an absolute
+deadline in \code{wake\_at}, changes to \code{Blocked} and switches away, so it
+no longer competes for the CPU. At every IRQ0, \code{on\_tick} advances the
+scheduler clock and moves expired tasks back to \code{Ready}; the idle loop
+also executes \code{hlt} when no task is runnable, instead of spinning. The
+timer wakeup path is the moral equivalent of the timer wheel used by
+\code{schedule\_timeout}.
+
+Blocking also supports events. \code{WaitQueue} mirrors the contract of
+\code{wait\_queue\_head\_t} in \code{include/linux/wait.h}: a task records the
+queue in \code{wait\_queue}, changes to \code{Blocked} and is only made
+\code{Ready} when another context calls \code{wake\_up\_one} or
+\code{wake\_up\_all}. \code{wait\_event} rechecks a condition after every
+wakeup, and \code{wait\_event\_timeout} adds a deadline, like
+\code{wait\_event\_timeout} in Linux. The queue identity is the address of
+the static structure, and the waiters live in the task table, which is a
+simplified version of Linux's intrusive linked lists.
+
+The \code{spawn [nome] [n] [sleep|wait|timeout]} applet creates up to eight
+workers. Each worker yields once and then busy-waits for timer ticks without
+further yields, so the observed interleaving comes from preemption. With the
+optional \code{sleep} mode (\code{spawn nap 2 sleep}), the worker calls
+\code{task::sleep} between rounds. With \code{wait}, it sleeps on the event
+queue until the \code{notify} applet calls \code{wake\_up\_all} (or
+\code{notify one} for \code{wake\_up}); \code{timeout} uses
+\code{wait\_event\_timeout} and reports whether the event arrived within one
+second. In all blocking modes \code{ps} shows the task as \code{dormindo}
+while the shell stays responsive. \code{ps} prints PID, PPID, state, yield
+count, preemption count (\code{PREEMP}) and name. For example, two busy
+workers advance one step at a time and each accumulates three preemptions.
+
+\section{New system calls}
+
+The \code{int 0x80} table was extended with file and process calls:
+
+\begin{center}
+\begin{tabular}{@{}cll@{}}
+\toprule
+\textbf{Number} & \textbf{Name} & \textbf{Arguments} \\
+\midrule
+0  & \code{exit}     & \code{status} \\
+1  & \code{write}    & \code{buf, len} \\
+2  & \code{read}     & \code{buf, len, flags} \\
+3  & \code{get\_tty} & -- \\
+4  & \code{open}     & \code{path, len, flags} \\
+5  & \code{close}    & \code{fd} \\
+6  & \code{read\_fd} & \code{fd, buf, len} \\
+7  & \code{write\_fd}& \code{fd, buf, len} \\
+8  & \code{lseek}    & \code{fd, offset, whence} \\
+9  & \code{getpid}   & -- \\
+10 & \code{getppid}  & -- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\code{filetest} runs a ring 3 blob that opens \code{/etc/motd} with
+\code{open}, reads it with \code{read\_fd}, writes the content with
+\code{write\_fd} and closes the descriptor. \code{getpid} and \code{getppid}
+read the current task from the scheduler instead of returning constants.

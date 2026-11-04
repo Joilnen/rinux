@@ -56,10 +56,12 @@ CPUs & One CPU; SMP is not initialized. \\
 Interrupts & IDT with 256 gates; PIC remapped and timer IRQ0 at
 ~100 Hz. IRQ1 (keyboard) remains masked. \\
 Input & Polling of \code{0x60}/\code{0x64} and of COM1; timer via IRQ. \\
-Concurrency & Spinlock in the console; the timer does not preempt (there is no
-scheduler). \\
-Memory & 4 KiB physical frames, on-demand tables and page faults;
-no heap, \code{alloc} or \code{Vec}. \\
+Concurrency & IRQ-safe spinlocks in the console, ramfs, heap, VFS and task
+table. The round-robin scheduler preempts on the timer quantum (5 ticks),
+switches on explicit yield, blocks tasks in \code{sleep} until a deadline
+tick and suspends them on event wait queues until \code{wake\_up}. \\
+Memory & 4 KiB physical frames, on-demand tables and page faults, a 1 MiB
+first-fit heap, and \code{alloc}/\code{Vec}/\code{String}. \\
 Stacks & 8 KiB in the stub (low), 32 KiB in the kernel (high), 16 KiB for
 user interrupts and 8 KiB of IST for double fault. \\
 Lifetime & The shell never returns; \code{halt} and \code{reboot} end the flow. \\
@@ -78,29 +80,41 @@ Lifetime & The shell never returns; \code{halt} and \code{reboot} end the flow. 
 \textbf{Module} & \textbf{Uses / is used by} \\
 \midrule
 \code{main.rs} & Declares all modules; calls \code{vga}, \code{serial},
-\code{tty}, \code{paging}, \code{gdt}, \code{keyboard}, \code{idt},
-\code{arch} and \code{shell}; implements the printing macros. \\
+\code{tty}, \code{paging}, \code{heap}, \code{ramfs}, \code{vfs}, \code{gdt},
+\code{keyboard}, \code{idt}, \code{task}, \code{arch} and \code{shell};
+implements the printing macros. \\
 \code{boot.rs} & Assembly that calls \code{kernel\_main}; it is not called by
 Rust. \\
-\code{arch.rs} & I/O ports, \code{sti}, \code{halt} and \code{reboot};
-used by several modules. \\
+\code{arch.rs} & I/O ports, \code{irq\_save}/\code{irq\_restore},
+\code{sti}, \code{halt} and \code{reboot}; used by several modules. \\
 \code{gdt.rs} & GDT/TSS and stacks; uses only \code{core::arch}. \\
 \code{idt.rs} & Uses \code{arch}, \code{paging}, \code{syscall} and
 \code{user} to handle exceptions, IRQs and the \emph{syscall}. \\
 \code{paging.rs} & Frames, tables and \emph{page faults}; uses only
 \code{core::arch}. \\
+\code{heap.rs} & First-fit heap and \code{\#[global\_allocator]}; uses
+\code{paging} and \code{sync}. \\
+\code{ramfs.rs} & 48-node in-memory tree; uses \code{sync}. \\
+\code{proc.rs} & Synthetic \code{/proc}; renders from \code{heap},
+\code{idt}, \code{paging} and \code{task}. \\
+\code{vfs.rs} & Descriptor table over the ramfs, \code{/proc} and consoles;
+uses \code{proc}, \code{ramfs}, \code{tty} and \code{sync}. \\
+\code{task.rs} & Task table, stacks, timer-preemptive switch, blocking sleep
+and event wait queues; uses \code{sync} and \code{arch}. \\
 \code{user.rs} & Builds the programs, calls \code{paging} and \code{tty} and
 returns to the kernel through \code{user\_resume}. \\
-\code{syscall.rs} & Implements \code{exit/write/read/get\_tty}; uses
-\code{paging}, \code{tty} and \code{user}. \\
-\code{shell.rs} & Uses \code{tty}, \code{idt}, \code{paging}, \code{user} and
+\code{syscall.rs} & Implements the eleven calls; uses \code{paging},
+\code{task}, \code{tty}, \code{user} and \code{vfs}. \\
+\code{shell.rs} & Uses \code{tty}, \code{idt}, \code{paging}, \code{heap},
+\code{ramfs}, \code{vfs}, \code{proc}, \code{task}, \code{user} and
 \code{arch}. \\
 \code{tty.rs} & Owns the eight consoles; uses \code{vga}, \code{keyboard},
 \code{serial} and \code{sync}. \\
 \code{vga.rs} & Low-level renderer; uses \code{arch}. \\
 \code{keyboard.rs} & Uses \code{arch} to access the 8042. \\
 \code{serial.rs} & Uses \code{arch} to access the UART. \\
-\code{sync.rs} & Console spinlock; uses only \code{core}. \\
+\code{sync.rs} & IRQ-safe spinlocks for console, ramfs, heap, VFS and tasks;
+uses \code{core} and \code{arch}. \\
 \bottomrule
 \end{tabularx}
 \end{table}

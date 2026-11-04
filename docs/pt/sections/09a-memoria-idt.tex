@@ -303,10 +303,12 @@ leitura de usu\'ario em p\'agina presente e supervisor.
 \begin{itemize}
   \item n\~ao h\'a espa\c{c}os de endere\c{c}o separados por processo: o
         programa de usu\'ario usa a mesma PML4 do kernel;
-  \item n\~ao h\'a escalonador nem troca de contexto; o timer apenas conta
-        \emph{ticks};
-  \item a \'unica \emph{syscall} \'e \code{exit} (\code{rax = 0}); n\~ao
-        h\'a valida\c{c}\~ao de ponteiros de usu\'ario;
+  \item a preemp\c{c}\~ao fica suspensa enquanto um programa de ring 3 est\'a
+        ativo, pois ele usa a pilha de interrup\c{c}\~ao compartilhada do TSS;
+        n\~ao h\'a pilha de kernel por processo nem \code{fork};
+  \item as syscalls s\~ao as quatro originais mais as chamadas de arquivo e
+        de PID; ponteiros de usu\'ario s\~ao validados por intervalo, mas
+        n\~ao h\'a um auxiliar \code{copy\_from\_user};
   \item SMEP/SMAP e NX ainda n\~ao est\~ao habilitados; a separa\c{c}\~ao
         depende apenas de U/S;
   \item o teclado continua em \emph{polling} e IRQ1 permanece mascarada;

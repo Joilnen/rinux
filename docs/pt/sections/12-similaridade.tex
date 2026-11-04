@@ -27,7 +27,7 @@ A compara\c{c}\~ao usa como refer\^encia a \'arvore Linux 7.3.1 presente em
 
 \begin{itemize}
   \item linhas f\'isicas dos 12 arquivos Linux mais pr\'oximos;
-  \item linhas f\'isicas dos 12 m\'odulos Rust;
+  \item linhas f\'isicas dos 19 m\'odulos Rust;
   \item funcionalidades presentes, ausentes e parciais;
   \item mecanismos de hardware usados (Multiboot2, GDT, PAE, long mode,
         VGA texto, 8042, UART 16550);
@@ -65,16 +65,27 @@ ing\^enua de que ``\'e um Linux em Rust'' quanto a conclus\~ao oposta de que
 \code{kernel/printk/printk.c} & 5.188 & macros + \code{tty.rs} \\
 \code{kernel/panic.c} & 1.274 & \emph{panic handler} em \code{main.rs} \\
 \code{init/main.c} & 1.706 & \code{kernel\_main} em \code{main.rs} \\
+\code{mm/slab\_common.c}, \code{mm/slub.c} & --- & \code{heap.rs} \\
+\code{fs/ramfs/inode.c} & --- & \code{ramfs.rs} \\
+\code{fs/open.c}, \code{fs/file\_table.c} & --- & \code{vfs.rs} \\
+\code{fs/proc/} & --- & \code{proc.rs} \\
+\code{kernel/sched/core.c} & --- & \code{task.rs} \\
+\code{arch/x86/entry/syscalls/syscall\_64.tbl} & --- & \code{syscall.rs} \\
 \midrule
-\textbf{Total Linux (12 arquivos)} & \textbf{22.352} & --- \\
-\textbf{Total Rust (14 m\'odulos)} & \textbf{3.223} & --- \\
+\textbf{Total Linux (12 primeiros arquivos)} & \textbf{22.352} & --- \\
+\textbf{Total Rust (19 m\'odulos)} & \textbf{6.797} & --- \\
 \bottomrule
 \end{longtable}
+
+As linhas marcadas com \code{---} ampliam o mapeamento conceitual depois da
+adi\c{c}\~ao do heap, do VFS, do \code{/proc}, das tarefas e das syscalls de
+arquivo; elas n\~ao fazem parte da compara\c{c}\~ao de linhas, que continua
+usando os doze primeiros arquivos Linux.
 
 A raz\~ao de linhas \'e:
 
 \[
-\frac{3.223}{22.352} \approx 14{,}42\%.
+\frac{6.797}{22.352} \approx 30{,}41\%.
 \]
 
 Em rela\c{c}\~ao \`a \'arvore Linux completa, que tem aproximadamente
@@ -82,11 +93,11 @@ Em rela\c{c}\~ao \`a \'arvore Linux completa, que tem aproximadamente
 raz\~ao \'e:
 
 \[
-\frac{3.223}{38.062.672} \approx 0{,}00847\%.
+\frac{6.797}{38.062.672} \approx 0{,}0179\%.
 \]
 
 \begin{atencao}[Linhas de c\'odigo n\~ao medem similaridade]
-Os 12 arquivos Linux n\~ao t\^em o mesmo escopo que os 14 m\'odulos Rust. O
+Os 12 arquivos Linux n\~ao t\^em o mesmo escopo que os 19 m\'odulos Rust. O
 \code{vgacon.c}, por exemplo, suporta v\'arias arquiteturas, consoles
 virtuais e modos gr\'aficos; o \code{vga.rs} implementa apenas texto 80x25.
 Al\'em disso, grande parte das linhas Linux \'e coment\'ario, configura\c{c}\~ao
@@ -115,27 +126,30 @@ Console e v\'ideo & 15 & 100 & 25 & 3,75 \\
 Teclado e entrada & 12 & 100 & 18 & 2,16 \\
 Serial e tty & 5 & 100 & 20 & 1,00 \\
 Interrup\c{c}\~oes e exce\c{c}\~oes & 12 & 100 & 30 & 3,60 \\
-Mem\'oria f\'isica e heap & 8 & 100 & 15 & 1,20 \\
-Processos, scheduler e syscalls & 12 & 100 & 5 & 0,60 \\
-Arquivos, rede e outros drivers & 6 & 100 & 0 & 0,00 \\
+Mem\'oria f\'isica e heap & 8 & 100 & 25 & 2,00 \\
+Processos, scheduler e syscalls & 12 & 100 & 30 & 3,60 \\
+Arquivos, rede e outros drivers & 6 & 100 & 10 & 0,60 \\
 \midrule
-\textbf{Total} & \textbf{100} & --- & --- & \textbf{21,11} \\
+\textbf{Total} & \textbf{100} & --- & --- & \textbf{25,51} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-O \'indice ponderado \'e \textbf{21,1\%}. Ele deve ser lido como:
+O \'indice ponderado \'e \textbf{25,5\%}. Ele deve ser lido como:
 
 \begin{quote}
-``Dentro das dez dimens\~oes escolhidas, o projeto reproduz cerca de 21,1\%
+``Dentro das dez dimens\~oes escolhidas, o projeto reproduz cerca de 25,5\%
 do que o Linux oferece, com peso maior para boot, console e teclado.''
 \end{quote}
 
-N\~ao significa que 21,1\% do c\'odigo do Linux foi reimplementado. Em
+N\~ao significa que 25,5\% do c\'odigo do Linux foi reimplementado. Em
 n\'umero de subsistemas e servi\c{c}os, a fra\c{c}\~ao \'e muito menor: o
-projeto n\~ao tem, por exemplo, nenhum dos servi\c{c}os que ocupam a maior
-parte do kernel (scheduler, mem\'oria virtual completa, VFS, rede, drivers,
-seguran\c{c}a, virtualiza\c{c}\~ao).
+projeto tem apenas um heap \emph{first-fit}, um escalonador
+\emph{round-robin} preemptivo por timer com \code{sleep} bloqueante e filas
+de espera por evento, um sistema de arquivos em mem\'oria e um \code{/proc}
+sint\'etico, enquanto o Linux tamb\'em tem buddy allocator, slab, CFS/EEVDF
+com classes de tempo real, uma infraestrutura de wait queues e locks muito
+mais rica, um VFS completo com block devices e rede.
 
 \subsection{Leitura por dimens\~ao}
 
@@ -166,14 +180,22 @@ seguran\c{c}a, virtualiza\c{c}\~ao).
   \item \textbf{Interrup\c{c}\~oes (30/100)}: h\'a IDT, \emph{stubs} para
         exce\c{c}\~oes, PIC remapeado e PIT em IRQ0; faltam APIC, IRQ1,
         IRQs esp\'urias, \emph{softirq}, workqueues e preemp\c{c}\~ao.
-  \item \textbf{Mem\'oria/heap (15/100)}: h\'a alocador de frames e demand
-        paging, mas n\~ao h\'a heap, slab, page cache ou \code{vmalloc}.
-  \item \textbf{Processos (5/100)}: h\'a demos em ring 3 e um login com TSS
-        e \code{int 0x80}, mas n\~ao h\'a \code{task\_struct},
-        scheduler, context switch, espa\c{c}os de endere\c{c}o separados,
-        sinais ou uma tabela de syscalls maior.
-  \item \textbf{FS/rede (0/100)}: n\~ao h\'a VFS, block layer, TCP/IP,
-        netfilter ou drivers de dispositivos.
+  \item \textbf{Mem\'oria/heap (25/100)}: h\'a alocador de frames por bitmap,
+        demand paging e um heap \emph{first-fit} de 1 MiB atr\'as de
+        \code{\#[global\_allocator]}, mas n\~ao h\'a buddy allocator, slab,
+        page cache, \code{vmalloc}, swap ou NUMA.
+  \item \textbf{Processos (30/100)}: h\'a tabela de tarefas com PID/PPID e
+        estados, troca de contexto que preserva \code{RFLAGS}, escalonador
+        \emph{round-robin} preemptivo por timer com quantum de cinco ticks,
+        \code{sleep} bloqueante com sem\^antica de \code{schedule\_timeout},
+        filas de espera por evento com \code{wait\_event}/\code{wake\_up} e
+        onze syscalls; n\~ao h\'a \code{fork}/\code{exec}/\code{wait},
+        espa\c{c}os de endere\c{c}o separados, sinais, prioridades ou
+        CFS/EEVDF.
+  \item \textbf{FS/rede (10/100)}: h\'a ramfs, VFS com dezesseis descritores e
+        um \code{/proc} sint\'etico, mas n\~ao h\'a block layer, driver de
+        disco, tabela de mounts, modelo de permiss\~oes, page cache, TCP/IP ou
+        netfilter.
 \end{itemize}
 
 \section{Similaridade arquitetural}
@@ -203,12 +225,17 @@ Serial & 8250 + tty + termios & 16550 por polling \\
 Entrada & IRQ1/IRQ4, \emph{softirq}, workqueues & IRQ0 (timer) + polling no
 shell + \code{int 0x80} \\
 Tempo & PIT/APIC, \code{jiffies}, timers & PIT a ~100 Hz, contador de
-\emph{ticks} \\
+\emph{ticks}, quantum preemptivo \\
 Mem\'oria & buddy, slab, \code{vmalloc}, page cache & Bitmap de frames,
-demand paging; sem heap \\
-Processos & CFS/EEVDF, namespaces, cgroups & Demo em ring 3; sem scheduler \\
+demand paging, heap \emph{first-fit} \\
+Processos & CFS/EEVDF, namespaces, cgroups & Tabela de tarefas,
+\emph{round-robin} preemptivo, \code{sleep} bloqueante e wait queues; sem
+\code{fork} ou namespaces \\
 Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} com
-\code{exit/write/read/get\_tty} \\
+onze chamadas (\code{exit}..\code{getppid}) \\
+Arquivos & VFS, inodes, dentries, page cache & ramfs, 16 descritores,
+\code{/proc} sint\'etico; sem block layer \\
+Rede & sockets, TCP/IP, netfilter & Ausente \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -243,13 +270,13 @@ Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} com
 \textbf{Medida} & \textbf{Resultado} \\
 \midrule
 C\'odigo copiado & 0\% (implementa\c{c}\~ao independente) \\
-Linhas vs.\ 12 arquivos an\'alogos & $\approx 11{,}22\%$ \\
-Linhas vs.\ \'arvore Linux completa & $\approx 0{,}0066\%$ \\
-Similaridade funcional ponderada (10 dimens\~oes) & $\approx 21{,}1\%$ \\
-Cobertura de subsistemas do kernel completo & muito baixa; ordem de 1\% \\
+Linhas vs.\ 12 arquivos an\'alogos & $\approx 30{,}41\%$ \\
+Linhas vs.\ \'arvore Linux completa & $\approx 0{,}0179\%$ \\
+Similaridade funcional ponderada (10 dimens\~oes) & $\approx 25{,}5\%$ \\
+Cobertura de subsistemas do kernel completo & muito baixa; ordem de 2\% \\
 Similaridade conceitual no boot & alta (mesmos mecanismos x86) \\
 Similaridade conceitual em drivers & m\'edia/baixa (subconjunto por polling) \\
-Similaridade conceitual em servi\c{c}os & nula (sem MM, scheduler, FS, rede) \\
+Similaridade conceitual em servi\c{c}os & baixa (MM, scheduler e VFS b\'asicos; sem rede) \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -266,7 +293,7 @@ Em uma escala qualitativa:
         VGA, PS/2 e serial; baixo para entender o Linux como sistema
         operacional completo.
   \item \textbf{Nota de 0 a 10 para ``quanto do Linux foi reimplementado''}:
-        aproximadamente \textbf{2,1/10} na pontua\c{c}\~ao ponderada; menos de
+        aproximadamente \textbf{2,5/10} na pontua\c{c}\~ao ponderada; menos de
         \textbf{0,1/10} se o crit\'erio for o kernel completo em
         funcionalidades.
 \end{itemize}
@@ -276,8 +303,9 @@ Se o objetivo for estudar o Linux, este projeto serve como ``mapa do
 caminho inicial'': ele mostra, em c\'odigo pequeno, o que acontece antes de
 o kernel Linux come\c{c}ar a usar seus subsistemas. Se o objetivo for
 substituir o Linux, o projeto est\'a a v\'arias ordens de grandeza de
-dist\^ancia: faltam escalonador, espa\c{c}os de endere\c{c}o por processo,
-heap, sistema de arquivos, drivers e endurecimento de seguran\c{c}a.
+dist\^ancia: faltam CFS/EEVDF, \code{fork}/\code{exec}, espa\c{c}os de
+endere\c{c}o por processo, sistema de arquivos em disco, rede, drivers e
+endurecimento de seguran\c{c}a.
 \end{nota}
 
 \section{Diferen\c{c}as essenciais}
@@ -291,14 +319,16 @@ heap, sistema de arquivos, drivers e endurecimento de seguran\c{c}a.
 \textbf{Aspecto} & \textbf{Linux} & \textbf{Rust VGA Kernel} \\
 \midrule
 Linguagem & C e assembly & Rust e assembly \\
-Tamanho & $\sim$38 milh\~oes de linhas & 2.500 linhas \\
+Tamanho & $\sim$38 milh\~oes de linhas & 6.797 linhas \\
 Modelo de boot & Protocolo pr\'oprio, setup, EFI & Multiboot2/GRUB \\
 Interrup\c{c}\~oes & IDT, PIC/APIC, timers & IDT, PIC/PIT; teclado em polling \\
-Concorr\^encia & SMP, preemp\c{c}\~ao, RCU & Uma CPU, sem preemp\c{c}\~ao \\
+Concorr\^encia & SMP, preemp\c{c}\~ao, RCU & Uma CPU, \emph{round-robin}
+preemptivo com sleep bloqueante e wait queues \\
 Mem\'oria & Buddy, slab, VM, page cache & Bitmap de frames, demand paging,
-sem heap \\
-Processos & Scheduler, namespaces, cgroups & Apenas demo em ring 3 \\
-Entrada/sa\'ida & VFS, block, net, tty & Portas de I/O diretas \\
+heap \emph{first-fit} \\
+Processos & Scheduler, namespaces, cgroups & Tabela de tarefas,
+\emph{round-robin} preemptivo, wait queues; sem namespaces \\
+Entrada/sa\'ida & VFS, block, net, tty & ramfs, VFS, \code{/proc}, portas de I/O diretas \\
 Seguran\c{c}a & Rings, SMEP/SMAP, KASLR, LSM & Rings 0/3 e U/S; sem NX,
 SMEP ou SMAP \\
 Portabilidade & V\'arias arquiteturas & Apenas x86\_64 BIOS \\

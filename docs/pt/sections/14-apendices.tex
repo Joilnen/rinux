@@ -3,7 +3,7 @@
 \chapter{Cat\'alogo de fun\c{c}\~oes}
 \label{ap:funcoes}
 
-Esta se\c{c}\~ao lista as 129 fun\c{c}\~oes do c\'odigo Rust, agrupadas por
+Esta se\c{c}\~ao lista as 276 fun\c{c}\~oes do c\'odigo Rust, agrupadas por
 m\'odulo. O \emph{stub} \code{\_start} n\~ao \'e uma fun\c{c}\~ao Rust e
 aparece separadamente no Cap\'itulo~\ref{cap:boot}. Declara\c{c}\~oes
 \code{extern} sem corpo, como \code{gdt\_reload\_cs}, \code{user\_enter} e
@@ -28,7 +28,7 @@ Ponto de entrada Rust; inicializa drivers, imprime banner e entra no shell. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{arch.rs} (5 fun\c{c}\~oes)}
+\section{\code{arch.rs} (7 fun\c{c}\~oes)}
 
 \begin{longtable}{@{}p{5.2cm}p{9.3cm}@{}}
 \caption{Fun\c{c}\~oes de \code{arch.rs}.}\\
@@ -46,6 +46,10 @@ L\^e um byte de uma porta. \code{unsafe}. \\
 Escreve um byte em uma porta. \code{unsafe}. \\
 \code{enable\_interrupts()} &
 Executa \code{sti} para habilitar interrup\c{c}\~oes mascar\'aveis. \\
+\code{irq\_save() -> u64} &
+Salva \code{RFLAGS} e limpa \code{IF}; usado pelos spinlocks. \\
+\code{irq\_restore(flags: u64)} &
+Restaura o \code{RFLAGS} salvo por \code{irq\_save}. \\
 \code{halt\_loop() -> !} &
 La\c{c}o infinito com \code{cli; hlt}. \\
 \code{reboot() -> !} &
@@ -68,13 +72,13 @@ Envia \code{0xFE} ao 8042; se falhar, para a CPU. \\
 \code{SpinLock::new(data: T) -> SpinLock<T>} &
 Cria o lock em contexto \code{const}. \\
 \code{SpinLock::lock(\&self) -> SpinLockGuard<'\_, T>} &
-Adquire o lock girando at\'e conseguir. \\
+Salva \code{RFLAGS}, desabilita interrup\c{c}\~oes e gira at\'e adquirir. \\
 \code{SpinLockGuard::deref(\&self) -> \&T} &
 Acesso imut\'avel ao dado protegido. \\
 \code{SpinLockGuard::deref\_mut(\&mut self) -> \&mut T} &
 Acesso mut\'avel ao dado protegido. \\
 \code{SpinLockGuard::drop(\&mut self)} &
-Libera o lock com ordena\c{c}\~ao \code{Release}. \\
+Libera o lock com ordena\c{c}\~ao \code{Release} e restaura \code{RFLAGS}. \\
 \bottomrule
 \end{longtable}
 
@@ -241,10 +245,15 @@ Inv\'olucro de \code{write\_bytes} para strings. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{shell.rs} (9 fun\c{c}\~oes)}
+\section{\code{shell.rs} (61 fun\c{c}\~oes)}
 
-\begin{longtable}{@{}p{4.8cm}p{9.7cm}@{}}
-\caption{Fun\c{c}\~oes de \code{shell.rs}.}\\
+O shell \'e uma tabela est\'atica de 37 applets mais o parser, o despachante e
+os auxiliares de demo. A tabela abaixo lista as fun\c{c}\~oes centrais; os
+demais applets seguem o mesmo padr\~ao
+\code{fn(\&Command) -> Result<(), \&'static str>}.
+
+\begin{longtable}{@{}p{5.4cm}p{9.1cm}@{}}
+\caption{Fun\c{c}\~oes centrais de \code{shell.rs}.}\\
 \toprule
 \textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
 \midrule
@@ -254,27 +263,42 @@ Inv\'olucro de \code{write\_bytes} para strings. \\
 \midrule
 \endhead
 \code{run() -> !} &
-La\c{c}o eterno de prompt, leitura e execu\c{c}\~ao. \\
-\code{trim(bytes: \&[u8]) -> \&[u8]} &
-Remove espa\c{c}os ASCII das extremidades. \\
-\code{as\_text(bytes: \&[u8]) -> \&str} &
-Converte bytes em \code{\&str} ou texto de erro. \\
-\code{execute(line: \&[u8])} &
-Compara e executa o comando. \\
-\code{parse\_console(arg: \&[u8]) -> Option<usize>} &
-Interpreta um \'indice de console de um d\'igito para \code{tty} e \code{getty}. \\
-\code{getty\_demo(console: Option<usize>)} &
-Executa o login em ring 3 no console escolhido ou ativo. \\
-\code{demand\_demo()} &
-Escreve na regi\~ao de demand paging do kernel e mostra o valor. \\
-\code{user\_demo(protection: bool)} &
-Executa o demo em ring 3 e imprime o status ou a falha. \\
+La\c{c}o eterno de prompt, entrada, parsing e execu\c{c}\~ao; chama \code{task::idle}. \\
+\code{Command::parse(line: \&mut [u8]) -> Result<Command, \&'static str>} &
+Divide a linha em at\'e 24 spans, tratando aspas e escapes. \\
+\code{Command::arg(index) -> Option<\&[u8]>} &
+Devolve a fatia de um argumento. \\
+\code{execute(line: \&mut [u8])} &
+Interpreta e despacha para a tabela de applets. \\
+\code{find\_applet(name: \&[u8]) -> Option<\&Applet>} &
+Procura um comando pelo nome. \\
+\code{applet\_help}, \code{applet\_echo}, \code{applet\_cat}, \code{applet\_ls} &
+Listam, imprimem, leem pelo VFS e listam ramfs ou \code{/proc}. \\
+\code{applet\_ps}, \code{applet\_spawn} &
+Mostram a tabela de tarefas e criam workers preemptivos ou dorminhocos. \\
+\code{applet\_sleep()} &
+Bloqueia o shell com sem\^antica de \code{schedule\_timeout}. \\
+\code{applet\_notify()} &
+Avan\c{c}a o contador de eventos e chama \code{wake\_up\_one} ou
+\code{wake\_up\_all}. \\
+\code{applet\_info}, \code{applet\_mem} &
+Imprimem estat\'isticas de kernel, ramfs, heap, tarefas, preemp\c{c}\~oes,
+frames e faults. \\
+\code{worker\_task()} &
+Thread de kernel usada por \code{spawn}; cede uma vez e depois espera ticks do
+timer sem novos yields. \\
+\code{sleeper\_task()} &
+Thread de kernel usada por \code{spawn ... sleep}; bloqueia em
+\code{task::sleep} entre as rodadas. \\
+\code{waiter\_task()}, \code{waiter\_timeout\_task()} &
+Workers usados por \code{spawn ... wait|timeout}; dormem na fila de eventos,
+com ou sem prazo. \\
 \code{memory\_info()} &
-Mostra frames, page faults, ticks e flags U/S das p\'aginas. \\
+Mostra frames, heap, contadores do escalonador e flags U/S. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{gdt.rs} (7 fun\c{c}\~oes)}
+\section{\code{gdt.rs} (6 fun\c{c}\~oes)}
 
 \begin{longtable}{@{}p{6.0cm}p{8.5cm}@{}}
 \caption{Fun\c{c}\~oes de \code{gdt.rs}.}\\
@@ -288,8 +312,6 @@ Mostra frames, page faults, ticks e flags U/S das p\'aginas. \\
 \endhead
 \code{stack\_top<const N: usize>(stack: *mut Stack<N>) -> u64} &
 Calcula o topo de uma pilha est\'atica. \\
-\code{gdt\_reload\_cs()} &
-Recarrega \code{CS} ap\'os carregar a nova GDT. \\
 \code{user\_kernel\_stack\_top() -> u64} &
 Topo da pilha de 16 KiB usada em interrup\c{c}\~oes vindas de ring 3. \\
 \code{double\_fault\_stack\_top() -> u64} &
@@ -409,7 +431,7 @@ Copia o programa para \code{USER\_CODE}, criando a p\'agina residente. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{user.rs} (10 fun\c{c}\~oes)}
+\section{\code{user.rs} (9 fun\c{c}\~oes)}
 
 \begin{longtable}{@{}p{6.0cm}p{8.5cm}@{}}
 \caption{Fun\c{c}\~oes de \code{user.rs}.}\\
@@ -435,12 +457,14 @@ Indica se h\'a um programa de usu\'ario em execu\c{c}\~ao. \\
 Instala o c\'odigo, entra em ring 3 e devolve o status de sa\'ida. \\
 \code{run\_getty(console: Option<usize>) -> Result<i32, \&'static str>} &
 Troca para o console pedido, executa o blob de login e devolve o status. \\
+\code{run\_file() -> Result<i32, \&'static str>} &
+Executa o blob em ring 3 que abre e l\^e \code{/etc/motd} via syscalls. \\
 \code{abort(status: i32) -> !} &
 Chamado por exce\c{c}\~oes/\emph{syscall}; grava o status e retoma o kernel. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{syscall.rs} (3 fun\c{c}\~oes)}
+\section{\code{syscall.rs} (9 fun\c{c}\~oes)}
 
 \begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
 \caption{Fun\c{c}\~oes de \code{syscall.rs}.}\\
@@ -453,11 +477,209 @@ Chamado por exce\c{c}\~oes/\emph{syscall}; grava o status e retoma o kernel. \\
 \midrule
 \endhead
 \code{dispatch(frame: \&mut InterruptFrame)} &
-Despacha \code{exit}, \code{write}, \code{read} e \code{get\_tty}. \\
+Despacha as onze chamadas (\code{exit}, \code{write}, \code{read},
+\code{get\_tty}, \code{open}, \code{close}, \code{read\_fd},
+\code{write\_fd}, \code{lseek}, \code{getpid}, \code{getppid}). \\
 \code{sys\_write(frame: \&mut InterruptFrame)} &
 Valida o buffer do usu\'ario, escreve no console ativo e devolve o tamanho. \\
 \code{sys\_read(frame: \&mut InterruptFrame)} &
 Valida o buffer e l\^e uma linha do console, com eco opcional. \\
+\code{read\_line(ptr, len, echo) -> u64} &
+Copia uma linha do console para um ponteiro do usu\'ario. \\
+\code{sys\_open(frame: \&mut InterruptFrame)} &
+Copia o caminho e o abre pelo VFS. \\
+\code{sys\_close(frame: \&mut InterruptFrame)} &
+Fecha um descritor. \\
+\code{sys\_read\_fd(frame: \&mut InterruptFrame)} &
+L\^e de um descritor para um buffer validado do usu\'ario. \\
+\code{sys\_write\_fd(frame: \&mut InterruptFrame)} &
+Escreve um buffer validado do usu\'ario em um descritor. \\
+\code{sys\_lseek(frame: \&mut InterruptFrame)} &
+Reposiciona o offset do descritor. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{heap.rs} (9 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Fun\c{c}\~oes de \code{heap.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{Block::new()} &
+Constr\'oi um cabe\c{c}alho de bloco de 16 bytes. \\
+\code{Heap::grow() -> Result<(), ()>} &
+Mapeia mais uma p\'agina de 4 KiB quando a lista livre n\~ao atende. \\
+\code{Heap::insert\_free(block: *mut Block)} &
+Insere um bloco livre em ordem de endere\c{c}o e coalesce vizinhos. \\
+\code{Heap::take(layout: Layout) -> *mut u8} &
+Aloca\c{c}\~ao \emph{first-fit}; pode crescer o heap. \\
+\code{Heap::give\_back(ptr: *mut u8)} &
+Devolve um bloco \`a lista livre. \\
+\code{align\_up(value, align) -> usize} &
+Arredonda um endere\c{c}o para o alinhamento pedido. \\
+\code{GlobalAlloc::alloc}, \code{GlobalAlloc::dealloc} &
+Implementa\c{c}\~ao da interface de alocador global. \\
+\code{stats() -> Stats} &
+Devolve bytes mapeados, bytes em uso e contagem de aloca\c{c}\~oes. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{ramfs.rs} (31 fun\c{c}\~oes)}
+
+O ramfs guarda 48 n\'os fixos em um array est\'atico atr\'as de um spinlock.
+As fun\c{c}\~oes principais s\~ao:
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Fun\c{c}\~oes principais de \code{ramfs.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{init()}, \code{lock() -> SpinLockGuard} &
+Criam a \'arvore inicial e d\~ao acesso exclusivo a ela. \\
+\code{Fs::seed()} &
+Cria \code{/etc}, \code{/home}, \code{/proc}, \code{/README} e outras
+entradas iniciais. \\
+\code{Fs::resolve(path) -> Result<usize, \&'static str>} &
+Resolve um caminho absoluto ou relativo para um \'indice de n\'o. \\
+\code{Fs::create(path, is\_dir)}, \code{Fs::remove(path, recursive)} &
+Criam e removem n\'os. \\
+\code{Fs::read}, \code{Fs::write}, \code{Fs::read\_at}, \code{Fs::write\_at} &
+I/O de arquivo inteiro e por offset. \\
+\code{Fs::truncate}, \code{Fs::rename} &
+Mudam o tamanho e renomeiam um n\'o. \\
+\code{Fs::path(index, out) -> Result<usize, \&'static str>} &
+Escreve o caminho absoluto de um n\'o em um buffer. \\
+\code{Fs::usage() -> (usize, usize)} &
+Devolve o n\'umero de n\'os usados e os bytes armazenados. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{proc.rs} (9 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Fun\c{c}\~oes de \code{proc.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{lookup(path: \&[u8]) -> Option<Entry>} &
+Resolve \code{/proc/<nome>} para uma entrada. \\
+\code{is\_dir(path) -> bool} &
+Reconhece \code{/proc} e \code{/proc/}. \\
+\code{size(entry) -> usize}, \code{read(entry, offset, out) -> usize} &
+Renderizam a entrada e copiam a fatia pedida. \\
+\code{Buffer::new}, \code{Buffer::write\_str} &
+Buffer fixo de 2 KiB com \code{fmt::Write} usado na renderiza\c{c}\~ao. \\
+\code{render(entry, out) -> usize} &
+Formata version, uptime, meminfo, ps, cpuinfo, mounts ou cmdline. \\
+\code{render\_meminfo}, \code{render\_ps} &
+Formatam contadores de frames, heap e tarefas, e a tabela de tarefas. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{vfs.rs} (11 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Fun\c{c}\~oes de \code{vfs.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{init()} &
+Pr\'e-abre os descritores 0, 1 e 2 no console. \\
+\code{open(path, flags) -> Result<usize, \&'static str>} &
+Abre um arquivo do ramfs, um caminho de console ou uma entrada
+\code{/proc}. \\
+\code{close(fd)}, \code{open\_count() -> usize} &
+Libera um descritor e conta os abertos. \\
+\code{read(fd, out) -> Result<usize, \&'static str>} &
+L\^e no offset atual e o avan\c{c}a. \\
+\code{write(fd, data) -> Result<usize, \&'static str>} &
+Escreve no offset atual, tratando append e truncate. \\
+\code{lseek(fd, offset, whence) -> Result<u64, \&'static str>} &
+Suporta \code{SEEK\_SET}, \code{SEEK\_CUR} e \code{SEEK\_END}. \\
+\code{Fd::free()}, \code{Fd::console()}, \code{Table::free\_slot()} &
+Construtores de descritor e busca de slot. \\
+\code{is\_console\_path(path) -> bool} &
+Reconhece \code{/dev/tty} e \code{/dev/console}. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{task.rs} (29 fun\c{c}\~oes)}
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Fun\c{c}\~oes de \code{task.rs}.}\\
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Assinatura} & \textbf{Descri\c{c}\~ao} \\
+\midrule
+\endhead
+\code{init()} &
+Reinicia a tabela e instala o shell como PID 1. \\
+\code{spawn(name, entry) -> Result<u64, \&'static str>} &
+Aloca uma pilha de 16 KiB, reusa um slot encerrado e devolve o novo PID. \\
+\code{current\_pid()}, \code{current\_ppid()} &
+Devolvem os identificadores da tarefa em execu\c{c}\~ao. \\
+\code{yield\_now()} &
+Troca \emph{round-robin} expl\'icita para a pr\'oxima tarefa pronta; reinicia
+o quantum. \\
+\code{sleep(ticks: u64)} &
+Bloqueia a tarefa atual at\'e um tick de prazo e troca de contexto
+(\code{schedule\_timeout}); usa \code{hlt} quando n\~ao h\'a tarefa pronta. \\
+\code{on\_tick()} &
+Hook da IRQ0: avan\c{c}a o rel\'ogio do escalonador, acorda tarefas vencidas,
+decrementa o quantum e preempta a tarefa atual quando ele expira. \\
+\code{block\_current(queue, deadline) -> bool} &
+Bloqueia quem chama em uma fila com prazo opcional; devolve se um evento
+chegou antes do timeout. \\
+\code{WaitQueue::new()} &
+Cria uma fila est\'atica cuja identidade \'e o pr\'oprio endere\c{c}o. \\
+\code{wait\_event(condition)}, \code{wait\_event\_timeout(ticks, condition)} &
+Dormem at\'e a condi\c{c}\~ao valer, opcionalmente com prazo
+(\code{wait\_event}/\code{wait\_event\_timeout} no Linux). \\
+\code{wake\_up\_one()}, \code{wake\_up\_all()}, \code{wake(queue, one)} &
+Tornam um ou todos os waiters da fila \code{Ready}, sem trocar de contexto
+imediatamente. \\
+\code{waiters()} &
+Conta as tarefas bloqueadas na fila. \\
+\code{exit\_current() -> !} &
+Marca a tarefa atual como \code{Exited} e troca de contexto. \\
+\code{idle()} &
+Bloqueia por um tick e retorna, para o shell pollar a entrada a cada ~10 ms. \\
+\code{for\_each(visit)} &
+Percorre a tabela para \code{ps} e \code{/proc/ps}. \\
+\code{stats() -> Stats} &
+Conta tarefas totais, prontas, em execu\c{c}\~ao, dormindo, encerradas e
+preemp\c{c}\~oes. \\
+\code{task\_trampoline()} &
+Primeira fun\c{c}\~ao de uma nova tarefa; chama a entrada e depois
+\code{exit\_current}. \\
+\code{State::as\_str}, \code{Task::free}, \code{Task::name}, \code{Task::set\_name},
+\code{next\_ready}, \code{kernel\_stack\_layout}, \code{current\_pid\_locked},
+\code{dummy\_entry} &
+Auxiliares internos de estados, nomes, escalonamento e layout de pilha. \\
 \bottomrule
 \end{longtable}
 
@@ -513,6 +735,8 @@ tabelas de p\'agina, pilha de 8 KiB). \\
 \'e sob demanda. \\
 \code{0xFFFFFFFFC0000000} & \code{KDEMAND\_BASE}: 2 MiB de demand paging do
 kernel. \\
+\code{0xFFFFFFFFE0000000} & \code{HEAP\_BASE}: 1 MiB de heap do kernel
+(alocador \emph{first-fit}). \\
 \bottomrule
 \end{tabularx}
 \end{table}

@@ -3,7 +3,7 @@
 \chapter{Function Catalog}
 \label{ap:funcoes}
 
-This section lists the 129 functions of the Rust code, grouped by
+This section lists the 276 functions of the Rust code, grouped by
 module. The \emph{stub} \code{\_start} is not a Rust function and
 appears separately in Chapter~\ref{cap:boot}. \code{extern} declarations
 without a body, such as \code{gdt\_reload\_cs}, \code{user\_enter} and
@@ -28,7 +28,7 @@ Rust entry point; initializes drivers, prints the banner and enters the shell. \
 \bottomrule
 \end{longtable}
 
-\section{\code{arch.rs} (5 functions)}
+\section{\code{arch.rs} (7 functions)}
 
 \begin{longtable}{@{}p{5.2cm}p{9.3cm}@{}}
 \caption{Functions of \code{arch.rs}.}\\
@@ -46,6 +46,10 @@ Reads one byte from a port. \code{unsafe}. \\
 Writes one byte to a port. \code{unsafe}. \\
 \code{enable\_interrupts()} &
 Executes \code{sti} to enable maskable interrupts. \\
+\code{irq\_save() -> u64} &
+Saves \code{RFLAGS} and clears \code{IF}; used by the spinlocks. \\
+\code{irq\_restore(flags: u64)} &
+Restores the \code{RFLAGS} value saved by \code{irq\_save}. \\
 \code{halt\_loop() -> !} &
 Infinite loop with \code{cli; hlt}. \\
 \code{reboot() -> !} &
@@ -68,13 +72,13 @@ Sends \code{0xFE} to the 8042; if it fails, halts the CPU. \\
 \code{SpinLock::new(data: T) -> SpinLock<T>} &
 Creates the lock in a \code{const} context. \\
 \code{SpinLock::lock(\&self) -> SpinLockGuard<'\_, T>} &
-Acquires the lock by spinning until it succeeds. \\
+Saves \code{RFLAGS}, disables interrupts and spins until it acquires the lock. \\
 \code{SpinLockGuard::deref(\&self) -> \&T} &
 Immutable access to the protected data. \\
 \code{SpinLockGuard::deref\_mut(\&mut self) -> \&mut T} &
 Mutable access to the protected data. \\
 \code{SpinLockGuard::drop(\&mut self)} &
-Releases the lock with \code{Release} ordering. \\
+Releases the lock with \code{Release} ordering and restores \code{RFLAGS}. \\
 \bottomrule
 \end{longtable}
 
@@ -241,10 +245,14 @@ Wrapper around \code{write\_bytes} for strings. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{shell.rs} (9 functions)}
+\section{\code{shell.rs} (61 functions)}
 
-\begin{longtable}{@{}p{4.8cm}p{9.7cm}@{}}
-\caption{Functions of \code{shell.rs}.}\\
+The shell is a static table of 37 applets plus the parser, dispatcher and demo
+helpers. The table below lists the core functions; the remaining applets
+follow the same \code{fn(\&Command) -> Result<(), \&'static str>} pattern.
+
+\begin{longtable}{@{}p{5.4cm}p{9.1cm}@{}}
+\caption{Core functions of \code{shell.rs}.}\\
 \toprule
 \textbf{Signature} & \textbf{Description} \\
 \midrule
@@ -254,27 +262,41 @@ Wrapper around \code{write\_bytes} for strings. \\
 \midrule
 \endhead
 \code{run() -> !} &
-Eternal loop of prompt, read and execution. \\
-\code{trim(bytes: \&[u8]) -> \&[u8]} &
-Removes ASCII spaces from both ends. \\
-\code{as\_text(bytes: \&[u8]) -> \&str} &
-Converts bytes into \code{\&str} or an error text. \\
-\code{execute(line: \&[u8])} &
-Compares and executes the command. \\
-\code{parse\_console(arg: \&[u8]) -> Option<usize>} &
-Parses a single-digit console index for \code{tty} and \code{getty}. \\
-\code{getty\_demo(console: Option<usize>)} &
-Runs the ring 3 login on the selected or active console. \\
-\code{demand\_demo()} &
-Writes to the kernel demand paging region and prints the value. \\
-\code{user\_demo(protection: bool)} &
-Runs the demo in ring 3 and prints the status or the failure. \\
+Eternal loop of prompt, input, parsing and execution; calls \code{task::idle}. \\
+\code{Command::parse(line: \&mut [u8]) -> Result<Command, \&'static str>} &
+Splits the line into up to 24 spans, handling quotes and escapes. \\
+\code{Command::arg(index) -> Option<\&[u8]>} &
+Returns one argument slice. \\
+\code{execute(line: \&mut [u8])} &
+Parses and dispatches to the applet table. \\
+\code{find\_applet(name: \&[u8]) -> Option<\&Applet>} &
+Looks up a command by name. \\
+\code{applet\_help}, \code{applet\_echo}, \code{applet\_cat}, \code{applet\_ls} &
+List, print, read through the VFS and list ramfs or \code{/proc}. \\
+\code{applet\_ps}, \code{applet\_spawn} &
+Print the task table and create preemptive or sleeping workers. \\
+\code{applet\_sleep()} &
+Blocks the shell with \code{schedule\_timeout} semantics. \\
+\code{applet\_notify()} &
+Advances the demo event counter and calls \code{wake\_up\_one} or
+\code{wake\_up\_all}. \\
+\code{applet\_info}, \code{applet\_mem} &
+Print kernel, ramfs, heap, task, preemption, frame and fault statistics. \\
+\code{worker\_task()} &
+Kernel thread used by \code{spawn}; yields once, then busy-waits on timer
+ticks without further yields. \\
+\code{sleeper\_task()} &
+Kernel thread used by \code{spawn ... sleep}; blocks in \code{task::sleep}
+between rounds. \\
+\code{waiter\_task()}, \code{waiter\_timeout\_task()} &
+Workers used by \code{spawn ... wait|timeout}; sleep on the demo event queue,
+with or without a deadline. \\
 \code{memory\_info()} &
-Shows frames, page faults, ticks and the U/S flags of the pages. \\
+Shows frames, heap, scheduler counters and U/S flags. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{gdt.rs} (7 functions)}
+\section{\code{gdt.rs} (6 functions)}
 
 \begin{longtable}{@{}p{6.0cm}p{8.5cm}@{}}
 \caption{Functions of \code{gdt.rs}.}\\
@@ -288,8 +310,6 @@ Shows frames, page faults, ticks and the U/S flags of the pages. \\
 \endhead
 \code{stack\_top<const N: usize>(stack: *mut Stack<N>) -> u64} &
 Computes the top of a static stack. \\
-\code{gdt\_reload\_cs()} &
-Reloads \code{CS} after loading the new GDT. \\
 \code{user\_kernel\_stack\_top() -> u64} &
 Top of the 16 KiB stack used for interrupts coming from ring 3. \\
 \code{double\_fault\_stack\_top() -> u64} &
@@ -408,7 +428,7 @@ Copies the program to \code{USER\_CODE}, creating the resident page. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{user.rs} (10 functions)}
+\section{\code{user.rs} (9 functions)}
 
 \begin{longtable}{@{}p{6.0cm}p{8.5cm}@{}}
 \caption{Functions of \code{user.rs}.}\\
@@ -434,12 +454,14 @@ Indicates whether a user program is running. \\
 Installs the code, enters ring 3 and returns the exit status. \\
 \code{run\_getty(console: Option<usize>) -> Result<i32, \&'static str>} &
 Switches to the requested console, runs the login blob and returns its status. \\
+\code{run\_file() -> Result<i32, \&'static str>} &
+Runs the ring 3 blob that opens and reads \code{/etc/motd} through syscalls. \\
 \code{abort(status: i32) -> !} &
 Called by exceptions/\emph{syscall}; stores the status and resumes the kernel. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{syscall.rs} (3 functions)}
+\section{\code{syscall.rs} (9 functions)}
 
 \begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
 \caption{Functions of \code{syscall.rs}.}\\
@@ -452,11 +474,205 @@ Called by exceptions/\emph{syscall}; stores the status and resumes the kernel. \
 \midrule
 \endhead
 \code{dispatch(frame: \&mut InterruptFrame)} &
-Dispatches \code{exit}, \code{write}, \code{read} and \code{get\_tty}. \\
+Dispatches the eleven calls (\code{exit}, \code{write}, \code{read},
+\code{get\_tty}, \code{open}, \code{close}, \code{read\_fd},
+\code{write\_fd}, \code{lseek}, \code{getpid}, \code{getppid}). \\
 \code{sys\_write(frame: \&mut InterruptFrame)} &
 Validates the user buffer, writes to the active console and returns the length. \\
 \code{sys\_read(frame: \&mut InterruptFrame)} &
 Validates the buffer and reads a line from the console, with optional echo. \\
+\code{read\_line(ptr, len, echo) -> u64} &
+Copies a line from the console to a user pointer. \\
+\code{sys\_open(frame: \&mut InterruptFrame)} &
+Copies the path and opens it through the VFS. \\
+\code{sys\_close(frame: \&mut InterruptFrame)} &
+Closes a descriptor. \\
+\code{sys\_read\_fd(frame: \&mut InterruptFrame)} &
+Reads from a descriptor into a validated user buffer. \\
+\code{sys\_write\_fd(frame: \&mut InterruptFrame)} &
+Writes a validated user buffer to a descriptor. \\
+\code{sys\_lseek(frame: \&mut InterruptFrame)} &
+Repositions the descriptor offset. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{heap.rs} (9 functions)}
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Functions of \code{heap.rs}.}\\
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\code{Block::new()} &
+Builds a 16-byte block header. \\
+\code{Heap::grow() -> Result<(), ()>} &
+Maps one more 4 KiB page when the free list cannot satisfy a request. \\
+\code{Heap::insert\_free(block: *mut Block)} &
+Inserts a free block in address order and coalesces neighbours. \\
+\code{Heap::take(layout: Layout) -> *mut u8} &
+First-fit allocation; may grow the heap. \\
+\code{Heap::give\_back(ptr: *mut u8)} &
+Returns a block to the free list. \\
+\code{align\_up(value, align) -> usize} &
+Rounds an address up to the requested alignment. \\
+\code{GlobalAlloc::alloc}, \code{GlobalAlloc::dealloc} &
+Implementation of the global allocator interface. \\
+\code{stats() -> Stats} &
+Returns mapped bytes, used bytes and allocation count. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{ramfs.rs} (31 functions)}
+
+The ramfs stores 48 fixed nodes in a static array behind a spinlock. The main
+functions are:
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Main functions of \code{ramfs.rs}.}\\
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\code{init()}, \code{lock() -> SpinLockGuard} &
+Create the initial tree and provide exclusive access to it. \\
+\code{Fs::seed()} &
+Creates \code{/etc}, \code{/home}, \code{/proc}, \code{/README} and other
+initial entries. \\
+\code{Fs::resolve(path) -> Result<usize, \&'static str>} &
+Resolves an absolute or relative path to a node index. \\
+\code{Fs::create(path, is\_dir)}, \code{Fs::remove(path, recursive)} &
+Create and remove nodes. \\
+\code{Fs::read}, \code{Fs::write}, \code{Fs::read\_at}, \code{Fs::write\_at} &
+Whole-file and offset I/O. \\
+\code{Fs::truncate}, \code{Fs::rename} &
+Change file size and rename a node. \\
+\code{Fs::path(index, out) -> Result<usize, \&'static str>} &
+Writes the absolute path of a node into a buffer. \\
+\code{Fs::usage() -> (usize, usize)} &
+Returns the number of used nodes and bytes stored. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{proc.rs} (9 functions)}
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Functions of \code{proc.rs}.}\\
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\code{lookup(path: \&[u8]) -> Option<Entry>} &
+Resolves \code{/proc/<name>} to an entry. \\
+\code{is\_dir(path) -> bool} &
+Recognizes \code{/proc} and \code{/proc/}. \\
+\code{size(entry) -> usize}, \code{read(entry, offset, out) -> usize} &
+Render the entry and copy the requested slice. \\
+\code{Buffer::new}, \code{Buffer::write\_str} &
+Fixed 2 KiB \code{fmt::Write} buffer used for rendering. \\
+\code{render(entry, out) -> usize} &
+Formats version, uptime, meminfo, ps, cpuinfo, mounts or cmdline. \\
+\code{render\_meminfo}, \code{render\_ps} &
+Format frame, heap and task counters, and the task table. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{vfs.rs} (11 functions)}
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Functions of \code{vfs.rs}.}\\
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\code{init()} &
+Pre-opens descriptors 0, 1 and 2 on the console. \\
+\code{open(path, flags) -> Result<usize, \&'static str>} &
+Opens a ramfs file, a console path or a \code{/proc} entry. \\
+\code{close(fd)}, \code{open\_count() -> usize} &
+Release a descriptor and count the open ones. \\
+\code{read(fd, out) -> Result<usize, \&'static str>} &
+Reads at the current offset and advances it. \\
+\code{write(fd, data) -> Result<usize, \&'static str>} &
+Writes at the current offset, handling append and truncate. \\
+\code{lseek(fd, offset, whence) -> Result<u64, \&'static str>} &
+Supports \code{SEEK\_SET}, \code{SEEK\_CUR} and \code{SEEK\_END}. \\
+\code{Fd::free()}, \code{Fd::console()}, \code{Table::free\_slot()} &
+Descriptor constructors and slot lookup. \\
+\code{is\_console\_path(path) -> bool} &
+Recognizes \code{/dev/tty} and \code{/dev/console}. \\
+\bottomrule
+\end{longtable}
+
+\section{\code{task.rs} (29 functions)}
+
+\begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
+\caption{Functions of \code{task.rs}.}\\
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Signature} & \textbf{Description} \\
+\midrule
+\endhead
+\code{init()} &
+Resets the table and installs the shell as PID 1. \\
+\code{spawn(name, entry) -> Result<u64, \&'static str>} &
+Allocates a 16 KiB stack, reuses an exited slot and returns the new PID. \\
+\code{current\_pid()}, \code{current\_ppid()} &
+Return the identifiers of the running task. \\
+\code{yield\_now()} &
+Explicit round-robin switch to the next ready task; resets the quantum. \\
+\code{sleep(ticks: u64)} &
+Blocks the current task until a deadline tick and switches away
+(\code{schedule\_timeout}); uses \code{hlt} when nothing is runnable. \\
+\code{on\_tick()} &
+IRQ0 hook: advances the scheduler clock, wakes expired tasks, decrements the
+quantum and preempts the current task when it expires. \\
+\code{block\_current(queue, deadline) -> bool} &
+Blocks the caller on a wait queue with an optional deadline; returns whether
+an event arrived before the timeout. \\
+\code{WaitQueue::new()} &
+Creates a static wait queue whose identity is its own address. \\
+\code{wait\_event(condition)}, \code{wait\_event\_timeout(ticks, condition)} &
+Sleeps until the condition holds, optionally with a deadline
+(\code{wait\_event}/\code{wait\_event\_timeout} in Linux). \\
+\code{wake\_up\_one()}, \code{wake\_up\_all()}, \code{wake(queue, one)} &
+Makes one or every waiter of a queue \code{Ready}, without switching
+context immediately. \\
+\code{waiters()} &
+Counts the tasks blocked on the queue. \\
+\code{exit\_current() -> !} &
+Marks the current task \code{Exited} and switches away. \\
+\code{idle()} &
+Blocks for one tick and returns, so the shell polls input every ~10 ms. \\
+\code{for\_each(visit)} &
+Walks the task table for \code{ps} and \code{/proc/ps}. \\
+\code{stats() -> Stats} &
+Counts total, ready, running, blocked and exited tasks and preemptions. \\
+\code{task\_trampoline()} &
+First function of a new task; calls the entry and then \code{exit\_current}. \\
+\code{State::as\_str}, \code{Task::free}, \code{Task::name}, \code{Task::set\_name},
+\code{next\_ready}, \code{kernel\_stack\_layout}, \code{current\_pid\_locked},
+\code{dummy\_entry} &
+Internal helpers for states, names, scheduling and stack layout. \\
 \bottomrule
 \end{longtable}
 
@@ -512,6 +728,8 @@ page tables, 8 KiB stack). \\
 is on demand. \\
 \code{0xFFFFFFFFC0000000} & \code{KDEMAND\_BASE}: 2 MiB of kernel
 demand paging. \\
+\code{0xFFFFFFFFE0000000} & \code{HEAP\_BASE}: 1 MiB kernel heap
+(first-fit allocator). \\
 \bottomrule
 \end{tabularx}
 \end{table}

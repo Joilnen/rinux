@@ -1,183 +1,194 @@
 \babel@toc {brazilian}{}\relax 
-\contentsline {chapter}{\numberline {1}Introdu\c {c}\~ao}{8}{chapter.1}%
-\contentsline {section}{\numberline {1.1}Motiva\c {c}\~ao}{8}{section.1.1}%
-\contentsline {section}{\numberline {1.2}Objetivo do documento}{8}{section.1.2}%
-\contentsline {section}{\numberline {1.3}Escopo}{8}{section.1.3}%
-\contentsline {section}{\numberline {1.4}P\'ublico-alvo}{9}{section.1.4}%
-\contentsline {section}{\numberline {1.5}Conven\c {c}\~oes}{9}{section.1.5}%
-\contentsline {section}{\numberline {1.6}Estado do projeto}{9}{section.1.6}%
-\contentsline {chapter}{\numberline {2}Vis\~ao geral do sistema}{11}{chapter.2}%
-\contentsline {section}{\numberline {2.1}Resumo executivo}{11}{section.2.1}%
-\contentsline {section}{\numberline {2.2}Funcionalidades}{12}{section.2.2}%
-\contentsline {section}{\numberline {2.3}Requisitos}{12}{section.2.3}%
-\contentsline {subsection}{\numberline {2.3.1}Hardware}{12}{subsection.2.3.1}%
-\contentsline {subsection}{\numberline {2.3.2}Software de desenvolvimento}{12}{subsection.2.3.2}%
-\contentsline {section}{\numberline {2.4}Estrutura de diret\'orios}{13}{section.2.4}%
-\contentsline {section}{\numberline {2.5}M\'etricas do c\'odigo}{13}{section.2.5}%
-\contentsline {section}{\numberline {2.6}Fluxo resumido de execu\c {c}\~ao}{14}{section.2.6}%
-\contentsline {chapter}{\numberline {3}Arquitetura}{15}{chapter.3}%
-\contentsline {section}{\numberline {3.1}Vis\~ao em camadas}{15}{section.3.1}%
-\contentsline {section}{\numberline {3.2}Modelo de execu\c {c}\~ao}{15}{section.3.2}%
-\contentsline {section}{\numberline {3.3}Depend\^encias entre m\'odulos}{16}{section.3.3}%
-\contentsline {section}{\numberline {3.4}Cadeia de boot}{17}{section.3.4}%
-\contentsline {section}{\numberline {3.5}Decis\~oes de projeto}{17}{section.3.5}%
-\contentsline {section}{\numberline {3.6}Tratamento de erros e falhas}{17}{section.3.6}%
-\contentsline {section}{\numberline {3.7}Concorr\^encia e sincroniza\c {c}\~ao}{18}{section.3.7}%
-\contentsline {section}{\numberline {3.8}Ciclo de vida da inicializa\c {c}\~ao}{18}{section.3.8}%
-\contentsline {chapter}{\numberline {4}Boot e inicializa\c {c}\~ao de baixo n\'ivel}{19}{chapter.4}%
-\contentsline {section}{\numberline {4.1}Responsabilidades de \texttt {boot.rs}}{19}{section.4.1}%
-\contentsline {section}{\numberline {4.2}Cabe\c {c}alho Multiboot2}{19}{section.4.2}%
-\contentsline {section}{\numberline {4.3}Contrato de entrada}{19}{section.4.3}%
-\contentsline {section}{\numberline {4.4}Sequ\^encia do stub}{20}{section.4.4}%
-\contentsline {section}{\numberline {4.5}Pagina\c {c}\~ao e layout de mem\'oria}{20}{section.4.5}%
-\contentsline {subsection}{\numberline {4.5.1}C\'alculo dos \'indices}{21}{subsection.4.5.1}%
-\contentsline {section}{\numberline {4.6}GDT e modo longo}{21}{section.4.6}%
-\contentsline {section}{\numberline {4.7}Registradores de controle}{22}{section.4.7}%
-\contentsline {section}{\numberline {4.8}Linker script}{22}{section.4.8}%
-\contentsline {section}{\numberline {4.9}Se\c {c}\~oes observadas no ELF}{23}{section.4.9}%
-\contentsline {section}{\numberline {4.10}Passagem para Rust}{23}{section.4.10}%
-\contentsline {section}{\numberline {4.11}Limita\c {c}\~oes do boot}{23}{section.4.11}%
-\contentsline {chapter}{\numberline {5}M\'odulos de base}{24}{chapter.5}%
-\contentsline {section}{\numberline {5.1}\texttt {main.rs}: ponto de entrada Rust}{24}{section.5.1}%
-\contentsline {subsection}{\numberline {5.1.1}Atributos globais}{24}{subsection.5.1.1}%
-\contentsline {subsection}{\numberline {5.1.2}\texttt {kernel\_main}}{24}{subsection.5.1.2}%
-\contentsline {subsection}{\numberline {5.1.3}Macros \texttt {print!} e \texttt {println!}}{25}{subsection.5.1.3}%
-\contentsline {subsection}{\numberline {5.1.4}Panic handler}{26}{subsection.5.1.4}%
-\contentsline {section}{\numberline {5.2}\texttt {arch.rs}: arquitetura e portas de I/O}{26}{section.5.2}%
-\contentsline {subsection}{\numberline {5.2.1}Portas de I/O}{26}{subsection.5.2.1}%
-\contentsline {subsection}{\numberline {5.2.2}Reinicializa\c {c}\~ao}{27}{subsection.5.2.2}%
-\contentsline {section}{\numberline {5.3}\texttt {sync.rs}: spinlock}{27}{section.5.3}%
-\contentsline {subsection}{\numberline {5.3.1}Implementa\c {c}\~ao}{27}{subsection.5.3.1}%
-\contentsline {subsection}{\numberline {5.3.2}Propriedades e limita\c {c}\~oes}{27}{subsection.5.3.2}%
-\contentsline {chapter}{\numberline {6}Renderizador VGA e consoles virtuais}{29}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Vis\~ao geral}{29}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Estado do console}{29}{section.6.2}%
-\contentsline {section}{\numberline {6.3}Opera\c {c}\~oes}{29}{section.6.3}%
-\contentsline {subsection}{\numberline {6.3.1}Inicializa\c {c}\~ao}{29}{subsection.6.3.1}%
-\contentsline {subsection}{\numberline {6.3.2}Escrita de bytes}{30}{subsection.6.3.2}%
-\contentsline {subsection}{\numberline {6.3.3}Escrita de caracteres e quebra de linha}{30}{subsection.6.3.3}%
-\contentsline {subsection}{\numberline {6.3.4}Rolagem}{30}{subsection.6.3.4}%
-\contentsline {subsection}{\numberline {6.3.5}Backspace}{31}{subsection.6.3.5}%
-\contentsline {subsection}{\numberline {6.3.6}Cursor de hardware}{31}{subsection.6.3.6}%
-\contentsline {section}{\numberline {6.4}Pipeline de impress\~ao}{31}{section.6.4}%
-\contentsline {section}{\numberline {6.5}API p\'ublica}{32}{section.6.5}%
-\contentsline {section}{\numberline {6.6}Exemplo de uso}{32}{section.6.6}%
-\contentsline {section}{\numberline {6.7}Limita\c {c}\~oes e observa\c {c}\~oes}{32}{section.6.7}%
-\contentsline {chapter}{\numberline {7}Teclado PS/2}{33}{chapter.7}%
-\contentsline {section}{\numberline {7.1}Vis\~ao geral}{33}{section.7.1}%
-\contentsline {section}{\numberline {7.2}Hardware: controlador 8042}{33}{section.7.2}%
-\contentsline {section}{\numberline {7.3}Inicializa\c {c}\~ao}{33}{section.7.3}%
-\contentsline {section}{\numberline {7.4}Scancodes e tradu\c {c}\~ao para ASCII}{34}{section.7.4}%
-\contentsline {subsection}{\numberline {7.4.1}Shift}{35}{subsection.7.4.1}%
-\contentsline {subsection}{\numberline {7.4.2}Teclas estendidas}{35}{subsection.7.4.2}%
-\contentsline {subsection}{\numberline {7.4.3}Alt e sele\c {c}\~ao de console}{35}{subsection.7.4.3}%
-\contentsline {subsection}{\numberline {7.4.4}Mouse}{35}{subsection.7.4.4}%
-\contentsline {section}{\numberline {7.5}Fluxo de leitura}{36}{section.7.5}%
-\contentsline {section}{\numberline {7.6}API e fun\c {c}\~oes internas}{36}{section.7.6}%
-\contentsline {section}{\numberline {7.7}Limita\c {c}\~oes}{37}{section.7.7}%
-\contentsline {chapter}{\numberline {8}Serial COM1}{38}{chapter.8}%
-\contentsline {section}{\numberline {8.1}Vis\~ao geral}{38}{section.8.1}%
-\contentsline {section}{\numberline {8.2}Hardware}{38}{section.8.2}%
-\contentsline {section}{\numberline {8.3}Inicializa\c {c}\~ao}{38}{section.8.3}%
-\contentsline {section}{\numberline {8.4}Escrita}{39}{section.8.4}%
-\contentsline {section}{\numberline {8.5}Leitura}{40}{section.8.5}%
-\contentsline {section}{\numberline {8.6}API}{40}{section.8.6}%
-\contentsline {section}{\numberline {8.7}Uso no QEMU e em hardware f\'isico}{40}{section.8.7}%
-\contentsline {section}{\numberline {8.8}Limita\c {c}\~oes}{40}{section.8.8}%
-\contentsline {chapter}{\numberline {9}Shell e linha de comando}{42}{chapter.9}%
-\contentsline {section}{\numberline {9.1}Vis\~ao geral}{42}{section.9.1}%
-\contentsline {section}{\numberline {9.2}La\c {c}o principal}{42}{section.9.2}%
-\contentsline {subsection}{\numberline {9.2.1}Buffer de linha}{43}{subsection.9.2.1}%
-\contentsline {subsection}{\numberline {9.2.2}Entrada e eco}{43}{subsection.9.2.2}%
-\contentsline {section}{\numberline {9.3}Interpreta\c {c}\~ao}{43}{section.9.3}%
-\contentsline {subsection}{\numberline {9.3.1}Trim}{43}{subsection.9.3.1}%
-\contentsline {subsection}{\numberline {9.3.2}Convers\~ao para texto}{44}{subsection.9.3.2}%
-\contentsline {subsection}{\numberline {9.3.3}Comandos}{44}{subsection.9.3.3}%
-\contentsline {section}{\numberline {9.4}Sa\'ida de \texttt {info}}{44}{section.9.4}%
-\contentsline {section}{\numberline {9.5}Comandos especiais}{45}{section.9.5}%
-\contentsline {subsection}{\numberline {9.5.1}\texttt {halt}}{45}{subsection.9.5.1}%
-\contentsline {subsection}{\numberline {9.5.2}\texttt {reboot}}{45}{subsection.9.5.2}%
-\contentsline {section}{\numberline {9.6}Como estender}{45}{section.9.6}%
-\contentsline {section}{\numberline {9.7}Limita\c {c}\~oes}{45}{section.9.7}%
-\contentsline {chapter}{\numberline {10}Mem\'oria virtual, demand paging e interrup\c {c}\~oes}{46}{chapter.10}%
-\contentsline {section}{\numberline {10.1}Ordem de inicializa\c {c}\~ao}{46}{section.10.1}%
-\contentsline {section}{\numberline {10.2}GDT, TSS e pilhas de privil\'egio}{46}{section.10.2}%
-\contentsline {section}{\numberline {10.3}IDT, stubs e normaliza\c {c}\~ao do erro}{47}{section.10.3}%
-\contentsline {section}{\numberline {10.4}PIC e PIT}{47}{section.10.4}%
-\contentsline {section}{\numberline {10.5}Alocador de frames f\'isicos}{48}{section.10.5}%
-\contentsline {section}{\numberline {10.6}Demand paging e prote\c {c}\~ao U/S}{48}{section.10.6}%
-\contentsline {section}{\numberline {10.7}Modo usu\'ario e retorno ao kernel}{49}{section.10.7}%
-\contentsline {section}{\numberline {10.8}Comandos e evid\^encias}{49}{section.10.8}%
-\contentsline {section}{\numberline {10.9}Limita\c {c}\~oes desta implementa\c {c}\~ao}{50}{section.10.9}%
-\contentsline {chapter}{\numberline {11}Camada TTY, syscalls e getty}{51}{chapter.11}%
-\contentsline {section}{\numberline {11.1}Do renderizador VGA aos consoles virtuais}{51}{section.11.1}%
-\contentsline {section}{\numberline {11.2}Troca de console}{51}{section.11.2}%
-\contentsline {section}{\numberline {11.3}Sequ\^encias de escape ANSI/VT100}{52}{section.11.3}%
-\contentsline {section}{\numberline {11.4}ABI das chamadas de sistema}{53}{section.11.4}%
-\contentsline {subsection}{\numberline {11.4.1}Valida\c {c}\~ao de ponteiros do usu\'ario}{53}{subsection.11.4.1}%
-\contentsline {subsection}{\numberline {11.4.2}Leitura bloqueante}{54}{subsection.11.4.2}%
-\contentsline {section}{\numberline {11.5}getty e login em ring 3}{54}{section.11.5}%
-\contentsline {section}{\numberline {11.6}Rela\c {c}\~ao com o Linux}{55}{section.11.6}%
-\contentsline {section}{\numberline {11.7}Limita\c {c}\~oes atuais}{55}{section.11.7}%
-\contentsline {chapter}{\numberline {12}Build, imagem e execu\c {c}\~ao}{56}{chapter.12}%
-\contentsline {section}{\numberline {12.1}Toolchain e alvo}{56}{section.12.1}%
-\contentsline {section}{\numberline {12.2}Configura\c {c}\~ao do Cargo}{56}{section.12.2}%
-\contentsline {section}{\numberline {12.3}Perfis de compila\c {c}\~ao}{57}{section.12.3}%
-\contentsline {section}{\numberline {12.4}Makefile}{57}{section.12.4}%
-\contentsline {subsection}{\numberline {12.4.1}Compila\c {c}\~ao direta com Cargo}{58}{subsection.12.4.1}%
-\contentsline {subsection}{\numberline {12.4.2}Alvos}{58}{subsection.12.4.2}%
-\contentsline {section}{\numberline {12.5}Configura\c {c}\~ao do GRUB}{58}{section.12.5}%
-\contentsline {section}{\numberline {12.6}ISO}{59}{section.12.6}%
-\contentsline {section}{\numberline {12.7}Execu\c {c}\~ao}{59}{section.12.7}%
-\contentsline {subsection}{\numberline {12.7.1}\texttt {make run}}{59}{subsection.12.7.1}%
-\contentsline {subsection}{\numberline {12.7.2}Execu\c {c}\~ao sem interface gr\'afica}{60}{subsection.12.7.2}%
-\contentsline {subsection}{\numberline {12.7.3}Valida\c {c}\~ao do ELF e da ISO}{60}{subsection.12.7.3}%
-\contentsline {section}{\numberline {12.8}Solu\c {c}\~ao de problemas}{61}{section.12.8}%
-\contentsline {section}{\numberline {12.9}Reprodutibilidade}{61}{section.12.9}%
-\contentsline {chapter}{\numberline {13}Testes e valida\c {c}\~ao}{62}{chapter.13}%
-\contentsline {section}{\numberline {13.1}Estrat\'egia}{62}{section.13.1}%
-\contentsline {section}{\numberline {13.2}Matriz de testes}{62}{section.13.2}%
-\contentsline {section}{\numberline {13.3}Evid\^encias de execu\c {c}\~ao}{62}{section.13.3}%
-\contentsline {subsection}{\numberline {13.3.1}Banner e prompt}{62}{subsection.13.3.1}%
-\contentsline {subsection}{\numberline {13.3.2}Comando \texttt {help} via PS/2}{63}{subsection.13.3.2}%
-\contentsline {subsection}{\numberline {13.3.3}Comando \texttt {echo} via PS/2}{63}{subsection.13.3.3}%
-\contentsline {subsection}{\numberline {13.3.4}\texttt {clear} via ANSI}{63}{subsection.13.3.4}%
-\contentsline {subsection}{\numberline {13.3.5}Entrada serial}{64}{subsection.13.3.5}%
-\contentsline {section}{\numberline {13.4}Script de teste headless}{64}{section.13.4}%
-\contentsline {section}{\numberline {13.5}Testes de build e formato}{65}{section.13.5}%
-\contentsline {section}{\numberline {13.6}Limita\c {c}\~oes dos testes}{65}{section.13.6}%
-\contentsline {section}{\numberline {13.7}Checklist de aceita\c {c}\~ao}{65}{section.13.7}%
-\contentsline {chapter}{\numberline {14}Similaridade com o kernel Linux}{67}{chapter.14}%
-\contentsline {section}{\numberline {14.1}O que significa ``similaridade''}{67}{section.14.1}%
-\contentsline {section}{\numberline {14.2}Metodologia}{67}{section.14.2}%
-\contentsline {section}{\numberline {14.3}Correspond\^encia de arquivos}{67}{section.14.3}%
-\contentsline {section}{\numberline {14.4}Similaridade funcional por dimens\~ao}{68}{section.14.4}%
-\contentsline {subsection}{\numberline {14.4.1}Leitura por dimens\~ao}{69}{subsection.14.4.1}%
-\contentsline {section}{\numberline {14.5}Similaridade arquitetural}{69}{section.14.5}%
-\contentsline {section}{\numberline {14.6}Similaridade de c\'odigo}{70}{section.14.6}%
-\contentsline {section}{\numberline {14.7}Similaridade global}{71}{section.14.7}%
-\contentsline {subsection}{\numberline {14.7.1}Classifica\c {c}\~ao}{71}{subsection.14.7.1}%
-\contentsline {section}{\numberline {14.8}Diferen\c {c}as essenciais}{72}{section.14.8}%
-\contentsline {chapter}{\numberline {15}Limita\c {c}\~oes, riscos e evolu\c {c}\~ao}{73}{chapter.15}%
-\contentsline {section}{\numberline {15.1}Limita\c {c}\~oes t\'ecnicas}{73}{section.15.1}%
-\contentsline {section}{\numberline {15.2}Riscos}{74}{section.15.2}%
-\contentsline {section}{\numberline {15.3}Roadmap sugerido}{74}{section.15.3}%
-\contentsline {section}{\numberline {15.4}Crit\'erios para considerar o projeto ``um kernel''}{74}{section.15.4}%
-\contentsline {chapter}{\numberline {A}Cat\'alogo de fun\c {c}\~oes}{76}{appendix.A}%
-\contentsline {section}{\numberline {A.1}\texttt {main.rs} (2 fun\c {c}\~oes)}{76}{section.A.1}%
-\contentsline {section}{\numberline {A.2}\texttt {arch.rs} (5 fun\c {c}\~oes)}{76}{section.A.2}%
-\contentsline {section}{\numberline {A.3}\texttt {sync.rs} (5 fun\c {c}\~oes)}{76}{section.A.3}%
-\contentsline {section}{\numberline {A.4}\texttt {vga.rs} (5 fun\c {c}\~oes)}{77}{section.A.4}%
-\contentsline {section}{\numberline {A.5}\texttt {tty.rs} (31 fun\c {c}\~oes)}{77}{section.A.5}%
-\contentsline {section}{\numberline {A.6}\texttt {keyboard.rs} (10 fun\c {c}\~oes)}{78}{section.A.6}%
-\contentsline {section}{\numberline {A.7}\texttt {serial.rs} (5 fun\c {c}\~oes)}{79}{section.A.7}%
-\contentsline {section}{\numberline {A.8}\texttt {shell.rs} (9 fun\c {c}\~oes)}{79}{section.A.8}%
-\contentsline {section}{\numberline {A.9}\texttt {gdt.rs} (7 fun\c {c}\~oes)}{79}{section.A.9}%
-\contentsline {section}{\numberline {A.10}\texttt {idt.rs} (14 fun\c {c}\~oes)}{80}{section.A.10}%
-\contentsline {section}{\numberline {A.11}\texttt {paging.rs} (23 fun\c {c}\~oes)}{81}{section.A.11}%
-\contentsline {section}{\numberline {A.12}\texttt {user.rs} (10 fun\c {c}\~oes)}{82}{section.A.12}%
-\contentsline {section}{\numberline {A.13}\texttt {syscall.rs} (3 fun\c {c}\~oes)}{82}{section.A.13}%
-\contentsline {chapter}{\numberline {B}Mapa de portas e mem\'oria}{83}{appendix.B}%
-\contentsline {section}{\numberline {B.1}Portas de I/O}{83}{section.B.1}%
-\contentsline {section}{\numberline {B.2}Mapa de mem\'oria}{83}{section.B.2}%
-\contentsline {chapter}{\numberline {C}Gloss\'ario}{84}{appendix.C}%
+\contentsline {chapter}{\numberline {1}Introdu\c {c}\~ao}{9}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Motiva\c {c}\~ao}{9}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Objetivo do documento}{9}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Escopo}{9}{section.1.3}%
+\contentsline {section}{\numberline {1.4}P\'ublico-alvo}{10}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Conven\c {c}\~oes}{10}{section.1.5}%
+\contentsline {section}{\numberline {1.6}Estado do projeto}{11}{section.1.6}%
+\contentsline {chapter}{\numberline {2}Vis\~ao geral do sistema}{12}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Resumo executivo}{12}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Funcionalidades}{13}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Requisitos}{13}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Hardware}{13}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Software de desenvolvimento}{14}{subsection.2.3.2}%
+\contentsline {section}{\numberline {2.4}Estrutura de diret\'orios}{14}{section.2.4}%
+\contentsline {section}{\numberline {2.5}M\'etricas do c\'odigo}{15}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Fluxo resumido de execu\c {c}\~ao}{15}{section.2.6}%
+\contentsline {chapter}{\numberline {3}Arquitetura}{16}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Vis\~ao em camadas}{16}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Modelo de execu\c {c}\~ao}{16}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Depend\^encias entre m\'odulos}{17}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Cadeia de boot}{18}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Decis\~oes de projeto}{18}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Tratamento de erros e falhas}{18}{section.3.6}%
+\contentsline {section}{\numberline {3.7}Concorr\^encia e sincroniza\c {c}\~ao}{19}{section.3.7}%
+\contentsline {section}{\numberline {3.8}Ciclo de vida da inicializa\c {c}\~ao}{19}{section.3.8}%
+\contentsline {chapter}{\numberline {4}Boot e inicializa\c {c}\~ao de baixo n\'ivel}{20}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Responsabilidades de \texttt {boot.rs}}{20}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Cabe\c {c}alho Multiboot2}{20}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Contrato de entrada}{20}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Sequ\^encia do stub}{21}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Pagina\c {c}\~ao e layout de mem\'oria}{21}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}C\'alculo dos \'indices}{22}{subsection.4.5.1}%
+\contentsline {section}{\numberline {4.6}GDT e modo longo}{22}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Registradores de controle}{23}{section.4.7}%
+\contentsline {section}{\numberline {4.8}Linker script}{23}{section.4.8}%
+\contentsline {section}{\numberline {4.9}Se\c {c}\~oes observadas no ELF}{24}{section.4.9}%
+\contentsline {section}{\numberline {4.10}Passagem para Rust}{24}{section.4.10}%
+\contentsline {section}{\numberline {4.11}Limita\c {c}\~oes do boot}{24}{section.4.11}%
+\contentsline {chapter}{\numberline {5}M\'odulos de base}{25}{chapter.5}%
+\contentsline {section}{\numberline {5.1}\texttt {main.rs}: ponto de entrada Rust}{25}{section.5.1}%
+\contentsline {subsection}{\numberline {5.1.1}Atributos globais}{25}{subsection.5.1.1}%
+\contentsline {subsection}{\numberline {5.1.2}\texttt {kernel\_main}}{25}{subsection.5.1.2}%
+\contentsline {subsection}{\numberline {5.1.3}Macros \texttt {print!} e \texttt {println!}}{26}{subsection.5.1.3}%
+\contentsline {subsection}{\numberline {5.1.4}Panic handler}{27}{subsection.5.1.4}%
+\contentsline {section}{\numberline {5.2}\texttt {arch.rs}: arquitetura e portas de I/O}{27}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Portas de I/O}{27}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}Reinicializa\c {c}\~ao}{28}{subsection.5.2.2}%
+\contentsline {section}{\numberline {5.3}\texttt {sync.rs}: spinlock}{28}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}Implementa\c {c}\~ao}{28}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}Propriedades e limita\c {c}\~oes}{28}{subsection.5.3.2}%
+\contentsline {chapter}{\numberline {6}Renderizador VGA e consoles virtuais}{30}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Vis\~ao geral}{30}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Estado do console}{30}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Opera\c {c}\~oes}{30}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}Inicializa\c {c}\~ao}{30}{subsection.6.3.1}%
+\contentsline {subsection}{\numberline {6.3.2}Escrita de bytes}{31}{subsection.6.3.2}%
+\contentsline {subsection}{\numberline {6.3.3}Escrita de caracteres e quebra de linha}{31}{subsection.6.3.3}%
+\contentsline {subsection}{\numberline {6.3.4}Rolagem}{31}{subsection.6.3.4}%
+\contentsline {subsection}{\numberline {6.3.5}Backspace}{32}{subsection.6.3.5}%
+\contentsline {subsection}{\numberline {6.3.6}Cursor de hardware}{32}{subsection.6.3.6}%
+\contentsline {section}{\numberline {6.4}Pipeline de impress\~ao}{32}{section.6.4}%
+\contentsline {section}{\numberline {6.5}API p\'ublica}{33}{section.6.5}%
+\contentsline {section}{\numberline {6.6}Exemplo de uso}{33}{section.6.6}%
+\contentsline {section}{\numberline {6.7}Limita\c {c}\~oes e observa\c {c}\~oes}{33}{section.6.7}%
+\contentsline {chapter}{\numberline {7}Teclado PS/2}{34}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Vis\~ao geral}{34}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Hardware: controlador 8042}{34}{section.7.2}%
+\contentsline {section}{\numberline {7.3}Inicializa\c {c}\~ao}{34}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Scancodes e tradu\c {c}\~ao para ASCII}{35}{section.7.4}%
+\contentsline {subsection}{\numberline {7.4.1}Shift}{36}{subsection.7.4.1}%
+\contentsline {subsection}{\numberline {7.4.2}Teclas estendidas}{36}{subsection.7.4.2}%
+\contentsline {subsection}{\numberline {7.4.3}Alt e sele\c {c}\~ao de console}{36}{subsection.7.4.3}%
+\contentsline {subsection}{\numberline {7.4.4}Mouse}{36}{subsection.7.4.4}%
+\contentsline {section}{\numberline {7.5}Fluxo de leitura}{37}{section.7.5}%
+\contentsline {section}{\numberline {7.6}API e fun\c {c}\~oes internas}{37}{section.7.6}%
+\contentsline {section}{\numberline {7.7}Limita\c {c}\~oes}{38}{section.7.7}%
+\contentsline {chapter}{\numberline {8}Serial COM1}{39}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Vis\~ao geral}{39}{section.8.1}%
+\contentsline {section}{\numberline {8.2}Hardware}{39}{section.8.2}%
+\contentsline {section}{\numberline {8.3}Inicializa\c {c}\~ao}{39}{section.8.3}%
+\contentsline {section}{\numberline {8.4}Escrita}{40}{section.8.4}%
+\contentsline {section}{\numberline {8.5}Leitura}{41}{section.8.5}%
+\contentsline {section}{\numberline {8.6}API}{41}{section.8.6}%
+\contentsline {section}{\numberline {8.7}Uso no QEMU e em hardware f\'isico}{41}{section.8.7}%
+\contentsline {section}{\numberline {8.8}Limita\c {c}\~oes}{41}{section.8.8}%
+\contentsline {chapter}{\numberline {9}Shell e linha de comando}{43}{chapter.9}%
+\contentsline {section}{\numberline {9.1}Vis\~ao geral}{43}{section.9.1}%
+\contentsline {section}{\numberline {9.2}La\c {c}o principal}{43}{section.9.2}%
+\contentsline {subsection}{\numberline {9.2.1}Buffer de linha}{44}{subsection.9.2.1}%
+\contentsline {subsection}{\numberline {9.2.2}Entrada e eco}{44}{subsection.9.2.2}%
+\contentsline {section}{\numberline {9.3}Interpreta\c {c}\~ao}{44}{section.9.3}%
+\contentsline {subsection}{\numberline {9.3.1}Spans de argumento}{44}{subsection.9.3.1}%
+\contentsline {subsection}{\numberline {9.3.2}Convers\~ao para texto}{45}{subsection.9.3.2}%
+\contentsline {subsection}{\numberline {9.3.3}Despacho de applets}{45}{subsection.9.3.3}%
+\contentsline {section}{\numberline {9.4}Comandos}{46}{section.9.4}%
+\contentsline {section}{\numberline {9.5}Sa\'ida de \texttt {info}}{47}{section.9.5}%
+\contentsline {section}{\numberline {9.6}Comandos especiais}{47}{section.9.6}%
+\contentsline {subsection}{\numberline {9.6.1}\texttt {halt}}{47}{subsection.9.6.1}%
+\contentsline {subsection}{\numberline {9.6.2}\texttt {reboot}}{47}{subsection.9.6.2}%
+\contentsline {section}{\numberline {9.7}Como estender}{47}{section.9.7}%
+\contentsline {section}{\numberline {9.8}Limita\c {c}\~oes}{48}{section.9.8}%
+\contentsline {chapter}{\numberline {10}Mem\'oria virtual, demand paging e interrup\c {c}\~oes}{49}{chapter.10}%
+\contentsline {section}{\numberline {10.1}Ordem de inicializa\c {c}\~ao}{49}{section.10.1}%
+\contentsline {section}{\numberline {10.2}GDT, TSS e pilhas de privil\'egio}{49}{section.10.2}%
+\contentsline {section}{\numberline {10.3}IDT, stubs e normaliza\c {c}\~ao do erro}{50}{section.10.3}%
+\contentsline {section}{\numberline {10.4}PIC e PIT}{50}{section.10.4}%
+\contentsline {section}{\numberline {10.5}Alocador de frames f\'isicos}{51}{section.10.5}%
+\contentsline {section}{\numberline {10.6}Demand paging e prote\c {c}\~ao U/S}{51}{section.10.6}%
+\contentsline {section}{\numberline {10.7}Modo usu\'ario e retorno ao kernel}{52}{section.10.7}%
+\contentsline {section}{\numberline {10.8}Comandos e evid\^encias}{52}{section.10.8}%
+\contentsline {section}{\numberline {10.9}Limita\c {c}\~oes desta implementa\c {c}\~ao}{53}{section.10.9}%
+\contentsline {chapter}{\numberline {11}Camada TTY, syscalls e getty}{54}{chapter.11}%
+\contentsline {section}{\numberline {11.1}Do renderizador VGA aos consoles virtuais}{54}{section.11.1}%
+\contentsline {section}{\numberline {11.2}Troca de console}{54}{section.11.2}%
+\contentsline {section}{\numberline {11.3}Sequ\^encias de escape ANSI/VT100}{55}{section.11.3}%
+\contentsline {section}{\numberline {11.4}ABI das chamadas de sistema}{56}{section.11.4}%
+\contentsline {subsection}{\numberline {11.4.1}Valida\c {c}\~ao de ponteiros do usu\'ario}{56}{subsection.11.4.1}%
+\contentsline {subsection}{\numberline {11.4.2}Leitura bloqueante}{57}{subsection.11.4.2}%
+\contentsline {section}{\numberline {11.5}getty e login em ring 3}{57}{section.11.5}%
+\contentsline {section}{\numberline {11.6}Rela\c {c}\~ao com o Linux}{58}{section.11.6}%
+\contentsline {section}{\numberline {11.7}Limita\c {c}\~oes atuais}{58}{section.11.7}%
+\contentsline {section}{\numberline {11.8}Heap do kernel}{58}{section.11.8}%
+\contentsline {section}{\numberline {11.9}VFS e descritores de arquivo}{59}{section.11.9}%
+\contentsline {section}{\numberline {11.10}O pseudo-sistema /proc}{59}{section.11.10}%
+\contentsline {section}{\numberline {11.11}Tarefas e escalonador preemptivo}{59}{section.11.11}%
+\contentsline {section}{\numberline {11.12}Novas chamadas de sistema}{61}{section.11.12}%
+\contentsline {chapter}{\numberline {12}Build, imagem e execu\c {c}\~ao}{62}{chapter.12}%
+\contentsline {section}{\numberline {12.1}Toolchain e alvo}{62}{section.12.1}%
+\contentsline {section}{\numberline {12.2}Configura\c {c}\~ao do Cargo}{62}{section.12.2}%
+\contentsline {section}{\numberline {12.3}Perfis de compila\c {c}\~ao}{63}{section.12.3}%
+\contentsline {section}{\numberline {12.4}Makefile}{63}{section.12.4}%
+\contentsline {subsection}{\numberline {12.4.1}Compila\c {c}\~ao direta com Cargo}{64}{subsection.12.4.1}%
+\contentsline {subsection}{\numberline {12.4.2}Alvos}{64}{subsection.12.4.2}%
+\contentsline {section}{\numberline {12.5}Configura\c {c}\~ao do GRUB}{64}{section.12.5}%
+\contentsline {section}{\numberline {12.6}ISO}{65}{section.12.6}%
+\contentsline {section}{\numberline {12.7}Execu\c {c}\~ao}{65}{section.12.7}%
+\contentsline {subsection}{\numberline {12.7.1}\texttt {make run}}{65}{subsection.12.7.1}%
+\contentsline {subsection}{\numberline {12.7.2}Execu\c {c}\~ao sem interface gr\'afica}{66}{subsection.12.7.2}%
+\contentsline {subsection}{\numberline {12.7.3}Valida\c {c}\~ao do ELF e da ISO}{66}{subsection.12.7.3}%
+\contentsline {section}{\numberline {12.8}Solu\c {c}\~ao de problemas}{67}{section.12.8}%
+\contentsline {section}{\numberline {12.9}Reprodutibilidade}{67}{section.12.9}%
+\contentsline {chapter}{\numberline {13}Testes e valida\c {c}\~ao}{68}{chapter.13}%
+\contentsline {section}{\numberline {13.1}Estrat\'egia}{68}{section.13.1}%
+\contentsline {section}{\numberline {13.2}Matriz de testes}{68}{section.13.2}%
+\contentsline {section}{\numberline {13.3}Evid\^encias de execu\c {c}\~ao}{68}{section.13.3}%
+\contentsline {subsection}{\numberline {13.3.1}Banner e prompt}{68}{subsection.13.3.1}%
+\contentsline {subsection}{\numberline {13.3.2}Comando \texttt {help} via PS/2}{69}{subsection.13.3.2}%
+\contentsline {subsection}{\numberline {13.3.3}Comando \texttt {echo} via PS/2}{69}{subsection.13.3.3}%
+\contentsline {subsection}{\numberline {13.3.4}\texttt {clear} via ANSI}{69}{subsection.13.3.4}%
+\contentsline {subsection}{\numberline {13.3.5}Entrada serial}{70}{subsection.13.3.5}%
+\contentsline {section}{\numberline {13.4}Script de teste headless}{70}{section.13.4}%
+\contentsline {section}{\numberline {13.5}Testes de build e formato}{71}{section.13.5}%
+\contentsline {section}{\numberline {13.6}Limita\c {c}\~oes dos testes}{71}{section.13.6}%
+\contentsline {section}{\numberline {13.7}Checklist de aceita\c {c}\~ao}{71}{section.13.7}%
+\contentsline {chapter}{\numberline {14}Similaridade com o kernel Linux}{73}{chapter.14}%
+\contentsline {section}{\numberline {14.1}O que significa ``similaridade''}{73}{section.14.1}%
+\contentsline {section}{\numberline {14.2}Metodologia}{73}{section.14.2}%
+\contentsline {section}{\numberline {14.3}Correspond\^encia de arquivos}{73}{section.14.3}%
+\contentsline {section}{\numberline {14.4}Similaridade funcional por dimens\~ao}{74}{section.14.4}%
+\contentsline {subsection}{\numberline {14.4.1}Leitura por dimens\~ao}{75}{subsection.14.4.1}%
+\contentsline {section}{\numberline {14.5}Similaridade arquitetural}{76}{section.14.5}%
+\contentsline {section}{\numberline {14.6}Similaridade de c\'odigo}{76}{section.14.6}%
+\contentsline {section}{\numberline {14.7}Similaridade global}{77}{section.14.7}%
+\contentsline {subsection}{\numberline {14.7.1}Classifica\c {c}\~ao}{77}{subsection.14.7.1}%
+\contentsline {section}{\numberline {14.8}Diferen\c {c}as essenciais}{78}{section.14.8}%
+\contentsline {chapter}{\numberline {15}Limita\c {c}\~oes, riscos e evolu\c {c}\~ao}{79}{chapter.15}%
+\contentsline {section}{\numberline {15.1}Limita\c {c}\~oes t\'ecnicas}{79}{section.15.1}%
+\contentsline {section}{\numberline {15.2}Riscos}{80}{section.15.2}%
+\contentsline {section}{\numberline {15.3}Roadmap sugerido}{80}{section.15.3}%
+\contentsline {section}{\numberline {15.4}Crit\'erios para considerar o projeto ``um kernel''}{81}{section.15.4}%
+\contentsline {chapter}{\numberline {A}Cat\'alogo de fun\c {c}\~oes}{82}{appendix.A}%
+\contentsline {section}{\numberline {A.1}\texttt {main.rs} (2 fun\c {c}\~oes)}{82}{section.A.1}%
+\contentsline {section}{\numberline {A.2}\texttt {arch.rs} (7 fun\c {c}\~oes)}{82}{section.A.2}%
+\contentsline {section}{\numberline {A.3}\texttt {sync.rs} (5 fun\c {c}\~oes)}{82}{section.A.3}%
+\contentsline {section}{\numberline {A.4}\texttt {vga.rs} (5 fun\c {c}\~oes)}{83}{section.A.4}%
+\contentsline {section}{\numberline {A.5}\texttt {tty.rs} (31 fun\c {c}\~oes)}{83}{section.A.5}%
+\contentsline {section}{\numberline {A.6}\texttt {keyboard.rs} (10 fun\c {c}\~oes)}{84}{section.A.6}%
+\contentsline {section}{\numberline {A.7}\texttt {serial.rs} (5 fun\c {c}\~oes)}{85}{section.A.7}%
+\contentsline {section}{\numberline {A.8}\texttt {shell.rs} (61 fun\c {c}\~oes)}{85}{section.A.8}%
+\contentsline {section}{\numberline {A.9}\texttt {gdt.rs} (6 fun\c {c}\~oes)}{86}{section.A.9}%
+\contentsline {section}{\numberline {A.10}\texttt {idt.rs} (14 fun\c {c}\~oes)}{86}{section.A.10}%
+\contentsline {section}{\numberline {A.11}\texttt {paging.rs} (23 fun\c {c}\~oes)}{87}{section.A.11}%
+\contentsline {section}{\numberline {A.12}\texttt {user.rs} (9 fun\c {c}\~oes)}{88}{section.A.12}%
+\contentsline {section}{\numberline {A.13}\texttt {syscall.rs} (9 fun\c {c}\~oes)}{88}{section.A.13}%
+\contentsline {section}{\numberline {A.14}\texttt {heap.rs} (9 fun\c {c}\~oes)}{89}{section.A.14}%
+\contentsline {section}{\numberline {A.15}\texttt {ramfs.rs} (31 fun\c {c}\~oes)}{89}{section.A.15}%
+\contentsline {section}{\numberline {A.16}\texttt {proc.rs} (9 fun\c {c}\~oes)}{90}{section.A.16}%
+\contentsline {section}{\numberline {A.17}\texttt {vfs.rs} (11 fun\c {c}\~oes)}{90}{section.A.17}%
+\contentsline {section}{\numberline {A.18}\texttt {task.rs} (29 fun\c {c}\~oes)}{91}{section.A.18}%
+\contentsline {chapter}{\numberline {B}Mapa de portas e mem\'oria}{93}{appendix.B}%
+\contentsline {section}{\numberline {B.1}Portas de I/O}{93}{section.B.1}%
+\contentsline {section}{\numberline {B.2}Mapa de mem\'oria}{93}{section.B.2}%
+\contentsline {chapter}{\numberline {C}Gloss\'ario}{94}{appendix.C}%

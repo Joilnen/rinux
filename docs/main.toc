@@ -1,183 +1,194 @@
 \babel@toc {english}{}\relax 
-\contentsline {chapter}{\numberline {1}Introduction}{8}{chapter.1}%
-\contentsline {section}{\numberline {1.1}Motivation}{8}{section.1.1}%
-\contentsline {section}{\numberline {1.2}Purpose of the document}{8}{section.1.2}%
-\contentsline {section}{\numberline {1.3}Scope}{8}{section.1.3}%
-\contentsline {section}{\numberline {1.4}Target audience}{9}{section.1.4}%
-\contentsline {section}{\numberline {1.5}Conventions}{9}{section.1.5}%
-\contentsline {section}{\numberline {1.6}Project status}{9}{section.1.6}%
-\contentsline {chapter}{\numberline {2}System overview}{11}{chapter.2}%
-\contentsline {section}{\numberline {2.1}Executive summary}{11}{section.2.1}%
-\contentsline {section}{\numberline {2.2}Features}{12}{section.2.2}%
-\contentsline {section}{\numberline {2.3}Requirements}{12}{section.2.3}%
-\contentsline {subsection}{\numberline {2.3.1}Hardware}{12}{subsection.2.3.1}%
-\contentsline {subsection}{\numberline {2.3.2}Development software}{12}{subsection.2.3.2}%
-\contentsline {section}{\numberline {2.4}Directory structure}{13}{section.2.4}%
-\contentsline {section}{\numberline {2.5}Code metrics}{13}{section.2.5}%
-\contentsline {section}{\numberline {2.6}Summary of the execution flow}{14}{section.2.6}%
-\contentsline {chapter}{\numberline {3}Architecture}{15}{chapter.3}%
-\contentsline {section}{\numberline {3.1}Layered view}{15}{section.3.1}%
-\contentsline {section}{\numberline {3.2}Execution model}{15}{section.3.2}%
-\contentsline {section}{\numberline {3.3}Dependencies between modules}{16}{section.3.3}%
-\contentsline {section}{\numberline {3.4}Boot chain}{17}{section.3.4}%
-\contentsline {section}{\numberline {3.5}Design decisions}{17}{section.3.5}%
-\contentsline {section}{\numberline {3.6}Error and failure handling}{17}{section.3.6}%
-\contentsline {section}{\numberline {3.7}Concurrency and synchronization}{18}{section.3.7}%
-\contentsline {section}{\numberline {3.8}Initialization lifecycle}{18}{section.3.8}%
-\contentsline {chapter}{\numberline {4}Boot and low-level initialization}{19}{chapter.4}%
-\contentsline {section}{\numberline {4.1}Responsibilities of \texttt {boot.rs}}{19}{section.4.1}%
-\contentsline {section}{\numberline {4.2}Multiboot2 header}{19}{section.4.2}%
-\contentsline {section}{\numberline {4.3}Entry contract}{19}{section.4.3}%
-\contentsline {section}{\numberline {4.4}Stub sequence}{20}{section.4.4}%
-\contentsline {section}{\numberline {4.5}Paging and memory layout}{20}{section.4.5}%
-\contentsline {subsection}{\numberline {4.5.1}Index calculation}{20}{subsection.4.5.1}%
-\contentsline {section}{\numberline {4.6}GDT and long mode}{21}{section.4.6}%
-\contentsline {section}{\numberline {4.7}Control registers}{22}{section.4.7}%
-\contentsline {section}{\numberline {4.8}Linker script}{22}{section.4.8}%
-\contentsline {section}{\numberline {4.9}Sections observed in the ELF}{23}{section.4.9}%
-\contentsline {section}{\numberline {4.10}Handoff to Rust}{23}{section.4.10}%
-\contentsline {section}{\numberline {4.11}Boot limitations}{23}{section.4.11}%
-\contentsline {chapter}{\numberline {5}Base modules}{24}{chapter.5}%
-\contentsline {section}{\numberline {5.1}\texttt {main.rs}: Rust entry point}{24}{section.5.1}%
-\contentsline {subsection}{\numberline {5.1.1}Global attributes}{24}{subsection.5.1.1}%
-\contentsline {subsection}{\numberline {5.1.2}\texttt {kernel\_main}}{24}{subsection.5.1.2}%
-\contentsline {subsection}{\numberline {5.1.3}\texttt {print!} and \texttt {println!} macros}{25}{subsection.5.1.3}%
-\contentsline {subsection}{\numberline {5.1.4}Panic handler}{25}{subsection.5.1.4}%
-\contentsline {section}{\numberline {5.2}\texttt {arch.rs}: architecture and I/O ports}{26}{section.5.2}%
-\contentsline {subsection}{\numberline {5.2.1}I/O ports}{26}{subsection.5.2.1}%
-\contentsline {subsection}{\numberline {5.2.2}Reboot}{26}{subsection.5.2.2}%
-\contentsline {section}{\numberline {5.3}\texttt {sync.rs}: spinlock}{27}{section.5.3}%
-\contentsline {subsection}{\numberline {5.3.1}Implementation}{27}{subsection.5.3.1}%
-\contentsline {subsection}{\numberline {5.3.2}Properties and limitations}{27}{subsection.5.3.2}%
-\contentsline {chapter}{\numberline {6}VGA text renderer and virtual consoles}{28}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Overview}{28}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Console state}{28}{section.6.2}%
-\contentsline {section}{\numberline {6.3}Operations}{28}{section.6.3}%
-\contentsline {subsection}{\numberline {6.3.1}Initialization}{28}{subsection.6.3.1}%
-\contentsline {subsection}{\numberline {6.3.2}Byte output}{29}{subsection.6.3.2}%
-\contentsline {subsection}{\numberline {6.3.3}Character output and line break}{29}{subsection.6.3.3}%
-\contentsline {subsection}{\numberline {6.3.4}Scrolling}{29}{subsection.6.3.4}%
-\contentsline {subsection}{\numberline {6.3.5}Backspace}{30}{subsection.6.3.5}%
-\contentsline {subsection}{\numberline {6.3.6}Hardware cursor}{30}{subsection.6.3.6}%
-\contentsline {section}{\numberline {6.4}Printing pipeline}{30}{section.6.4}%
-\contentsline {section}{\numberline {6.5}Public API}{31}{section.6.5}%
-\contentsline {section}{\numberline {6.6}Usage example}{31}{section.6.6}%
-\contentsline {section}{\numberline {6.7}Limitations and observations}{31}{section.6.7}%
-\contentsline {chapter}{\numberline {7}PS/2 Keyboard}{32}{chapter.7}%
-\contentsline {section}{\numberline {7.1}Overview}{32}{section.7.1}%
-\contentsline {section}{\numberline {7.2}Hardware: 8042 controller}{32}{section.7.2}%
-\contentsline {section}{\numberline {7.3}Initialization}{32}{section.7.3}%
-\contentsline {section}{\numberline {7.4}Scancodes and ASCII translation}{33}{section.7.4}%
-\contentsline {subsection}{\numberline {7.4.1}Shift}{34}{subsection.7.4.1}%
-\contentsline {subsection}{\numberline {7.4.2}Extended keys}{34}{subsection.7.4.2}%
-\contentsline {subsection}{\numberline {7.4.3}Alt and console selection}{34}{subsection.7.4.3}%
-\contentsline {subsection}{\numberline {7.4.4}Mouse}{34}{subsection.7.4.4}%
-\contentsline {section}{\numberline {7.5}Read flow}{35}{section.7.5}%
-\contentsline {section}{\numberline {7.6}API and internal functions}{35}{section.7.6}%
-\contentsline {section}{\numberline {7.7}Limitations}{36}{section.7.7}%
-\contentsline {chapter}{\numberline {8}Serial COM1}{37}{chapter.8}%
-\contentsline {section}{\numberline {8.1}Overview}{37}{section.8.1}%
-\contentsline {section}{\numberline {8.2}Hardware}{37}{section.8.2}%
-\contentsline {section}{\numberline {8.3}Initialization}{37}{section.8.3}%
-\contentsline {section}{\numberline {8.4}Write}{38}{section.8.4}%
-\contentsline {section}{\numberline {8.5}Read}{39}{section.8.5}%
-\contentsline {section}{\numberline {8.6}API}{39}{section.8.6}%
-\contentsline {section}{\numberline {8.7}Usage in QEMU and on physical hardware}{39}{section.8.7}%
-\contentsline {section}{\numberline {8.8}Limitations}{39}{section.8.8}%
-\contentsline {chapter}{\numberline {9}Shell and command line}{40}{chapter.9}%
-\contentsline {section}{\numberline {9.1}Overview}{40}{section.9.1}%
-\contentsline {section}{\numberline {9.2}Main loop}{40}{section.9.2}%
-\contentsline {subsection}{\numberline {9.2.1}Line buffer}{41}{subsection.9.2.1}%
-\contentsline {subsection}{\numberline {9.2.2}Input and echo}{41}{subsection.9.2.2}%
-\contentsline {section}{\numberline {9.3}Parsing}{41}{section.9.3}%
-\contentsline {subsection}{\numberline {9.3.1}Trim}{41}{subsection.9.3.1}%
-\contentsline {subsection}{\numberline {9.3.2}Text conversion}{42}{subsection.9.3.2}%
-\contentsline {subsection}{\numberline {9.3.3}Commands}{42}{subsection.9.3.3}%
-\contentsline {section}{\numberline {9.4}\texttt {info} output}{42}{section.9.4}%
-\contentsline {section}{\numberline {9.5}Special commands}{43}{section.9.5}%
-\contentsline {subsection}{\numberline {9.5.1}\texttt {halt}}{43}{subsection.9.5.1}%
-\contentsline {subsection}{\numberline {9.5.2}\texttt {reboot}}{43}{subsection.9.5.2}%
-\contentsline {section}{\numberline {9.6}How to extend}{43}{section.9.6}%
-\contentsline {section}{\numberline {9.7}Limitations}{43}{section.9.7}%
-\contentsline {chapter}{\numberline {10}Virtual memory, demand paging, and interrupts}{44}{chapter.10}%
-\contentsline {section}{\numberline {10.1}Initialization order}{44}{section.10.1}%
-\contentsline {section}{\numberline {10.2}GDT, TSS, and privilege stacks}{44}{section.10.2}%
-\contentsline {section}{\numberline {10.3}IDT, stubs, and error-code normalization}{45}{section.10.3}%
-\contentsline {section}{\numberline {10.4}PIC and PIT}{45}{section.10.4}%
-\contentsline {section}{\numberline {10.5}Physical frame allocator}{46}{section.10.5}%
-\contentsline {section}{\numberline {10.6}Demand paging and U/S protection}{46}{section.10.6}%
-\contentsline {section}{\numberline {10.7}User mode and return to kernel}{47}{section.10.7}%
-\contentsline {section}{\numberline {10.8}Commands and evidence}{47}{section.10.8}%
-\contentsline {section}{\numberline {10.9}Limitations of this implementation}{48}{section.10.9}%
-\contentsline {chapter}{\numberline {11}TTY layer, system calls and getty}{49}{chapter.11}%
-\contentsline {section}{\numberline {11.1}From VGA renderer to virtual consoles}{49}{section.11.1}%
-\contentsline {section}{\numberline {11.2}Console switching}{49}{section.11.2}%
-\contentsline {section}{\numberline {11.3}ANSI/VT100 escape sequences}{50}{section.11.3}%
-\contentsline {section}{\numberline {11.4}System call ABI}{51}{section.11.4}%
-\contentsline {subsection}{\numberline {11.4.1}User pointer validation}{51}{subsection.11.4.1}%
-\contentsline {subsection}{\numberline {11.4.2}Blocking read}{52}{subsection.11.4.2}%
-\contentsline {section}{\numberline {11.5}getty and login in ring 3}{52}{section.11.5}%
-\contentsline {section}{\numberline {11.6}Relationship with Linux}{53}{section.11.6}%
-\contentsline {section}{\numberline {11.7}Current limitations}{53}{section.11.7}%
-\contentsline {chapter}{\numberline {12}Build, image and execution}{54}{chapter.12}%
-\contentsline {section}{\numberline {12.1}Toolchain and target}{54}{section.12.1}%
-\contentsline {section}{\numberline {12.2}Cargo configuration}{54}{section.12.2}%
-\contentsline {section}{\numberline {12.3}Build profiles}{55}{section.12.3}%
-\contentsline {section}{\numberline {12.4}Makefile}{55}{section.12.4}%
-\contentsline {subsection}{\numberline {12.4.1}Direct compilation with Cargo}{56}{subsection.12.4.1}%
-\contentsline {subsection}{\numberline {12.4.2}Targets}{56}{subsection.12.4.2}%
-\contentsline {section}{\numberline {12.5}GRUB configuration}{56}{section.12.5}%
-\contentsline {section}{\numberline {12.6}ISO}{57}{section.12.6}%
-\contentsline {section}{\numberline {12.7}Execution}{57}{section.12.7}%
-\contentsline {subsection}{\numberline {12.7.1}\texttt {make run}}{57}{subsection.12.7.1}%
-\contentsline {subsection}{\numberline {12.7.2}Headless execution}{58}{subsection.12.7.2}%
-\contentsline {subsection}{\numberline {12.7.3}ELF and ISO validation}{58}{subsection.12.7.3}%
-\contentsline {section}{\numberline {12.8}Troubleshooting}{59}{section.12.8}%
-\contentsline {section}{\numberline {12.9}Reproducibility}{59}{section.12.9}%
-\contentsline {chapter}{\numberline {13}Tests and validation}{60}{chapter.13}%
-\contentsline {section}{\numberline {13.1}Strategy}{60}{section.13.1}%
-\contentsline {section}{\numberline {13.2}Test matrix}{60}{section.13.2}%
-\contentsline {section}{\numberline {13.3}Execution evidence}{60}{section.13.3}%
-\contentsline {subsection}{\numberline {13.3.1}Banner and prompt}{60}{subsection.13.3.1}%
-\contentsline {subsection}{\numberline {13.3.2}\texttt {help} command via PS/2}{61}{subsection.13.3.2}%
-\contentsline {subsection}{\numberline {13.3.3}\texttt {echo} command via PS/2}{61}{subsection.13.3.3}%
-\contentsline {subsection}{\numberline {13.3.4}\texttt {clear} via ANSI}{61}{subsection.13.3.4}%
-\contentsline {subsection}{\numberline {13.3.5}Serial input}{62}{subsection.13.3.5}%
-\contentsline {section}{\numberline {13.4}Headless test script}{62}{section.13.4}%
-\contentsline {section}{\numberline {13.5}Build and format tests}{63}{section.13.5}%
-\contentsline {section}{\numberline {13.6}Test limitations}{63}{section.13.6}%
-\contentsline {section}{\numberline {13.7}Acceptance checklist}{63}{section.13.7}%
-\contentsline {chapter}{\numberline {14}Similarity with the Linux kernel}{65}{chapter.14}%
-\contentsline {section}{\numberline {14.1}What ``similarity'' means}{65}{section.14.1}%
-\contentsline {section}{\numberline {14.2}Methodology}{65}{section.14.2}%
-\contentsline {section}{\numberline {14.3}File mapping}{65}{section.14.3}%
-\contentsline {section}{\numberline {14.4}Functional similarity by dimension}{66}{section.14.4}%
-\contentsline {subsection}{\numberline {14.4.1}Reading by dimension}{67}{subsection.14.4.1}%
-\contentsline {section}{\numberline {14.5}Architectural similarity}{67}{section.14.5}%
-\contentsline {section}{\numberline {14.6}Code similarity}{68}{section.14.6}%
-\contentsline {section}{\numberline {14.7}Overall similarity}{69}{section.14.7}%
-\contentsline {subsection}{\numberline {14.7.1}Classification}{69}{subsection.14.7.1}%
-\contentsline {section}{\numberline {14.8}Essential differences}{70}{section.14.8}%
-\contentsline {chapter}{\numberline {15}Limitations, Risks, and Evolution}{71}{chapter.15}%
-\contentsline {section}{\numberline {15.1}Technical limitations}{71}{section.15.1}%
-\contentsline {section}{\numberline {15.2}Risks}{72}{section.15.2}%
-\contentsline {section}{\numberline {15.3}Suggested roadmap}{72}{section.15.3}%
-\contentsline {section}{\numberline {15.4}Criteria for considering the project ``a kernel''}{72}{section.15.4}%
-\contentsline {chapter}{\numberline {A}Function Catalog}{74}{appendix.A}%
-\contentsline {section}{\numberline {A.1}\texttt {main.rs} (2 functions)}{74}{section.A.1}%
-\contentsline {section}{\numberline {A.2}\texttt {arch.rs} (5 functions)}{74}{section.A.2}%
-\contentsline {section}{\numberline {A.3}\texttt {sync.rs} (5 functions)}{74}{section.A.3}%
-\contentsline {section}{\numberline {A.4}\texttt {vga.rs} (5 functions)}{75}{section.A.4}%
-\contentsline {section}{\numberline {A.5}\texttt {tty.rs} (31 functions)}{75}{section.A.5}%
-\contentsline {section}{\numberline {A.6}\texttt {keyboard.rs} (10 functions)}{76}{section.A.6}%
-\contentsline {section}{\numberline {A.7}\texttt {serial.rs} (5 functions)}{77}{section.A.7}%
-\contentsline {section}{\numberline {A.8}\texttt {shell.rs} (9 functions)}{77}{section.A.8}%
-\contentsline {section}{\numberline {A.9}\texttt {gdt.rs} (7 functions)}{77}{section.A.9}%
-\contentsline {section}{\numberline {A.10}\texttt {idt.rs} (14 functions)}{78}{section.A.10}%
-\contentsline {section}{\numberline {A.11}\texttt {paging.rs} (23 functions)}{79}{section.A.11}%
-\contentsline {section}{\numberline {A.12}\texttt {user.rs} (10 functions)}{80}{section.A.12}%
-\contentsline {section}{\numberline {A.13}\texttt {syscall.rs} (3 functions)}{80}{section.A.13}%
-\contentsline {chapter}{\numberline {B}Port and Memory Map}{81}{appendix.B}%
-\contentsline {section}{\numberline {B.1}I/O Ports}{81}{section.B.1}%
-\contentsline {section}{\numberline {B.2}Memory Map}{81}{section.B.2}%
-\contentsline {chapter}{\numberline {C}Glossary}{82}{appendix.C}%
+\contentsline {chapter}{\numberline {1}Introduction}{9}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Motivation}{9}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Purpose of the document}{9}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Scope}{9}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Target audience}{10}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Conventions}{10}{section.1.5}%
+\contentsline {section}{\numberline {1.6}Project status}{10}{section.1.6}%
+\contentsline {chapter}{\numberline {2}System overview}{12}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Executive summary}{12}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Features}{13}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Requirements}{13}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Hardware}{13}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Development software}{14}{subsection.2.3.2}%
+\contentsline {section}{\numberline {2.4}Directory structure}{14}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Code metrics}{15}{section.2.5}%
+\contentsline {section}{\numberline {2.6}Summary of the execution flow}{15}{section.2.6}%
+\contentsline {chapter}{\numberline {3}Architecture}{16}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Layered view}{16}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Execution model}{16}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Dependencies between modules}{17}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Boot chain}{18}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Design decisions}{18}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Error and failure handling}{18}{section.3.6}%
+\contentsline {section}{\numberline {3.7}Concurrency and synchronization}{19}{section.3.7}%
+\contentsline {section}{\numberline {3.8}Initialization lifecycle}{19}{section.3.8}%
+\contentsline {chapter}{\numberline {4}Boot and low-level initialization}{20}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Responsibilities of \texttt {boot.rs}}{20}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Multiboot2 header}{20}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Entry contract}{20}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Stub sequence}{21}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Paging and memory layout}{21}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Index calculation}{21}{subsection.4.5.1}%
+\contentsline {section}{\numberline {4.6}GDT and long mode}{22}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Control registers}{23}{section.4.7}%
+\contentsline {section}{\numberline {4.8}Linker script}{23}{section.4.8}%
+\contentsline {section}{\numberline {4.9}Sections observed in the ELF}{24}{section.4.9}%
+\contentsline {section}{\numberline {4.10}Handoff to Rust}{24}{section.4.10}%
+\contentsline {section}{\numberline {4.11}Boot limitations}{24}{section.4.11}%
+\contentsline {chapter}{\numberline {5}Base modules}{25}{chapter.5}%
+\contentsline {section}{\numberline {5.1}\texttt {main.rs}: Rust entry point}{25}{section.5.1}%
+\contentsline {subsection}{\numberline {5.1.1}Global attributes}{25}{subsection.5.1.1}%
+\contentsline {subsection}{\numberline {5.1.2}\texttt {kernel\_main}}{25}{subsection.5.1.2}%
+\contentsline {subsection}{\numberline {5.1.3}\texttt {print!} and \texttt {println!} macros}{26}{subsection.5.1.3}%
+\contentsline {subsection}{\numberline {5.1.4}Panic handler}{26}{subsection.5.1.4}%
+\contentsline {section}{\numberline {5.2}\texttt {arch.rs}: architecture and I/O ports}{27}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}I/O ports}{27}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}Reboot}{27}{subsection.5.2.2}%
+\contentsline {section}{\numberline {5.3}\texttt {sync.rs}: spinlock}{28}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}Implementation}{28}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}Properties and limitations}{28}{subsection.5.3.2}%
+\contentsline {chapter}{\numberline {6}VGA text renderer and virtual consoles}{29}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Overview}{29}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Console state}{29}{section.6.2}%
+\contentsline {section}{\numberline {6.3}Operations}{29}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}Initialization}{29}{subsection.6.3.1}%
+\contentsline {subsection}{\numberline {6.3.2}Byte output}{30}{subsection.6.3.2}%
+\contentsline {subsection}{\numberline {6.3.3}Character output and line break}{30}{subsection.6.3.3}%
+\contentsline {subsection}{\numberline {6.3.4}Scrolling}{30}{subsection.6.3.4}%
+\contentsline {subsection}{\numberline {6.3.5}Backspace}{31}{subsection.6.3.5}%
+\contentsline {subsection}{\numberline {6.3.6}Hardware cursor}{31}{subsection.6.3.6}%
+\contentsline {section}{\numberline {6.4}Printing pipeline}{31}{section.6.4}%
+\contentsline {section}{\numberline {6.5}Public API}{32}{section.6.5}%
+\contentsline {section}{\numberline {6.6}Usage example}{32}{section.6.6}%
+\contentsline {section}{\numberline {6.7}Limitations and observations}{32}{section.6.7}%
+\contentsline {chapter}{\numberline {7}PS/2 Keyboard}{33}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Overview}{33}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Hardware: 8042 controller}{33}{section.7.2}%
+\contentsline {section}{\numberline {7.3}Initialization}{33}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Scancodes and ASCII translation}{34}{section.7.4}%
+\contentsline {subsection}{\numberline {7.4.1}Shift}{35}{subsection.7.4.1}%
+\contentsline {subsection}{\numberline {7.4.2}Extended keys}{35}{subsection.7.4.2}%
+\contentsline {subsection}{\numberline {7.4.3}Alt and console selection}{35}{subsection.7.4.3}%
+\contentsline {subsection}{\numberline {7.4.4}Mouse}{35}{subsection.7.4.4}%
+\contentsline {section}{\numberline {7.5}Read flow}{36}{section.7.5}%
+\contentsline {section}{\numberline {7.6}API and internal functions}{36}{section.7.6}%
+\contentsline {section}{\numberline {7.7}Limitations}{37}{section.7.7}%
+\contentsline {chapter}{\numberline {8}Serial COM1}{38}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Overview}{38}{section.8.1}%
+\contentsline {section}{\numberline {8.2}Hardware}{38}{section.8.2}%
+\contentsline {section}{\numberline {8.3}Initialization}{38}{section.8.3}%
+\contentsline {section}{\numberline {8.4}Write}{39}{section.8.4}%
+\contentsline {section}{\numberline {8.5}Read}{40}{section.8.5}%
+\contentsline {section}{\numberline {8.6}API}{40}{section.8.6}%
+\contentsline {section}{\numberline {8.7}Usage in QEMU and on physical hardware}{40}{section.8.7}%
+\contentsline {section}{\numberline {8.8}Limitations}{40}{section.8.8}%
+\contentsline {chapter}{\numberline {9}Shell and command line}{41}{chapter.9}%
+\contentsline {section}{\numberline {9.1}Overview}{41}{section.9.1}%
+\contentsline {section}{\numberline {9.2}Main loop}{41}{section.9.2}%
+\contentsline {subsection}{\numberline {9.2.1}Line buffer}{42}{subsection.9.2.1}%
+\contentsline {subsection}{\numberline {9.2.2}Input and echo}{42}{subsection.9.2.2}%
+\contentsline {section}{\numberline {9.3}Parsing}{42}{section.9.3}%
+\contentsline {subsection}{\numberline {9.3.1}Argument spans}{42}{subsection.9.3.1}%
+\contentsline {subsection}{\numberline {9.3.2}Text conversion}{43}{subsection.9.3.2}%
+\contentsline {subsection}{\numberline {9.3.3}Applet dispatch}{43}{subsection.9.3.3}%
+\contentsline {section}{\numberline {9.4}Commands}{44}{section.9.4}%
+\contentsline {section}{\numberline {9.5}\texttt {info} output}{45}{section.9.5}%
+\contentsline {section}{\numberline {9.6}Special commands}{45}{section.9.6}%
+\contentsline {subsection}{\numberline {9.6.1}\texttt {halt}}{45}{subsection.9.6.1}%
+\contentsline {subsection}{\numberline {9.6.2}\texttt {reboot}}{45}{subsection.9.6.2}%
+\contentsline {section}{\numberline {9.7}How to extend}{45}{section.9.7}%
+\contentsline {section}{\numberline {9.8}Limitations}{46}{section.9.8}%
+\contentsline {chapter}{\numberline {10}Virtual memory, demand paging, and interrupts}{47}{chapter.10}%
+\contentsline {section}{\numberline {10.1}Initialization order}{47}{section.10.1}%
+\contentsline {section}{\numberline {10.2}GDT, TSS, and privilege stacks}{47}{section.10.2}%
+\contentsline {section}{\numberline {10.3}IDT, stubs, and error-code normalization}{48}{section.10.3}%
+\contentsline {section}{\numberline {10.4}PIC and PIT}{48}{section.10.4}%
+\contentsline {section}{\numberline {10.5}Physical frame allocator}{49}{section.10.5}%
+\contentsline {section}{\numberline {10.6}Demand paging and U/S protection}{49}{section.10.6}%
+\contentsline {section}{\numberline {10.7}User mode and return to kernel}{50}{section.10.7}%
+\contentsline {section}{\numberline {10.8}Commands and evidence}{50}{section.10.8}%
+\contentsline {section}{\numberline {10.9}Limitations of this implementation}{51}{section.10.9}%
+\contentsline {chapter}{\numberline {11}TTY layer, system calls and getty}{52}{chapter.11}%
+\contentsline {section}{\numberline {11.1}From VGA renderer to virtual consoles}{52}{section.11.1}%
+\contentsline {section}{\numberline {11.2}Console switching}{52}{section.11.2}%
+\contentsline {section}{\numberline {11.3}ANSI/VT100 escape sequences}{53}{section.11.3}%
+\contentsline {section}{\numberline {11.4}System call ABI}{54}{section.11.4}%
+\contentsline {subsection}{\numberline {11.4.1}User pointer validation}{54}{subsection.11.4.1}%
+\contentsline {subsection}{\numberline {11.4.2}Blocking read}{55}{subsection.11.4.2}%
+\contentsline {section}{\numberline {11.5}getty and login in ring 3}{55}{section.11.5}%
+\contentsline {section}{\numberline {11.6}Relationship with Linux}{56}{section.11.6}%
+\contentsline {section}{\numberline {11.7}Current limitations}{56}{section.11.7}%
+\contentsline {section}{\numberline {11.8}Kernel heap}{56}{section.11.8}%
+\contentsline {section}{\numberline {11.9}VFS and file descriptors}{57}{section.11.9}%
+\contentsline {section}{\numberline {11.10}The /proc pseudo-filesystem}{57}{section.11.10}%
+\contentsline {section}{\numberline {11.11}Tasks and preemptive scheduler}{57}{section.11.11}%
+\contentsline {section}{\numberline {11.12}New system calls}{59}{section.11.12}%
+\contentsline {chapter}{\numberline {12}Build, image and execution}{60}{chapter.12}%
+\contentsline {section}{\numberline {12.1}Toolchain and target}{60}{section.12.1}%
+\contentsline {section}{\numberline {12.2}Cargo configuration}{60}{section.12.2}%
+\contentsline {section}{\numberline {12.3}Build profiles}{61}{section.12.3}%
+\contentsline {section}{\numberline {12.4}Makefile}{61}{section.12.4}%
+\contentsline {subsection}{\numberline {12.4.1}Direct compilation with Cargo}{62}{subsection.12.4.1}%
+\contentsline {subsection}{\numberline {12.4.2}Targets}{62}{subsection.12.4.2}%
+\contentsline {section}{\numberline {12.5}GRUB configuration}{62}{section.12.5}%
+\contentsline {section}{\numberline {12.6}ISO}{63}{section.12.6}%
+\contentsline {section}{\numberline {12.7}Execution}{63}{section.12.7}%
+\contentsline {subsection}{\numberline {12.7.1}\texttt {make run}}{63}{subsection.12.7.1}%
+\contentsline {subsection}{\numberline {12.7.2}Headless execution}{64}{subsection.12.7.2}%
+\contentsline {subsection}{\numberline {12.7.3}ELF and ISO validation}{64}{subsection.12.7.3}%
+\contentsline {section}{\numberline {12.8}Troubleshooting}{65}{section.12.8}%
+\contentsline {section}{\numberline {12.9}Reproducibility}{65}{section.12.9}%
+\contentsline {chapter}{\numberline {13}Tests and validation}{66}{chapter.13}%
+\contentsline {section}{\numberline {13.1}Strategy}{66}{section.13.1}%
+\contentsline {section}{\numberline {13.2}Test matrix}{66}{section.13.2}%
+\contentsline {section}{\numberline {13.3}Execution evidence}{66}{section.13.3}%
+\contentsline {subsection}{\numberline {13.3.1}Banner and prompt}{66}{subsection.13.3.1}%
+\contentsline {subsection}{\numberline {13.3.2}\texttt {help} command via PS/2}{67}{subsection.13.3.2}%
+\contentsline {subsection}{\numberline {13.3.3}\texttt {echo} command via PS/2}{67}{subsection.13.3.3}%
+\contentsline {subsection}{\numberline {13.3.4}\texttt {clear} via ANSI}{67}{subsection.13.3.4}%
+\contentsline {subsection}{\numberline {13.3.5}Serial input}{68}{subsection.13.3.5}%
+\contentsline {section}{\numberline {13.4}Headless test script}{68}{section.13.4}%
+\contentsline {section}{\numberline {13.5}Build and format tests}{69}{section.13.5}%
+\contentsline {section}{\numberline {13.6}Test limitations}{69}{section.13.6}%
+\contentsline {section}{\numberline {13.7}Acceptance checklist}{69}{section.13.7}%
+\contentsline {chapter}{\numberline {14}Similarity with the Linux kernel}{71}{chapter.14}%
+\contentsline {section}{\numberline {14.1}What ``similarity'' means}{71}{section.14.1}%
+\contentsline {section}{\numberline {14.2}Methodology}{71}{section.14.2}%
+\contentsline {section}{\numberline {14.3}File mapping}{71}{section.14.3}%
+\contentsline {section}{\numberline {14.4}Functional similarity by dimension}{72}{section.14.4}%
+\contentsline {subsection}{\numberline {14.4.1}Reading by dimension}{73}{subsection.14.4.1}%
+\contentsline {section}{\numberline {14.5}Architectural similarity}{74}{section.14.5}%
+\contentsline {section}{\numberline {14.6}Code similarity}{74}{section.14.6}%
+\contentsline {section}{\numberline {14.7}Overall similarity}{75}{section.14.7}%
+\contentsline {subsection}{\numberline {14.7.1}Classification}{75}{subsection.14.7.1}%
+\contentsline {section}{\numberline {14.8}Essential differences}{76}{section.14.8}%
+\contentsline {chapter}{\numberline {15}Limitations, Risks, and Evolution}{77}{chapter.15}%
+\contentsline {section}{\numberline {15.1}Technical limitations}{77}{section.15.1}%
+\contentsline {section}{\numberline {15.2}Risks}{78}{section.15.2}%
+\contentsline {section}{\numberline {15.3}Suggested roadmap}{78}{section.15.3}%
+\contentsline {section}{\numberline {15.4}Criteria for considering the project ``a kernel''}{78}{section.15.4}%
+\contentsline {chapter}{\numberline {A}Function Catalog}{80}{appendix.A}%
+\contentsline {section}{\numberline {A.1}\texttt {main.rs} (2 functions)}{80}{section.A.1}%
+\contentsline {section}{\numberline {A.2}\texttt {arch.rs} (7 functions)}{80}{section.A.2}%
+\contentsline {section}{\numberline {A.3}\texttt {sync.rs} (5 functions)}{80}{section.A.3}%
+\contentsline {section}{\numberline {A.4}\texttt {vga.rs} (5 functions)}{81}{section.A.4}%
+\contentsline {section}{\numberline {A.5}\texttt {tty.rs} (31 functions)}{81}{section.A.5}%
+\contentsline {section}{\numberline {A.6}\texttt {keyboard.rs} (10 functions)}{82}{section.A.6}%
+\contentsline {section}{\numberline {A.7}\texttt {serial.rs} (5 functions)}{83}{section.A.7}%
+\contentsline {section}{\numberline {A.8}\texttt {shell.rs} (61 functions)}{83}{section.A.8}%
+\contentsline {section}{\numberline {A.9}\texttt {gdt.rs} (6 functions)}{84}{section.A.9}%
+\contentsline {section}{\numberline {A.10}\texttt {idt.rs} (14 functions)}{84}{section.A.10}%
+\contentsline {section}{\numberline {A.11}\texttt {paging.rs} (23 functions)}{85}{section.A.11}%
+\contentsline {section}{\numberline {A.12}\texttt {user.rs} (9 functions)}{86}{section.A.12}%
+\contentsline {section}{\numberline {A.13}\texttt {syscall.rs} (9 functions)}{86}{section.A.13}%
+\contentsline {section}{\numberline {A.14}\texttt {heap.rs} (9 functions)}{87}{section.A.14}%
+\contentsline {section}{\numberline {A.15}\texttt {ramfs.rs} (31 functions)}{87}{section.A.15}%
+\contentsline {section}{\numberline {A.16}\texttt {proc.rs} (9 functions)}{88}{section.A.16}%
+\contentsline {section}{\numberline {A.17}\texttt {vfs.rs} (11 functions)}{88}{section.A.17}%
+\contentsline {section}{\numberline {A.18}\texttt {task.rs} (29 functions)}{89}{section.A.18}%
+\contentsline {chapter}{\numberline {B}Port and Memory Map}{91}{appendix.B}%
+\contentsline {section}{\numberline {B.1}I/O Ports}{91}{section.B.1}%
+\contentsline {section}{\numberline {B.2}Memory Map}{91}{section.B.2}%
+\contentsline {chapter}{\numberline {C}Glossary}{92}{appendix.C}%

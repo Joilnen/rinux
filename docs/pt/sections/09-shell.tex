@@ -3,15 +3,26 @@
 
 \section{Vis\~ao geral}
 
-O \code{src/shell.rs} implementa um terminal de linha de comando sem
-aloca\c{c}\~ao din\^amica. Ele n\~ao \'e um shell POSIX, n\~ao interpreta
-pipes, redirecionamentos, vari\'aveis, aspas ou scripts. \'E um la\c{c}o que:
+O \code{src/shell.rs} implementa uma linha de comando no estilo BusyBox sobre
+o VFS, o ramfs, o \code{/proc} e a tabela de tarefas. Ele n\~ao \'e um shell
+POSIX: n\~ao interpreta pipes, redirecionamentos, vari\'aveis de ambiente nem
+scripts, mas faz \emph{parsing} de argumentos com aspas e despacha para uma
+tabela est\'atica de applets.
+
+O shell roda como a tarefa 1 do escalonador preemptivo. Enquanto espera um
+byte, chama \code{task::idle}, que agora bloqueia por um tick
+(\code{task::sleep(1)}) e volta a pollar teclado e serial a cada ~10 ms. Sem
+outra tarefa execut\'avel, a CPU executa \code{hlt} em vez de girar, ent\~ao o
+prompt continua responsivo sem consumir o quantum.
+
+O la\c{c}o principal:
 
 \begin{enumerate}
   \item imprime o prompt \code{rinux> };
   \item l\^e bytes do teclado PS/2 ou da serial;
   \item ecoa caracteres imprim\'iveis e trata Backspace;
-  \item ao receber Enter, executa o comando;
+  \item ao receber Enter, interpreta a linha em argumentos e executa o applet
+        correspondente;
   \item volta ao in\'icio.
 \end{enumerate}
 
@@ -36,13 +47,13 @@ pub fn run() -> ! {
 
             let byte = match tty::read_byte() {
                 Some(byte) => byte,
-                None => { core::hint::spin_loop(); continue; }
+                None => { task::idle(); continue; }
             };
 
             match byte {
                 b'\n' | b'\r' => {
                     println!();
-                    execute(&line[..len]);
+                    execute(&mut line[..len]);
                     break;
                 }
                 0x08 | 0x7F => {
@@ -77,7 +88,8 @@ let mut len = 0usize;
 \end{lstlisting}
 
 Quando a linha est\'a cheia, novos caracteres s\~ao silenciosamente
-ignorados. N\~ao h\'a beep, mensagem de erro nem crescimento din\^amico.
+ignorados. N\~ao h\'a beep, mensagem de erro nem crescimento din\^amico. O
+parser remove as aspas no pr\'oprio buffer, ent\~ao n\~ao precisa alocar.
 
 \subsection{Entrada e eco}
 
@@ -86,9 +98,9 @@ a serial COM1 para a fila do console virtual ativo. Ele tamb\'em interpreta
 \code{Alt+F1}..\code{Alt+F8} como troca de console. O shell ent\~ao consome
 bytes do console ativo com \code{tty::read\_byte}.
 
-Se nenhum byte estiver dispon\'ivel, o shell executa \code{spin\_loop()} e
-tenta novamente. N\~ao h\'a \emph{sleep}, j\'a que a espera \'e feita por
-polling.
+Se nenhum byte estiver dispon\'ivel, o shell chama \code{task::idle()}, que
+bloqueia por um tick (\code{task::sleep(1)}); sem outra tarefa execut\'avel, a
+CPU fica em \code{hlt}. N\~ao h\'a espera por evento nem IRQ de teclado.
 
 Caracteres imprim\'iveis (0x20 a 0x7E) s\~ao armazenados no buffer e ecoados
 no console. Backspace (\code{0x08} ou \code{0x7F}) decrementa o tamanho e
@@ -100,25 +112,36 @@ descartada e o shell imprime um novo prompt no console selecionado.
 
 \section{Interpreta\c{c}\~ao}
 
-\subsection{Trim}
+\subsection{Spans de argumento}
 
-Antes de comparar, a linha passa por \code{trim}, que remove espa\c{c}os
-ASCII no in\'icio e no fim. A fun\c{c}\~ao retorna uma \emph{slice} da
-pr\'opria linha, sem c\'opia:
+\code{Command::parse} divide a linha em no m\'aximo 24 argumentos
+(\code{MAX\_ARGS}). Cada argumento vira um par de deslocamentos
+(\code{Span}) no mesmo buffer, e a remo\c{c}\~ao de aspas \'e feita no lugar,
+escrevendo atr\'as do cursor de leitura:
 
-\begin{lstlisting}[caption={Remo\c{c}\~ao de espa\c{c}os nas extremidades.},label={lst:trim}]
-fn trim(bytes: &[u8]) -> &[u8] {
-    let start = bytes.iter()
-        .position(|byte| !byte.is_ascii_whitespace())
-        .unwrap_or(bytes.len());
-    let end = bytes.iter()
-        .rposition(|byte| !byte.is_ascii_whitespace())
-        .map_or(start, |index| index + 1);
-    &bytes[start..end]
+\begin{lstlisting}[caption={Parsing de argumentos com aspas e escapes.},label={lst:parse}]
+struct Span { start: usize, end: usize }
+
+struct Command<'a> {
+    line: &'a [u8],
+    spans: [Span; MAX_ARGS],
+    count: usize,
 }
 \end{lstlisting}
 
-Uma linha vazia ou composta apenas de espa\c{c}os n\~ao executa nada.
+As regras s\~ao:
+
+\begin{itemize}
+  \item espa\c{c}os separam argumentos e s\~ao colapsados;
+  \item aspas simples preservam o texto literal at\'e o fechamento;
+  \item aspas duplas tamb\'em permitem \code{\textbackslash "} e
+        \code{\textbackslash \textbackslash};
+  \item fora de aspas, \code{\textbackslash} escapa o pr\'oximo byte;
+  \item aspas sem fechamento geram \code{"aspas sem fechamento"};
+  \item mais de 24 argumentos geram \code{"argumentos demais"}.
+\end{itemize}
+
+Uma linha vazia, ou composta apenas de espa\c{c}os, n\~ao executa nada.
 
 \subsection{Convers\~ao para texto}
 
@@ -126,47 +149,80 @@ Uma linha vazia ou composta apenas de espa\c{c}os n\~ao executa nada.
 aceita ASCII, na pr\'atica a convers\~ao sempre funciona para texto digitado;
 se falhar, retorna a string fixa \code{"<bytes invalidos>"}.
 
-\subsection{Comandos}
+\subsection{Despacho de applets}
 
-A execu\c{c}\~ao \'e uma cadeia de compara\c{c}\~oes \code{if}/\code{else if}.
-N\~ao h\'a tabela de despacho, \emph{parsing} de argumentos nem an\'alise
-sint\'atica.
+A execu\c{c}\~ao \'e uma busca na tabela est\'atica \code{APPLETS}, n\~ao uma
+cadeia de compara\c{c}\~oes. Cada entrada guarda nome, uso, resumo e um
+ponteiro de fun\c{c}\~ao:
+
+\begin{lstlisting}[caption={Entrada da tabela de applets.},label={lst:applet}]
+struct Applet {
+    name: &'static str,
+    usage: &'static str,
+    summary: &'static str,
+    run: fn(&Command<'_>) -> Result<(), &'static str>,
+}
+\end{lstlisting}
+
+\code{find\_applet} compara o primeiro argumento com a tabela e
+\code{execute} chama a fun\c{c}\~ao. Um applet devolve \code{Result}; em caso
+de erro o shell imprime \code{nome: motivo}. Comandos desconhecidos produzem
+duas linhas de mensagem.
+
+\section{Comandos}
 
 \begin{table}[H]
 \centering
-\caption{Comandos implementados.}
+\caption{Principais applets (veja \code{help} para a lista completa).}
 \label{tab:comandos}
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule
 \textbf{Comando} & \textbf{Efeito} \\
 \midrule
-\code{help} & Lista os comandos dispon\'iveis. \\
+\code{help [comando]} & Lista os applets ou mostra o uso de um deles. \\
+\code{echo [-n] [texto...]} & Imprime os argumentos separados por espa\c{c}os. \\
 \code{clear} & Limpa o console virtual ativo com \code{ESC[2J ESC[H}. \\
-\code{echo <texto>} & Imprime o texto ap\'os o primeiro espa\c{c}o. \\
-\code{info} & Mostra informa\c{c}\~oes do kernel, TTY e modelo de entrada. \\
-\code{tty} & Mostra o console virtual ativo. \\
-\code{tty [0..7]} & Troca para o console virtual indicado. \\
-\code{getty} & Roda o login em ring 3 no console ativo. \\
-\code{getty [0..7]} & Troca de console e roda o login nele. \\
-\code{demand} & Exercita o demand paging do kernel. \\
-\code{usertest} & Roda o demo de demand paging em ring 3. \\
-\code{userprot} & Tenta acessar o kernel a partir do ring 3. \\
-\code{mem} & Mostra estat\'isticas de frames, faults e bits U/S. \\
-\code{reboot} & Reinicia o PC via comando \code{0xFE} ao 8042. \\
-\code{halt} & Imprime uma mensagem e para a CPU com \code{cli; hlt}. \\
+\code{pwd}, \code{cd}, \code{ls [-l]} & Percorrem o diret\'orio corrente do ramfs. \\
+\code{cat [-n] <arquivo>...} & L\^e arquivos pelo VFS; funciona com \code{/proc}. \\
+\code{mkdir}, \code{touch}, \code{write [-a]} & Criam diret\'orios, criam
+arquivos e gravam ou anexam texto. \\
+\code{rm [-r]}, \code{rmdir}, \code{cp}, \code{mv} & Modificam a \'arvore do ramfs. \\
+\code{tree [dir]} & Imprime a \'arvore de diret\'orios. \\
+\code{uname [-asnrm]}, \code{uptime}, \code{free} & Informa\c{c}\~oes do
+sistema e da mem\'oria. \\
+\code{heap} & Aloca \code{Vec}/\code{String} e mostra os contadores do heap. \\
+\code{vfs} & Exercita \code{open/read/write/lseek/close} e l\^e
+\code{/proc/version}. \\
+\code{filetest} & Abre e l\^e \code{/etc/motd} em ring 3 via syscalls. \\
+\code{ps}, \code{tasks} & Listam PID, PPID, estado, yields, preemp\c{c}\~oes e
+nome das tarefas. \\
+\code{spawn [nome] [n] [sleep|wait|timeout]} & Cria at\'e oito workers; o
+modo escolhe sleep por prazo, fila de espera por evento ou espera com
+timeout. \\
+\code{sleep [segundos]} & Bloqueia o shell com sem\^antica de
+\code{schedule\_timeout}. \\
+\code{notify [one]} & Sinaliza a fila de eventos; \code{one} acorda uma
+\'unica tarefa (\code{wake\_up}) em vez de todas (\code{wake\_up\_all}). \\
+\code{whoami}, \code{hostname} & Mostram o usu\'ario da sess\~ao e o host. \\
+\code{info} & Mostra kernel, TTY, ramfs, heap e tarefas. \\
+\code{tty}, \code{getty} & Mostram ou trocam consoles; rodam o login em ring 3. \\
+\code{demand}, \code{usertest}, \code{userprot} & Demos de demand paging e U/S. \\
+\code{mem} & Mostra frames, heap e estat\'isticas do escalonador. \\
+\code{reboot}, \code{halt} & Reiniciam o PC ou param a CPU. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 \begin{nota}[Detalhes de comportamento]
 \begin{itemize}
-  \item \code{echo} sem argumento n\~ao \'e reconhecido como comando; apenas
-        \code{echo } seguido de texto casa com o prefixo.
-  \item \code{echo   ola} preserva os espa\c{c}os internos ap\'os o prefixo
-        \code{"echo "}; o \emph{trim} remove apenas as extremidades.
+  \item \code{echo   ola} preserva o espa\c{c}amento interno apenas se estiver
+        entre aspas ou escapado; caso contr\'ario o parser colapsa os espa\c{c}os.
   \item A compara\c{c}\~ao \'e sens\'ivel a mai\'usculas: \code{HELP} n\~ao
         funciona.
-  \item Comandos desconhecidos produzem duas linhas de mensagem.
+  \item \code{cat} usa \code{vfs::open/read/close}, ent\~ao funciona no ramfs e
+        no \code{/proc}; em caso de erro o descritor \'e fechado.
+  \item \code{ls /proc} lista as entradas sint\'eticas, e \code{ls -l /proc}
+        mostra os tamanhos atuais.
 \end{itemize}
 \end{nota}
 
@@ -182,12 +238,16 @@ TTY:    8 consoles virtuais, ativo = tty0 (Alt+F1..Alt+F8)
 Entrada: teclado PS/2 e serial COM1 (polling)
 IDT:    256 portas; excecoes + IRQ0 (timer ~100 Hz)
 Memoria: paginas de 4 KiB, demand paging e frames fisicos
+RAMFS:  17 nos, 186 bytes em arquivos
+HEAP:   4 KiB mapeados, 266 B em uso
 Usuario: ring 3 com GDT/TSS, protecao U/S e int 0x80
+Tarefas: 1 na tabela, 0 prontas, 0 dormindo, 0 encerradas (escalonador preemptivo)
 Ticks do timer: 366
 \end{lstlisting}
 
-A maioria das linhas \'e est\'atica; o n\'umero do console ativo e a contagem
-de ticks do timer s\~ao lidos no momento em que o comando roda.
+A maioria das linhas \'e est\'atica; o n\'umero do console ativo, o uso do
+ramfs, os contadores do heap, os contadores de tarefas e os ticks do timer
+s\~ao lidos no momento em que o comando roda.
 
 \section{Comandos especiais}
 
@@ -205,29 +265,35 @@ CPU termina em \code{halt\_loop()}.
 
 \section{Como estender}
 
-Para adicionar um comando:
+Para adicionar um applet:
 
 \begin{enumerate}
-  \item acrescente um ramo \code{else if line == b"meucomando"} em
-        \code{execute};
-  \item use \code{println!} para a sa\'ida;
-  \item se precisar de argumentos, use \code{strip\_prefix} como em
-        \code{echo};
-  \item mantenha o comando sem aloca\c{c}\~ao e sem bloqueio;
-  \item atualize a lista de \code{help} e esta documenta\c{c}\~ao.
+  \item acrescente uma entrada \code{Applet} em \code{APPLETS} com nome, uso,
+        resumo e fun\c{c}\~ao;
+  \item implemente \code{fn applet\_x(command: \&Command<'\_>) -> Result<(),
+        \&'static str>};
+  \item leia argumentos com \code{command.arg(index)} e valide a contagem;
+  \item use \code{println!}, \code{tty::write\_bytes} ou o VFS para a sa\'ida;
+  \item a lista de \code{help} \'e gerada da tabela; atualize esta
+        documenta\c{c}\~ao.
 \end{enumerate}
 
 Exemplo:
 
-\begin{lstlisting}[caption={Esqueleto de um novo comando.},label={lst:novocomando}]
-} else if line == b"versao" {
+\begin{lstlisting}[caption={Esqueleto de um novo applet.},label={lst:novocomando}]
+fn applet_versao(command: &Command<'_>) -> Result<(), &'static str> {
+    no_args(command)?;
     println!("Rust VGA Kernel 0.1.0");
-} else if let Some(arg) = line.strip_prefix(b"upper ") {
-    for byte in arg {
-        crate::print!("{}", byte.to_ascii_uppercase() as char);
-    }
-    println!();
+    Ok(())
 }
+
+// e, em APPLETS:
+Applet {
+    name: "versao",
+    usage: "versao",
+    summary: "mostra a versao do kernel",
+    run: applet_versao,
+},
 \end{lstlisting}
 
 \section{Limita\c{c}\~oes}
@@ -235,11 +301,14 @@ Exemplo:
 \begin{itemize}
   \item Sem hist\'orico, setas, Ctrl+C, Ctrl+D ou edi\c{c}\~ao no meio da
         linha.
-  \item Sem aspas, escape, pipes, redirecionamento ou vari\'aveis.
-  \item Sem argumentos estruturados: cada comando decide como interpretar o
-        restante.
-  \item Sem execu\c{c}\~ao de programas: n\~ao h\'a \emph{loader} nem
-        processos.
+  \item Sem pipes, redirecionamento, vari\'aveis, globbing ou scripts.
+  \item Sem execu\c{c}\~ao de programas: n\~ao h\'a \emph{loader},
+        \code{fork} nem \code{exec}; applets s\~ao fun\c{c}\~oes do kernel.
+  \item As tarefas s\~ao threads de kernel preemptivas por timer e
+        compartilham o espa\c{c}o de endere\c{c}os do kernel; a
+        preemp\c{c}\~ao fica suspensa durante programas de ring 3. Existem
+        sleep e filas de espera por evento, mas n\~ao h\'a sinais,
+        prioridades nem espa\c{c}o de endere\c{c}os por tarefa.
   \item Sem tradu\c{c}\~ao de UTF-8: acentos digitados podem virar \code{?}.
   \item A linha \'e limitada a 128 bytes e o excesso \'e descartado em
         sil\^encio.

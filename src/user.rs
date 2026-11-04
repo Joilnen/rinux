@@ -179,6 +179,108 @@ extern "C" {
     static getty_end: u8;
 }
 
+// Programa de demonstracao do VFS em ring 3.
+//
+// Syscalls novas:
+//   4 open(path, len, flags)
+//   5 close(fd)
+//   6 read(fd, buf, len)
+//   7 write(fd, buf, len)
+//   9 getpid()
+global_asm!(
+    r#"
+    .section .text.filetest, "ax"
+
+    .global filetest_start
+    .global filetest_end
+
+filetest_start:
+    # write(1, "filetest ring 3: ", ...)
+    mov $7, %rax
+    mov $1, %rdi
+    lea file_hello(%rip), %rsi
+    lea file_hello_end(%rip), %rdx
+    sub %rsi, %rdx
+    int $0x80
+
+    # Buffer de 256 bytes na pilha do usuario.
+    subq $256, %rsp
+
+    # fd = open("/etc/motd", 9, O_RDONLY)
+    mov $4, %rax
+    lea file_path(%rip), %rdi
+    mov $9, %rsi
+    xor %rdx, %rdx
+    int $0x80
+    mov %rax, %r12
+    cmpq $-1, %rax
+    je file_bad
+
+    # n = read(fd, buffer, 255)
+    mov $6, %rax
+    mov %r12, %rdi
+    mov %rsp, %rsi
+    mov $255, %rdx
+    int $0x80
+    mov %rax, %r13
+    cmpq $-1, %rax
+    je file_bad
+
+    # write(1, buffer, n)
+    mov $7, %rax
+    mov $1, %rdi
+    mov %rsp, %rsi
+    mov %r13, %rdx
+    int $0x80
+
+    # close(fd)
+    mov $5, %rax
+    mov %r12, %rdi
+    int $0x80
+
+    # getpid()
+    mov $9, %rax
+    int $0x80
+
+    # exit(0)
+    xor %rdi, %rdi
+    xor %rax, %rax
+    int $0x80
+    jmp file_halt
+
+file_bad:
+    mov $7, %rax
+    mov $1, %rdi
+    lea file_error(%rip), %rsi
+    lea file_error_end(%rip), %rdx
+    sub %rsi, %rdx
+    int $0x80
+    mov $1, %rdi
+    xor %rax, %rax
+    int $0x80
+
+file_halt:
+    jmp file_halt
+
+file_hello:
+    .ascii "filetest ring 3: "
+file_hello_end:
+file_path:
+    .ascii "/etc/motd"
+file_error:
+    .ascii "filetest: open/read falhou\n"
+file_error_end:
+
+filetest_end:
+"#,
+    options(att_syntax)
+);
+
+extern "C" {
+    static filetest_start: u8;
+    static filetest_end: u8;
+}
+
 pub enum Demo {
     /// Escreve na pagina `USER_DATA`, que ainda nao esta presente.
     Demand,
@@ -287,6 +389,32 @@ pub fn run_getty(console: Option<usize>) -> Result<i32, &'static str> {
 
     let start = core::ptr::addr_of!(getty_start) as *const u8;
     let end = core::ptr::addr_of!(getty_end) as *const u8;
+    let len = end as usize - start as usize;
+    let code = unsafe { core::slice::from_raw_parts(start, len) };
+
+    if let Err(reason) = paging::install_user_code(code) {
+        ACTIVE.store(false, Ordering::SeqCst);
+        return Err(reason);
+    }
+
+    EXIT_STATUS.store(-1, Ordering::SeqCst);
+    unsafe {
+        user_enter(paging::USER_CODE, paging::USER_STACK_TOP);
+    }
+
+    paging::reset_user_demand();
+    ACTIVE.store(false, Ordering::SeqCst);
+    Ok(EXIT_STATUS.load(Ordering::SeqCst))
+}
+
+/// Executa o demo de arquivos/VFS em ring 3.
+pub fn run_file() -> Result<i32, &'static str> {
+    if ACTIVE.swap(true, Ordering::SeqCst) {
+        return Err("ja existe um programa de usuario ativo");
+    }
+
+    let start = core::ptr::addr_of!(filetest_start) as *const u8;
+    let end = core::ptr::addr_of!(filetest_end) as *const u8;
     let len = end as usize - start as usize;
     let code = unsafe { core::slice::from_raw_parts(start, len) };
 
