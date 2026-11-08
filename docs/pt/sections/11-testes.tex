@@ -46,6 +46,13 @@ T17 & \code{mem} mostra U/S = 1 para usu\'ario e 0 para o kernel & Passou \\
 T18 & \code{tty} reporta \code{tty0} e \code{tty 3} troca de console & Passou \\
 T19 & \code{getty} autentica \code{root}/\code{rinux} em ring 3 & Passou \\
 T20 & Senha n\~ao \'e ecoada; senha errada encerra com status 1 & Passou \\
+T21 & \code{spawn ... signal} + \code{kill <pid> USR1} executa o handler & Passou \\
+T22 & A\c{c}\~oes padr\~ao \code{SIGTERM}/\code{SIGKILL} terminam o alvo & Passou \\
+T23 & \code{SIGSTOP} mostra \code{parada} no \code{ps}; \code{SIGCONT} retoma & Passou \\
+T24 & Sinal bloqueado fica pendente e \'e entregue ap\'os desbloquear & Passou \\
+T25 & \code{wait} colhe filho com status 42 e informa status 143 por sinal & Passou \\
+T26 & \code{/proc/signals}, \code{sig} e \code{sigaction} mostram as m\'ascaras & Passou \\
+T27 & \code{kill(pid, 0)} funciona para zumbi e falha ap\'os \code{wait} & Passou \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -123,6 +130,50 @@ rinux>
 
 O texto digitado no socket serial aparece no VGA porque o shell ecoa cada
 caractere e o console escreve tanto no VGA quanto na serial.
+
+\subsection{Sinais e ciclo de vida dos processos}
+
+Um worker criado com \code{spawn sig1 1 signal} instala um handler de
+\code{SIGUSR1} e dorme. Enviar \code{kill 2 USR1} o acorda e o handler roda no
+contexto do alvo:
+
+\begin{lstlisting}[style=shell,caption={Handler de sinal personalizado.},label={lst:testsignalpt}]
+rinux> spawn sig1 1 signal
+tarefa criada: pid=2 nome=sig1 nice=0
+[task 2] esperando SIGUSR1 (kill 2 USR1)
+rinux> kill 2 USR1
+pid=2 sinal=10 (SIGUSR1) enviado
+[task 2] handler: recebi SIGUSR1 (10)
+\end{lstlisting}
+
+A\c{c}\~oes padr\~ao, parada e colheita s\~ao exercitadas com:
+
+\begin{lstlisting}[style=shell,caption={A\c{c}\~oes padr\~ao, SIGSTOP/SIGCONT e wait.},label={lst:testlifecyclept}]
+rinux> spawn stop1 1 sleep
+tarefa criada: pid=2 nome=stop1 nice=0
+rinux> kill 2 STOP
+pid=2 sinal=19 (SIGSTOP) enviado
+rinux> ps
+*    1     0  rodando        ...  shell
+     2     1  parada         ...  stop1
+rinux> kill 2 CONT
+rinux> kill 2 TERM
+pid=2 sinal=15 (SIGTERM) enviado
+rinux> wait 2
+pid=2 terminado por SIGTERM (15), status=143
+rinux> spawn short 1 exit
+tarefa criada: pid=3 nome=short nice=0
+[task 3] encerrando com status 42 em 0,5 s
+rinux> wait 3
+pid=3 status=42
+\end{lstlisting}
+
+O bloqueio \'e sim\'etrico: \code{sigblock <pid> USR1 on} mant\'em o
+\code{SIGUSR1} pendente (vis\'ivel em \code{sig <pid>} e
+\code{/proc/signals}) at\'e \code{sigblock <pid> USR1 off}; o pr\'oximo ponto
+seguro ent\~ao executa o handler. \code{kill <pid> 0} informa que um zumbi
+ainda existe e, ap\'os \code{wait <pid>}, a mesma chamada falha com
+\emph{tarefa nao encontrada}.
 
 \section{Script de teste headless}
 
@@ -234,6 +285,14 @@ Resultados esperados:
         retorna ao \code{tty0}.
   \item[$\square$] \code{getty} aceita \code{root}/\code{rinux} e volta ao
         shell; senha errada encerra com status 1.
+  \item[$\square$] Um handler de \code{SIGUSR1} instalado com
+        \code{spawn ... signal} roda ap\'os \code{kill <pid> USR1}.
+  \item[$\square$] \code{SIGTERM}/\code{SIGKILL} terminam um worker e
+        \code{SIGSTOP}/\code{SIGCONT} o param e retomam.
+  \item[$\square$] Um sinal bloqueado fica pendente at\'e
+        \code{sigblock ... off}.
+  \item[$\square$] \code{wait} colhe status 42 e status 143 por sinal e os
+        mostra; \code{/proc/signals} coincide com \code{sig}.
   \item[$\square$] \code{halt} para a CPU e \code{reboot} reinicia (quando o
         ambiente suporta).
   \item[$\square$] A documenta\c{c}\~ao LaTeX compila e gera o PDF.

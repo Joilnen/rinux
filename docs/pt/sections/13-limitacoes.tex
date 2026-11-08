@@ -18,14 +18,17 @@ Mem\'oria & Alocador de frames, p\'aginas de 4 KiB sob demanda e um heap
 \emph{first-fit} de 1 MiB com \code{Vec}/\code{String}. Sem slab ou buddy
 allocator, sem swap, sem reclaim e sem NUMA. \\
 Processos & Tabela de tarefas, PID/PPID, troca de contexto, escalonador
-\emph{round-robin} preemptivo por timer com quantum de cinco ticks,
-\code{sleep} bloqueante (\code{schedule\_timeout}) e filas de espera por
-evento (\code{wait\_event}/\code{wake\_up}). N\~ao h\'a
-\code{fork}/\code{exec}/\code{wait}, CFS/EEVDF, prioridades nem espa\c{c}o de
-endere\c{c}o por processo; os programas em ring 3 ainda n\~ao s\~ao processos
-escalonados. Onze syscalls
+preemptivo justo e ponderado com \code{nice}, pesos no estilo
+\code{sched\_prio\_to\_weight} e \code{vruntime}, \code{sleep} bloqueante
+(\code{schedule\_timeout}), filas de espera por evento
+(\code{wait\_event}/\code{wake\_up}), sinais no estilo Unix com m\'ascaras de
+pendentes/bloqueados e disposi\c{c}\~oes, tarefas paradas/continuadas, status
+de sa\'ida, zumbis e \code{wait}/\code{SIGCHLD}. N\~ao h\'a
+\code{fork}/\code{exec}, \'arvore rubro-negra completa do CFS/EEVDF nem
+espa\c{c}o de endere\c{c}o por processo; os programas em ring 3 ainda n\~ao
+s\~ao processos escalonados. Doze syscalls
 (\code{exit/write/read/get\_tty/open/close/read\_fd/write\_fd/lseek/
-getpid/getppid}). \\
+getpid/getppid/kill}). \\
 Armazenamento & VFS com dezesseis descritores sobre o ramfs em mem\'oria e um
 \code{/proc} sint\'etico. Sem driver de disco, block layer, mounts,
 permiss\~oes, page cache, FAT ou ext2; a ISO \'e s\'o o meio de boot. \\
@@ -35,11 +38,11 @@ n\~ao s\~ao suportados. \\
 Entrada & Teclado PS/2 por polling, sem USB-HID nativo, Caps Lock, AltGr,
 setas ou layout ABNT2. \\
 Serial & Apenas COM1, polling, sem IRQ, DMA ou controle de fluxo. \\
-Concorr\^encia & Uma CPU; o escalonador \'e preemptivo por timer com quantum de
-cinco ticks, \code{sleep} bloqueante e filas de espera por evento, mas a
-preemp\c{c}\~ao fica suspensa enquanto um programa de ring 3 est\'a ativo. Os
-spinlocks usam \code{irqsave}, ent\~ao a tabela de tarefas \'e segura contra a
-IRQ0. \\
+Concorr\^encia & Uma CPU; o escalonador \'e preemptivo por timer com
+contabilidade justa e ponderada por \code{nice}/\code{vruntime},
+\code{sleep} bloqueante e filas de espera por evento, mas a preemp\c{c}\~ao
+fica suspensa enquanto um programa de ring 3 est\'a ativo. Os spinlocks usam
+\code{irqsave}, ent\~ao a tabela de tarefas \'e segura contra a IRQ0. \\
 Seguran\c{c}a & U/S separa usu\'ario e kernel, mas n\~ao h\'a ASLR, NX,
 SMEP/SMAP, \emph{stack canary} nem espa\c{c}os de endere\c{c}o por processo.
 Ponteiros do usu\'ario s\~ao validados por intervalo, mas n\~ao h\'a um
@@ -93,10 +96,12 @@ adicionar complexidade.
 \toprule
 \textbf{Prior.} & \textbf{Item} & \textbf{Objetivo} \\
 \midrule
-1 & Prioridades e sinais & Classes de escalonamento ponderadas e entrega de
-sinais (al\'em de pilhas de kernel por tarefa para ring 3). \\
-2 & Processos de verdade & \code{fork}/\code{exec}/\code{wait}, tabelas de
-p\'agina por processo e tarefas de ring 3 escalonadas pelo kernel. \\
+1 & Sinais em ring 3 e pilhas por tarefa & A entrega de sinais j\'a funciona
+para tarefas de kernel; estend\^e-la a programas de ring 3 e processos
+escalonados com pilha de kernel por tarefa. \\
+2 & Processos de verdade & \code{fork}/\code{exec} (com \code{wait} j\'a
+presente), tabelas de p\'agina por processo e tarefas de ring 3 escalonadas
+pelo kernel. \\
 3 & VFS e sistema de arquivos & Inodes, dentries, mounts e permiss\~oes;
 driver de disco e initramfs. \\
 4 & Robustez de IRQ e teclado & IRQ1 com buffer de scancodes e tratamento de
@@ -122,8 +127,10 @@ de um sistema operacional utiliz\'avel, ainda faltam, no m\'inimo:
 
 \begin{itemize}
   \item isolamento de processos e espa\c{c}o de usu\'ario por processo;
-  \item prioridades de escalonamento, sinais e pilhas de kernel por tarefa para
-        ring 3 (sleep e filas de espera por evento j\'a existem);
+  \item entrega de sinais em programas de ring 3, espa\c{c}os de endere\c{c}o
+        por processo e pilhas de kernel por tarefa para ring 3
+        (\code{nice}, pesos, \code{vruntime}, sleep, filas de espera por
+        evento, sinais em contexto de kernel e \code{wait} j\'a existem);
   \item sistema de arquivos persistente e \emph{loader} de programas;
   \item drivers de entrada/sa\'ida al\'em de VGA/PS/2/serial;
   \item tratamento de erros e recupera\c{c}\~ao.

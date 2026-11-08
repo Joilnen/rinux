@@ -369,6 +369,7 @@ arquivos dispon\'iveis s\~ao:
 \code{/proc/uptime}  & segundos e cent\'esimos a partir dos ticks do PIT \\
 \code{/proc/meminfo} & contadores de frames, heap e tarefas \\
 \code{/proc/ps}      & tabela de tarefas no formato do applet \code{ps} \\
+\code{/proc/signals} & m\'ascaras pendentes/bloqueadas, estado e status de sa\'ida \\
 \code{/proc/cpuinfo} & uma pequena descri\c{c}\~ao est\'atica da CPU \\
 \code{/proc/mounts}  & linhas de ramfs, proc e devtmpfs \\
 \code{/proc/cmdline} & linha de comando do boot \\
@@ -384,13 +385,13 @@ namespace.
 \section{Tarefas e escalonador preemptivo}
 
 \code{src/task.rs} adiciona PID/PPID, estados de tarefa e um escalonador
-\emph{round-robin}. O shell \'e a tarefa 1 e roda na pilha de boot.
-\code{spawn} cria uma thread de kernel com pilha de 16 KiB vinda do heap, uma
-c\'opia do nome e uma fun\c{c}\~ao de entrada. Cada tarefa tem seu pr\'oprio
-ponteiro de pilha salvo e um frame inicial consumido pela rotina assembly
-abaixo; al\'em dos registradores \emph{callee-saved}, a rotina salva e
-restaura \code{RFLAGS}, para que o flag de interrup\c{c}\~ao acompanhe a
-tarefa na troca:
+\emph{weighted fair} inspirado no CFS do Linux. O shell \'e a tarefa 1 e roda
+na pilha de boot. \code{spawn(name, entry, nice)} cria uma thread de kernel com
+pilha de 16 KiB vinda do heap, uma c\'opia do nome, uma fun\c{c}\~ao de entrada
+e uma prioridade. Cada tarefa tem seu pr\'oprio ponteiro de pilha salvo e um
+frame inicial consumido pela rotina assembly abaixo; al\'em dos registradores
+\emph{callee-saved}, a rotina salva e restaura \code{RFLAGS}, para que o flag
+de interrup\c{c}\~ao acompanhe a tarefa na troca:
 
 \begin{lstlisting}[caption={Troca de contexto com \code{RFLAGS}.},label={lst:ctxswitchpt}]
 task_switch:
@@ -414,30 +415,41 @@ task_switch:
 \end{lstlisting}
 
 Uma tarefa nova come\c{c}a em \code{task\_trampoline}, que chama a fun\c{c}\~ao
-de entrada e depois \code{exit\_current}. O escalonador roda sobre as tarefas
-\code{Ready}; \code{yield\_now} marca a atual como pronta e troca,
-\code{exit\_current} a marca como \code{Exited}. Slots encerrados s\~ao
-reutilizados pelo pr\'oximo \code{spawn}, como um zumbi sendo colhido, e a
-pilha antiga volta ao heap.
+de entrada e depois \code{exit\_current}. \code{yield\_now} marca a atual como
+pronta e deixa o escalonador escolher de novo, \code{exit\_current} a marca
+como \code{Exited}. Uma tarefa encerrada permanece como zumbi at\'e o pai
+chamar \code{wait}, que libera o slot; o pr\'oximo \code{spawn} ent\~ao
+devolve a pilha antiga ao heap.
 
-A pol\'itica \'e \emph{round-robin} preemptivo por timer. Cada tarefa tem um
-quantum de \code{QUANTUM\_TICKS = 5} interrup\c{c}\~oes do timer (cerca de
-50 ms a 100 Hz). A IRQ0 incrementa o contador de ticks, envia o EOI do PIC e
-chama \code{task::on\_tick}; quando o quantum termina e h\'a outra tarefa
-\code{Ready}, \code{on\_tick} salva o contexto corrente e troca sem qualquer
-coopera\c{c}\~ao da tarefa. A varredura come\c{c}a depois do slot atual, de
-modo que uma tarefa nunca \'e escolhida para trocar consigo mesma.
-\code{yield\_now} continua dispon\'ivel para ceder a CPU explicitamente e
-reinicia o quantum.
+A pol\'itica \'e escalonamento justo ponderado com \code{nice}, pesos no
+estilo \code{sched\_prio\_to\_weight} e tempo virtual. Cada tarefa guarda
+\code{nice} ($-20$ a $19$), seu peso (de 88761 em $-20$ at\'e 15 em $19$,
+com 1024 em $0$) e \code{vruntime}. A cada IRQ0 a tarefa corrente soma
+\[
+  \Delta \mathrm{vruntime} = \frac{1024 \ll 10}{\mathrm{weight}}
+\]
+ao tempo virtual, de modo que uma tarefa de prioridade alta acumula tempo
+virtual mais devagar. \code{on\_tick} escolhe ent\~ao a tarefa execut\'avel
+(\code{Ready} ou \code{Running}) de menor \code{vruntime}; empates mant\^em a
+tarefa corrente para evitar troca desnecess\'aria. N\~ao h\'a quantum fixo: a
+justi\c{c}a emerge da contabilidade por tick, tarefas de mesmo peso alternam
+aproximadamente a cada tick e uma tarefa com \code{nice} $-5$ recebe cerca de
+tr\^es vezes mais CPU que uma com \code{nice} $0$. Tarefas novas e acordadas
+t\^em o \code{vruntime} elevado ao m\'inimo das execut\'aveis, a mesma ideia de
+\code{place\_entity} em \code{kernel/sched/fair.c}, para n\~ao monopolizarem a
+CPU enquanto ``alcan\c{c}am'' as demais. \'E um CFS did\'atico: n\~ao h\'a
+\'arvore rubro-negra, \emph{lag} nem EEVDF.
 
 Como o pr\'oprio tratador do timer pode pegar a trava da tabela de tarefas,
 os spinlocks de \code{sync.rs} seguem o modelo \code{irqsave}: adquirir o
 lock desabilita interrup\c{c}\~oes locais e o \emph{guard} restaura o
 \code{RFLAGS} anterior ao sair. A preemp\c{c}\~ao fica suspensa enquanto um
 programa de ring 3 est\'a ativo, pois ele roda na pilha de interrup\c{c}\~ao
-compartilhada do TSS, n\~ao em uma pilha por tarefa. Todas as tarefas
-compartilham o espa\c{c}o de endere\c{c}os do kernel; n\~ao h\'a \code{fork},
-\code{exec}, \code{wait} nem tabela de p\'aginas por processo.
+compartilhada do TSS, n\~ao em uma pilha por tarefa; o rel\'ogio e o
+\code{vruntime} continuam avan\c{c}ando. Todas as tarefas compartilham o
+espa\c{c}o de endere\c{c}os do kernel; n\~ao h\'a \code{fork}, \code{exec} nem
+tabela de p\'aginas por processo. \code{wait} existe como opera\c{c}\~ao
+pai/filho sobre esse mesmo espa\c{c}o e colhe zumbis, como descrito adiante.
 
 O escalonador tamb\'em tem um estado de bloqueio real. \code{task::sleep(ticks)}
 \'e o equivalente de \code{schedule\_timeout}: a tarefa corrente guarda um
@@ -454,23 +466,95 @@ fila em \code{wait\_queue}, muda para \code{Blocked} e s\'o volta a
 \code{Ready} quando outro contexto chama \code{wake\_up\_one} ou
 \code{wake\_up\_all}. \code{wait\_event} reavalia uma condi\c{c}\~ao ap\'os
 cada despertar, e \code{wait\_event\_timeout} acrescenta um prazo, como
-\code{wait\_event\_timeout} no Linux. A identidade da fila \'e o endere\c{c}o
-da estrutura est\'atica e os waiters ficam na tabela de tarefas, uma vers\~ao
+\code{wait\_event\_timeout} no Linux. Uma tarefa acordada tem o
+\code{vruntime} elevado ao m\'inimo corrente antes de ficar execut\'avel, para
+n\~ao chegar muito atrasada. A identidade da fila \'e o endere\c{c}o da
+estrutura est\'atica e os waiters ficam na tabela de tarefas, uma vers\~ao
 simplificada das listas intrusivas do Linux.
 
-O applet \code{spawn [nome] [n] [sleep|wait|timeout]} cria at\'e oito
-workers. Cada worker cede a CPU uma vez e depois espera ticks do timer em
-\emph{busy wait}, sem novos yields, ent\~ao a intercala\c{c}\~ao observada vem
-da preemp\c{c}\~ao. Com o modo \code{sleep} (\code{spawn nap 2 sleep}), o
-worker chama \code{task::sleep} entre as rodadas. Com \code{wait}, ele dorme
-na fila de eventos at\'e o applet \code{notify} chamar \code{wake\_up\_all}
-(ou \code{notify one} para \code{wake\_up}); \code{timeout} usa
-\code{wait\_event\_timeout} e informa se o evento chegou em um segundo. Em
-todos os modos de bloqueio o \code{ps} mostra a tarefa como \code{dormindo}
-e o shell continua responsivo. \code{ps} mostra PID, PPID, estado, contagem
-de yields, contagem de preemp\c{c}\~oes (\code{PREEMP}) e nome. Por exemplo,
-dois workers ocupados avan\c{c}am um passo por vez e cada um acumula tr\^es
-preemp\c{c}\~oes.
+O applet \code{spawn [nome] [n] [cpu|sleep|wait|timeout|signal|exit] [nice]}
+cria at\'e oito workers. No modo padr\~ao \code{cpu}, cada worker cede a CPU
+uma vez e depois consome 10 ticks reais de CPU por rodada, medidos pelo
+contador \code{cpu\_ticks} da tarefa, ent\~ao a intercala\c{c}\~ao observada vem
+da preemp\c{c}\~ao e o mesmo trabalho leva mais tempo em prioridade menor. Com
+\code{sleep} (\code{spawn nap 2 sleep -5}), o worker chama \code{task::sleep}
+entre as rodadas. Com \code{wait}, ele dorme na fila de eventos at\'e o applet
+\code{notify} chamar \code{wake\_up\_all} (ou \code{notify one} para
+\code{wake\_up}); \code{timeout} usa \code{wait\_event\_timeout} e informa se
+o evento chegou em um segundo; \code{signal} instala um handler de
+\code{SIGUSR1} e dorme; \code{exit} termina com status 42 depois de meio
+segundo, deixando um zumbi para \code{wait}. Em todos os modos de bloqueio o
+\code{ps} mostra a tarefa como \code{dormindo} (ou \code{parada} depois de
+\code{SIGSTOP}) e o shell continua responsivo. O applet
+\code{nice [pid] [valor]} l\^e ou altera a prioridade de uma tarefa, como
+\code{setpriority}. \code{ps} mostra PID, PPID, estado, \code{NICE}, ticks de
+\code{CPU}, \code{VRUNTIME}, contagem de yields, contagem de
+preemp\c{c}\~oes (\code{PREEMP}) e nome. Dois workers iguais terminam com os
+mesmos ticks de CPU e o mesmo \code{vruntime}; um worker criado com
+\code{nice} $-5$ termina bem antes de um \code{nice} $0$ equivalente e
+acumula muito menos \code{vruntime} por tick.
+
+\section{Sinais e ciclo de vida dos processos}
+
+Os sinais seguem o modelo Unix de forma compacta. Cada tarefa guarda uma
+m\'ascara de 32 bits de \code{pending}, uma de \code{blocked} e um vetor de 32
+valores \code{SignalAction}, numerados a partir de 1 (sinais Unix
+cl\'assicos). A disposi\c{c}\~ao \'e uma de:
+
+\begin{lstlisting}[caption={Disposi\c{c}\~oes de sinal.},label={lst:signalspt}]
+pub enum SignalAction {
+    Default,
+    Ignore,
+    Handler(fn(i32)),
+}
+\end{lstlisting}
+
+\code{Default} aplica a a\c{c}\~ao cl\'assica: terminar, parar ou ignorar,
+conforme o sinal. \code{SIGKILL} (9) e \code{SIGSTOP} (19) s\~ao especiais:
+n\~ao podem ser bloqueados, ignorados nem ter a disposi\c{c}\~ao alterada.
+\code{SIGCONT} (18) sempre retira a tarefa de \code{Stopped}, mesmo que o
+sinal esteja bloqueado. \code{SIGCHLD} (17) e
+\code{SIGURG}/\code{SIGWINCH} s\~ao ignorados por padr\~ao;
+\code{SIGTSTP}/\code{SIGTTIN}/\code{SIGTTOU} param por padr\~ao; os demais
+terminam por padr\~ao.
+
+A entrega ocorre apenas em pontos seguros, nunca dentro de um tratador de
+IRQ, porque um handler pode dormir ou trocar de tarefa. \code{check\_signals}
+\'e chamada por \code{yield\_now}, \code{sleep}, \code{block\_current},
+\code{wait\_child}, o la\c{c}o/idle do shell e o la\c{c}o do worker de CPU.
+Ela pega o menor sinal pendente fora da m\'ascara de bloqueio, limpa o bit e
+executa a disposi\c{c}\~ao. A flag \code{in\_handler} impede entrega
+recursiva enquanto um handler roda; um sinal que chega durante o handler
+espera o pr\'oximo ponto seguro.
+
+O envio passa por \code{task::kill(pid, sig)}. Para a tarefa corrente o bit
+\'e apenas enfileirado. Para outra tarefa, \code{SIGKILL}, \code{SIGSTOP} e
+sinais de termina\c{c}\~ao padr\~ao s\~ao aplicados imediatamente, pois o alvo
+n\~ao est\'a executando e n\~ao h\'a contexto de kernel a salvar; sinais com
+handler ficam pendentes e um alvo bloqueado \'e acordado para chegar a um
+ponto seguro. Um handler de sinal \'e um ponteiro de fun\c{c}\~ao do kernel,
+n\~ao um endere\c{c}o de usu\'ario: ele roda no contexto da tarefa alvo, com a
+mesma pilha e o mesmo espa\c{c}o de endere\c{c}os do kernel.
+\code{kill(pid, 0)} apenas verifica a exist\^encia e, portanto, funciona para
+um zumbi.
+
+Os applets espelham a API: \code{kill} envia um n\'umero ou nome;
+\code{sigaction} l\^e ou instala a disposi\c{c}\~ao; \code{sigblock} altera a
+m\'ascara; \code{sig} mostra as m\'ascaras pendentes/bloqueadas e o status de
+sa\'ida; e \code{/proc/signals} exp\~oe a mesma tabela. Sinais com handler s\~ao
+enfileirados e entregues em ponto seguro; sinais de termina\c{c}\~ao ou parada
+padr\~ao enviados a uma tarefa que n\~ao \'e a corrente t\^em efeito imediato.
+
+O ciclo de vida est\'a ligado \`a mesma tabela. Uma tarefa que chama
+\code{exit\_current\_with\_status(status)} vira \code{Exited}, guarda o status
+e, quando morta por sinal, o n\'umero do sinal fatal (\code{128 + sig}). O pai
+recebe \code{SIGCHLD} e, se estava bloqueado em \code{wait}, \'e acordado.
+\code{wait\_child(target)} espera em uma \code{CHILD\_QUEUE} global; quando h\'a
+um filho zumbi, devolve um \code{WaitResult} (pid, status, sinal) e marca o
+slot como \code{Free}. Um timeout de dez ticks cobre a corrida entre verificar
+a condi\c{c}\~ao e dormir, para que nenhum despertar seja perdido. At\'e ser
+colhido, o zumbi mant\'em o PID e pode encher a tabela de 16 slots; chamar
+\code{wait} \'e necess\'ario antes de criar muitos filhos de vida curta.
 
 \section{Novas chamadas de sistema}
 
@@ -492,6 +576,7 @@ A tabela de \code{int 0x80} foi estendida com chamadas de arquivo e processo:
 8  & \code{lseek}    & \code{fd, offset, whence} \\
 9  & \code{getpid}   & -- \\
 10 & \code{getppid}  & -- \\
+11 & \code{kill}     & \code{pid, sig} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -499,4 +584,6 @@ A tabela de \code{int 0x80} foi estendida com chamadas de arquivo e processo:
 \code{filetest} roda um blob de ring 3 que abre \code{/etc/motd} com
 \code{open}, l\^e com \code{read\_fd}, escreve o conte\'udo com
 \code{write\_fd} e fecha o descritor. \code{getpid} e \code{getppid} leem a
-tarefa atual do escalonador em vez de devolver constantes.
+tarefa atual do escalonador em vez de devolver constantes. \code{kill} valida
+o n\'umero do sinal e delega para \code{task::kill}; \code{sig = 0} apenas
+verifica se o alvo existe.

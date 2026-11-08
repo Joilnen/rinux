@@ -8,11 +8,11 @@
 \contentsline {section}{\numberline {1.6}Estado do projeto}{11}{section.1.6}%
 \contentsline {chapter}{\numberline {2}Vis\~ao geral do sistema}{12}{chapter.2}%
 \contentsline {section}{\numberline {2.1}Resumo executivo}{12}{section.2.1}%
-\contentsline {section}{\numberline {2.2}Funcionalidades}{13}{section.2.2}%
+\contentsline {section}{\numberline {2.2}Funcionalidades}{12}{section.2.2}%
 \contentsline {section}{\numberline {2.3}Requisitos}{13}{section.2.3}%
 \contentsline {subsection}{\numberline {2.3.1}Hardware}{13}{subsection.2.3.1}%
-\contentsline {subsection}{\numberline {2.3.2}Software de desenvolvimento}{14}{subsection.2.3.2}%
-\contentsline {section}{\numberline {2.4}Estrutura de diret\'orios}{14}{section.2.4}%
+\contentsline {subsection}{\numberline {2.3.2}Software de desenvolvimento}{13}{subsection.2.3.2}%
+\contentsline {section}{\numberline {2.4}Estrutura de diret\'orios}{13}{section.2.4}%
 \contentsline {section}{\numberline {2.5}M\'etricas do c\'odigo}{15}{section.2.5}%
 \contentsline {section}{\numberline {2.6}Fluxo resumido de execu\c {c}\~ao}{15}{section.2.6}%
 \contentsline {chapter}{\numberline {3}Arquitetura}{16}{chapter.3}%
@@ -93,8 +93,8 @@
 \contentsline {subsection}{\numberline {9.3.1}Spans de argumento}{44}{subsection.9.3.1}%
 \contentsline {subsection}{\numberline {9.3.2}Convers\~ao para texto}{45}{subsection.9.3.2}%
 \contentsline {subsection}{\numberline {9.3.3}Despacho de applets}{45}{subsection.9.3.3}%
-\contentsline {section}{\numberline {9.4}Comandos}{46}{section.9.4}%
-\contentsline {section}{\numberline {9.5}Sa\'ida de \texttt {info}}{47}{section.9.5}%
+\contentsline {section}{\numberline {9.4}Comandos}{45}{section.9.4}%
+\contentsline {section}{\numberline {9.5}Sa\'ida de \texttt {info}}{46}{section.9.5}%
 \contentsline {section}{\numberline {9.6}Comandos especiais}{47}{section.9.6}%
 \contentsline {subsection}{\numberline {9.6.1}\texttt {halt}}{47}{subsection.9.6.1}%
 \contentsline {subsection}{\numberline {9.6.2}\texttt {reboot}}{47}{subsection.9.6.2}%
@@ -124,71 +124,73 @@
 \contentsline {section}{\numberline {11.9}VFS e descritores de arquivo}{59}{section.11.9}%
 \contentsline {section}{\numberline {11.10}O pseudo-sistema /proc}{59}{section.11.10}%
 \contentsline {section}{\numberline {11.11}Tarefas e escalonador preemptivo}{59}{section.11.11}%
-\contentsline {section}{\numberline {11.12}Novas chamadas de sistema}{61}{section.11.12}%
-\contentsline {chapter}{\numberline {12}Build, imagem e execu\c {c}\~ao}{62}{chapter.12}%
-\contentsline {section}{\numberline {12.1}Toolchain e alvo}{62}{section.12.1}%
-\contentsline {section}{\numberline {12.2}Configura\c {c}\~ao do Cargo}{62}{section.12.2}%
-\contentsline {section}{\numberline {12.3}Perfis de compila\c {c}\~ao}{63}{section.12.3}%
-\contentsline {section}{\numberline {12.4}Makefile}{63}{section.12.4}%
-\contentsline {subsection}{\numberline {12.4.1}Compila\c {c}\~ao direta com Cargo}{64}{subsection.12.4.1}%
-\contentsline {subsection}{\numberline {12.4.2}Alvos}{64}{subsection.12.4.2}%
-\contentsline {section}{\numberline {12.5}Configura\c {c}\~ao do GRUB}{64}{section.12.5}%
-\contentsline {section}{\numberline {12.6}ISO}{65}{section.12.6}%
-\contentsline {section}{\numberline {12.7}Execu\c {c}\~ao}{65}{section.12.7}%
-\contentsline {subsection}{\numberline {12.7.1}\texttt {make run}}{65}{subsection.12.7.1}%
-\contentsline {subsection}{\numberline {12.7.2}Execu\c {c}\~ao sem interface gr\'afica}{66}{subsection.12.7.2}%
-\contentsline {subsection}{\numberline {12.7.3}Valida\c {c}\~ao do ELF e da ISO}{66}{subsection.12.7.3}%
-\contentsline {section}{\numberline {12.8}Solu\c {c}\~ao de problemas}{67}{section.12.8}%
-\contentsline {section}{\numberline {12.9}Reprodutibilidade}{67}{section.12.9}%
-\contentsline {chapter}{\numberline {13}Testes e valida\c {c}\~ao}{68}{chapter.13}%
-\contentsline {section}{\numberline {13.1}Estrat\'egia}{68}{section.13.1}%
-\contentsline {section}{\numberline {13.2}Matriz de testes}{68}{section.13.2}%
-\contentsline {section}{\numberline {13.3}Evid\^encias de execu\c {c}\~ao}{68}{section.13.3}%
-\contentsline {subsection}{\numberline {13.3.1}Banner e prompt}{68}{subsection.13.3.1}%
-\contentsline {subsection}{\numberline {13.3.2}Comando \texttt {help} via PS/2}{69}{subsection.13.3.2}%
-\contentsline {subsection}{\numberline {13.3.3}Comando \texttt {echo} via PS/2}{69}{subsection.13.3.3}%
-\contentsline {subsection}{\numberline {13.3.4}\texttt {clear} via ANSI}{69}{subsection.13.3.4}%
-\contentsline {subsection}{\numberline {13.3.5}Entrada serial}{70}{subsection.13.3.5}%
-\contentsline {section}{\numberline {13.4}Script de teste headless}{70}{section.13.4}%
-\contentsline {section}{\numberline {13.5}Testes de build e formato}{71}{section.13.5}%
-\contentsline {section}{\numberline {13.6}Limita\c {c}\~oes dos testes}{71}{section.13.6}%
-\contentsline {section}{\numberline {13.7}Checklist de aceita\c {c}\~ao}{71}{section.13.7}%
-\contentsline {chapter}{\numberline {14}Similaridade com o kernel Linux}{73}{chapter.14}%
-\contentsline {section}{\numberline {14.1}O que significa ``similaridade''}{73}{section.14.1}%
-\contentsline {section}{\numberline {14.2}Metodologia}{73}{section.14.2}%
-\contentsline {section}{\numberline {14.3}Correspond\^encia de arquivos}{73}{section.14.3}%
-\contentsline {section}{\numberline {14.4}Similaridade funcional por dimens\~ao}{74}{section.14.4}%
-\contentsline {subsection}{\numberline {14.4.1}Leitura por dimens\~ao}{75}{subsection.14.4.1}%
-\contentsline {section}{\numberline {14.5}Similaridade arquitetural}{76}{section.14.5}%
-\contentsline {section}{\numberline {14.6}Similaridade de c\'odigo}{76}{section.14.6}%
-\contentsline {section}{\numberline {14.7}Similaridade global}{77}{section.14.7}%
-\contentsline {subsection}{\numberline {14.7.1}Classifica\c {c}\~ao}{77}{subsection.14.7.1}%
-\contentsline {section}{\numberline {14.8}Diferen\c {c}as essenciais}{78}{section.14.8}%
-\contentsline {chapter}{\numberline {15}Limita\c {c}\~oes, riscos e evolu\c {c}\~ao}{79}{chapter.15}%
-\contentsline {section}{\numberline {15.1}Limita\c {c}\~oes t\'ecnicas}{79}{section.15.1}%
-\contentsline {section}{\numberline {15.2}Riscos}{80}{section.15.2}%
-\contentsline {section}{\numberline {15.3}Roadmap sugerido}{80}{section.15.3}%
-\contentsline {section}{\numberline {15.4}Crit\'erios para considerar o projeto ``um kernel''}{81}{section.15.4}%
-\contentsline {chapter}{\numberline {A}Cat\'alogo de fun\c {c}\~oes}{82}{appendix.A}%
-\contentsline {section}{\numberline {A.1}\texttt {main.rs} (2 fun\c {c}\~oes)}{82}{section.A.1}%
-\contentsline {section}{\numberline {A.2}\texttt {arch.rs} (7 fun\c {c}\~oes)}{82}{section.A.2}%
-\contentsline {section}{\numberline {A.3}\texttt {sync.rs} (5 fun\c {c}\~oes)}{82}{section.A.3}%
-\contentsline {section}{\numberline {A.4}\texttt {vga.rs} (5 fun\c {c}\~oes)}{83}{section.A.4}%
-\contentsline {section}{\numberline {A.5}\texttt {tty.rs} (31 fun\c {c}\~oes)}{83}{section.A.5}%
-\contentsline {section}{\numberline {A.6}\texttt {keyboard.rs} (10 fun\c {c}\~oes)}{84}{section.A.6}%
-\contentsline {section}{\numberline {A.7}\texttt {serial.rs} (5 fun\c {c}\~oes)}{85}{section.A.7}%
-\contentsline {section}{\numberline {A.8}\texttt {shell.rs} (61 fun\c {c}\~oes)}{85}{section.A.8}%
-\contentsline {section}{\numberline {A.9}\texttt {gdt.rs} (6 fun\c {c}\~oes)}{86}{section.A.9}%
-\contentsline {section}{\numberline {A.10}\texttt {idt.rs} (14 fun\c {c}\~oes)}{86}{section.A.10}%
-\contentsline {section}{\numberline {A.11}\texttt {paging.rs} (23 fun\c {c}\~oes)}{87}{section.A.11}%
-\contentsline {section}{\numberline {A.12}\texttt {user.rs} (9 fun\c {c}\~oes)}{88}{section.A.12}%
-\contentsline {section}{\numberline {A.13}\texttt {syscall.rs} (9 fun\c {c}\~oes)}{88}{section.A.13}%
-\contentsline {section}{\numberline {A.14}\texttt {heap.rs} (9 fun\c {c}\~oes)}{89}{section.A.14}%
-\contentsline {section}{\numberline {A.15}\texttt {ramfs.rs} (31 fun\c {c}\~oes)}{89}{section.A.15}%
-\contentsline {section}{\numberline {A.16}\texttt {proc.rs} (9 fun\c {c}\~oes)}{90}{section.A.16}%
-\contentsline {section}{\numberline {A.17}\texttt {vfs.rs} (11 fun\c {c}\~oes)}{90}{section.A.17}%
-\contentsline {section}{\numberline {A.18}\texttt {task.rs} (29 fun\c {c}\~oes)}{91}{section.A.18}%
-\contentsline {chapter}{\numberline {B}Mapa de portas e mem\'oria}{93}{appendix.B}%
-\contentsline {section}{\numberline {B.1}Portas de I/O}{93}{section.B.1}%
-\contentsline {section}{\numberline {B.2}Mapa de mem\'oria}{93}{section.B.2}%
-\contentsline {chapter}{\numberline {C}Gloss\'ario}{94}{appendix.C}%
+\contentsline {section}{\numberline {11.12}Sinais e ciclo de vida dos processos}{61}{section.11.12}%
+\contentsline {section}{\numberline {11.13}Novas chamadas de sistema}{62}{section.11.13}%
+\contentsline {chapter}{\numberline {12}Build, imagem e execu\c {c}\~ao}{63}{chapter.12}%
+\contentsline {section}{\numberline {12.1}Toolchain e alvo}{63}{section.12.1}%
+\contentsline {section}{\numberline {12.2}Configura\c {c}\~ao do Cargo}{63}{section.12.2}%
+\contentsline {section}{\numberline {12.3}Perfis de compila\c {c}\~ao}{64}{section.12.3}%
+\contentsline {section}{\numberline {12.4}Makefile}{64}{section.12.4}%
+\contentsline {subsection}{\numberline {12.4.1}Compila\c {c}\~ao direta com Cargo}{65}{subsection.12.4.1}%
+\contentsline {subsection}{\numberline {12.4.2}Alvos}{65}{subsection.12.4.2}%
+\contentsline {section}{\numberline {12.5}Configura\c {c}\~ao do GRUB}{65}{section.12.5}%
+\contentsline {section}{\numberline {12.6}ISO}{66}{section.12.6}%
+\contentsline {section}{\numberline {12.7}Execu\c {c}\~ao}{66}{section.12.7}%
+\contentsline {subsection}{\numberline {12.7.1}\texttt {make run}}{66}{subsection.12.7.1}%
+\contentsline {subsection}{\numberline {12.7.2}Execu\c {c}\~ao sem interface gr\'afica}{67}{subsection.12.7.2}%
+\contentsline {subsection}{\numberline {12.7.3}Valida\c {c}\~ao do ELF e da ISO}{67}{subsection.12.7.3}%
+\contentsline {section}{\numberline {12.8}Solu\c {c}\~ao de problemas}{68}{section.12.8}%
+\contentsline {section}{\numberline {12.9}Reprodutibilidade}{68}{section.12.9}%
+\contentsline {chapter}{\numberline {13}Testes e valida\c {c}\~ao}{69}{chapter.13}%
+\contentsline {section}{\numberline {13.1}Estrat\'egia}{69}{section.13.1}%
+\contentsline {section}{\numberline {13.2}Matriz de testes}{70}{section.13.2}%
+\contentsline {section}{\numberline {13.3}Evid\^encias de execu\c {c}\~ao}{70}{section.13.3}%
+\contentsline {subsection}{\numberline {13.3.1}Banner e prompt}{70}{subsection.13.3.1}%
+\contentsline {subsection}{\numberline {13.3.2}Comando \texttt {help} via PS/2}{71}{subsection.13.3.2}%
+\contentsline {subsection}{\numberline {13.3.3}Comando \texttt {echo} via PS/2}{71}{subsection.13.3.3}%
+\contentsline {subsection}{\numberline {13.3.4}\texttt {clear} via ANSI}{71}{subsection.13.3.4}%
+\contentsline {subsection}{\numberline {13.3.5}Entrada serial}{71}{subsection.13.3.5}%
+\contentsline {subsection}{\numberline {13.3.6}Sinais e ciclo de vida dos processos}{72}{subsection.13.3.6}%
+\contentsline {section}{\numberline {13.4}Script de teste headless}{72}{section.13.4}%
+\contentsline {section}{\numberline {13.5}Testes de build e formato}{73}{section.13.5}%
+\contentsline {section}{\numberline {13.6}Limita\c {c}\~oes dos testes}{73}{section.13.6}%
+\contentsline {section}{\numberline {13.7}Checklist de aceita\c {c}\~ao}{74}{section.13.7}%
+\contentsline {chapter}{\numberline {14}Similaridade com o kernel Linux}{75}{chapter.14}%
+\contentsline {section}{\numberline {14.1}O que significa ``similaridade''}{75}{section.14.1}%
+\contentsline {section}{\numberline {14.2}Metodologia}{75}{section.14.2}%
+\contentsline {section}{\numberline {14.3}Correspond\^encia de arquivos}{75}{section.14.3}%
+\contentsline {section}{\numberline {14.4}Similaridade funcional por dimens\~ao}{76}{section.14.4}%
+\contentsline {subsection}{\numberline {14.4.1}Leitura por dimens\~ao}{77}{subsection.14.4.1}%
+\contentsline {section}{\numberline {14.5}Similaridade arquitetural}{78}{section.14.5}%
+\contentsline {section}{\numberline {14.6}Similaridade de c\'odigo}{79}{section.14.6}%
+\contentsline {section}{\numberline {14.7}Similaridade global}{79}{section.14.7}%
+\contentsline {subsection}{\numberline {14.7.1}Classifica\c {c}\~ao}{79}{subsection.14.7.1}%
+\contentsline {section}{\numberline {14.8}Diferen\c {c}as essenciais}{80}{section.14.8}%
+\contentsline {chapter}{\numberline {15}Limita\c {c}\~oes, riscos e evolu\c {c}\~ao}{81}{chapter.15}%
+\contentsline {section}{\numberline {15.1}Limita\c {c}\~oes t\'ecnicas}{81}{section.15.1}%
+\contentsline {section}{\numberline {15.2}Riscos}{82}{section.15.2}%
+\contentsline {section}{\numberline {15.3}Roadmap sugerido}{82}{section.15.3}%
+\contentsline {section}{\numberline {15.4}Crit\'erios para considerar o projeto ``um kernel''}{83}{section.15.4}%
+\contentsline {chapter}{\numberline {A}Cat\'alogo de fun\c {c}\~oes}{84}{appendix.A}%
+\contentsline {section}{\numberline {A.1}\texttt {main.rs} (2 fun\c {c}\~oes)}{84}{section.A.1}%
+\contentsline {section}{\numberline {A.2}\texttt {arch.rs} (7 fun\c {c}\~oes)}{84}{section.A.2}%
+\contentsline {section}{\numberline {A.3}\texttt {sync.rs} (5 fun\c {c}\~oes)}{84}{section.A.3}%
+\contentsline {section}{\numberline {A.4}\texttt {vga.rs} (5 fun\c {c}\~oes)}{85}{section.A.4}%
+\contentsline {section}{\numberline {A.5}\texttt {tty.rs} (31 fun\c {c}\~oes)}{85}{section.A.5}%
+\contentsline {section}{\numberline {A.6}\texttt {keyboard.rs} (10 fun\c {c}\~oes)}{86}{section.A.6}%
+\contentsline {section}{\numberline {A.7}\texttt {serial.rs} (5 fun\c {c}\~oes)}{87}{section.A.7}%
+\contentsline {section}{\numberline {A.8}\texttt {shell.rs} (73 fun\c {c}\~oes)}{87}{section.A.8}%
+\contentsline {section}{\numberline {A.9}\texttt {gdt.rs} (6 fun\c {c}\~oes)}{88}{section.A.9}%
+\contentsline {section}{\numberline {A.10}\texttt {idt.rs} (14 fun\c {c}\~oes)}{89}{section.A.10}%
+\contentsline {section}{\numberline {A.11}\texttt {paging.rs} (23 fun\c {c}\~oes)}{89}{section.A.11}%
+\contentsline {section}{\numberline {A.12}\texttt {user.rs} (9 fun\c {c}\~oes)}{90}{section.A.12}%
+\contentsline {section}{\numberline {A.13}\texttt {syscall.rs} (10 fun\c {c}\~oes)}{91}{section.A.13}%
+\contentsline {section}{\numberline {A.14}\texttt {heap.rs} (9 fun\c {c}\~oes)}{91}{section.A.14}%
+\contentsline {section}{\numberline {A.15}\texttt {ramfs.rs} (31 fun\c {c}\~oes)}{92}{section.A.15}%
+\contentsline {section}{\numberline {A.16}\texttt {proc.rs} (10 fun\c {c}\~oes)}{92}{section.A.16}%
+\contentsline {section}{\numberline {A.17}\texttt {vfs.rs} (11 fun\c {c}\~oes)}{93}{section.A.17}%
+\contentsline {section}{\numberline {A.18}\texttt {task.rs} (55 fun\c {c}\~oes)}{93}{section.A.18}%
+\contentsline {chapter}{\numberline {B}Mapa de portas e mem\'oria}{96}{appendix.B}%
+\contentsline {section}{\numberline {B.1}Portas de I/O}{96}{section.B.1}%
+\contentsline {section}{\numberline {B.2}Mapa de mem\'oria}{96}{section.B.2}%
+\contentsline {chapter}{\numberline {C}Gloss\'ario}{97}{appendix.C}%

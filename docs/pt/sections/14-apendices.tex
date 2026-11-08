@@ -3,7 +3,7 @@
 \chapter{Cat\'alogo de fun\c{c}\~oes}
 \label{ap:funcoes}
 
-Esta se\c{c}\~ao lista as 276 fun\c{c}\~oes do c\'odigo Rust, agrupadas por
+Esta se\c{c}\~ao lista as 316 fun\c{c}\~oes do c\'odigo Rust, agrupadas por
 m\'odulo. O \emph{stub} \code{\_start} n\~ao \'e uma fun\c{c}\~ao Rust e
 aparece separadamente no Cap\'itulo~\ref{cap:boot}. Declara\c{c}\~oes
 \code{extern} sem corpo, como \code{gdt\_reload\_cs}, \code{user\_enter} e
@@ -245,9 +245,9 @@ Inv\'olucro de \code{write\_bytes} para strings. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{shell.rs} (61 fun\c{c}\~oes)}
+\section{\code{shell.rs} (73 fun\c{c}\~oes)}
 
-O shell \'e uma tabela est\'atica de 37 applets mais o parser, o despachante e
+O shell \'e uma tabela est\'atica de 43 applets mais o parser, o despachante e
 os auxiliares de demo. A tabela abaixo lista as fun\c{c}\~oes centrais; os
 demais applets seguem o mesmo padr\~ao
 \code{fn(\&Command) -> Result<(), \&'static str>}.
@@ -275,7 +275,18 @@ Procura um comando pelo nome. \\
 \code{applet\_help}, \code{applet\_echo}, \code{applet\_cat}, \code{applet\_ls} &
 Listam, imprimem, leem pelo VFS e listam ramfs ou \code{/proc}. \\
 \code{applet\_ps}, \code{applet\_spawn} &
-Mostram a tabela de tarefas e criam workers preemptivos ou dorminhocos. \\
+Mostram a tabela de tarefas (com \code{nice}, ticks de CPU e \code{vruntime})
+e criam workers com modo e prioridade opcionais. \\
+\code{applet\_nice()} &
+L\^e ou altera o \code{nice} de uma tarefa, como \code{setpriority}. \\
+\code{applet\_kill()}, \code{applet\_sig()} &
+Enviam um sinal por n\'umero ou nome e mostram m\'ascaras pendentes/bloqueadas,
+estado e status de sa\'ida. \\
+\code{applet\_sigaction()}, \code{applet\_sigblock()} &
+Leem ou instalam a disposi\c{c}\~ao de um sinal e alteram a m\'ascara de
+bloqueio. \\
+\code{applet\_wait()} &
+Espera um filho, mostra status e sinal fatal e colhe o zumbi. \\
 \code{applet\_sleep()} &
 Bloqueia o shell com sem\^antica de \code{schedule\_timeout}. \\
 \code{applet\_notify()} &
@@ -285,16 +296,27 @@ Avan\c{c}a o contador de eventos e chama \code{wake\_up\_one} ou
 Imprimem estat\'isticas de kernel, ramfs, heap, tarefas, preemp\c{c}\~oes,
 frames e faults. \\
 \code{worker\_task()} &
-Thread de kernel usada por \code{spawn}; cede uma vez e depois espera ticks do
-timer sem novos yields. \\
+Thread de kernel usada por \code{spawn ... cpu}; cede uma vez e depois consome
+10 ticks reais de CPU por rodada, sem novos yields. \\
 \code{sleeper\_task()} &
 Thread de kernel usada por \code{spawn ... sleep}; bloqueia em
 \code{task::sleep} entre as rodadas. \\
 \code{waiter\_task()}, \code{waiter\_timeout\_task()} &
 Workers usados por \code{spawn ... wait|timeout}; dormem na fila de eventos,
 com ou sem prazo. \\
+\code{demo\_signal\_handler(sig)}, \code{signal\_task()} &
+Handler de \code{SIGUSR1} de demonstra\c{c}\~ao e worker de
+\code{spawn ... signal}. \\
+\code{exit\_task()} &
+Worker de \code{spawn ... exit}; termina com status 42 para demonstrar
+\code{wait}. \\
+\code{print\_signal\_mask(label, mask)}, \code{describe\_signal\_action(action)} &
+Formatam m\'ascaras pendentes/bloqueadas e disposi\c{c}\~oes para \code{sig} e
+\code{sigaction}. \\
 \code{memory\_info()} &
 Mostra frames, heap, contadores do escalonador e flags U/S. \\
+\code{parse\_decimal}, \code{parse\_signed\_decimal} &
+Interpretam argumentos decimais sem e com sinal para os applets. \\
 \bottomrule
 \end{longtable}
 
@@ -464,7 +486,7 @@ Chamado por exce\c{c}\~oes/\emph{syscall}; grava o status e retoma o kernel. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{syscall.rs} (9 fun\c{c}\~oes)}
+\section{\code{syscall.rs} (10 fun\c{c}\~oes)}
 
 \begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
 \caption{Fun\c{c}\~oes de \code{syscall.rs}.}\\
@@ -477,9 +499,10 @@ Chamado por exce\c{c}\~oes/\emph{syscall}; grava o status e retoma o kernel. \\
 \midrule
 \endhead
 \code{dispatch(frame: \&mut InterruptFrame)} &
-Despacha as onze chamadas (\code{exit}, \code{write}, \code{read},
+Despacha as doze chamadas (\code{exit}, \code{write}, \code{read},
 \code{get\_tty}, \code{open}, \code{close}, \code{read\_fd},
-\code{write\_fd}, \code{lseek}, \code{getpid}, \code{getppid}). \\
+\code{write\_fd}, \code{lseek}, \code{getpid}, \code{getppid},
+\code{kill}). \\
 \code{sys\_write(frame: \&mut InterruptFrame)} &
 Valida o buffer do usu\'ario, escreve no console ativo e devolve o tamanho. \\
 \code{sys\_read(frame: \&mut InterruptFrame)} &
@@ -496,6 +519,9 @@ L\^e de um descritor para um buffer validado do usu\'ario. \\
 Escreve um buffer validado do usu\'ario em um descritor. \\
 \code{sys\_lseek(frame: \&mut InterruptFrame)} &
 Reposiciona o offset do descritor. \\
+\code{sys\_kill(frame: \&mut InterruptFrame)} &
+Valida o sinal e delega para \code{task::kill}; \code{sig = 0} apenas verifica
+a exist\^encia. \\
 \bottomrule
 \end{longtable}
 
@@ -565,7 +591,7 @@ Devolve o n\'umero de n\'os usados e os bytes armazenados. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{proc.rs} (9 fun\c{c}\~oes)}
+\section{\code{proc.rs} (10 fun\c{c}\~oes)}
 
 \begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
 \caption{Fun\c{c}\~oes de \code{proc.rs}.}\\
@@ -586,9 +612,10 @@ Renderizam a entrada e copiam a fatia pedida. \\
 \code{Buffer::new}, \code{Buffer::write\_str} &
 Buffer fixo de 2 KiB com \code{fmt::Write} usado na renderiza\c{c}\~ao. \\
 \code{render(entry, out) -> usize} &
-Formata version, uptime, meminfo, ps, cpuinfo, mounts ou cmdline. \\
-\code{render\_meminfo}, \code{render\_ps} &
-Formatam contadores de frames, heap e tarefas, e a tabela de tarefas. \\
+Formata version, uptime, meminfo, ps, signals, cpuinfo, mounts ou cmdline. \\
+\code{render\_meminfo}, \code{render\_ps}, \code{render\_signals} &
+Formatam contadores de frames, heap e tarefas, a tabela de tarefas e as
+m\'ascaras de sinais. \\
 \bottomrule
 \end{longtable}
 
@@ -624,7 +651,7 @@ Reconhece \code{/dev/tty} e \code{/dev/console}. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{task.rs} (29 fun\c{c}\~oes)}
+\section{\code{task.rs} (55 fun\c{c}\~oes)}
 
 \begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
 \caption{Fun\c{c}\~oes de \code{task.rs}.}\\
@@ -638,19 +665,29 @@ Reconhece \code{/dev/tty} e \code{/dev/console}. \\
 \endhead
 \code{init()} &
 Reinicia a tabela e instala o shell como PID 1. \\
-\code{spawn(name, entry) -> Result<u64, \&'static str>} &
-Aloca uma pilha de 16 KiB, reusa um slot encerrado e devolve o novo PID. \\
+\code{spawn(name, entry, nice) -> Result<u64, \&'static str>} &
+Aloca uma pilha de 16 KiB, reusa um slot livre (ap\'os \code{wait}) e devolve o
+novo PID com a prioridade pedida. \\
 \code{current\_pid()}, \code{current\_ppid()} &
 Devolvem os identificadores da tarefa em execu\c{c}\~ao. \\
+\code{weight\_for\_nice(nice)}, \code{vruntime\_delta(weight)} &
+Mapeiam um \code{nice} para o peso no estilo Linux e o peso para o incremento
+de \code{vruntime} por tick. \\
+\code{min\_vruntime\_locked(table) -> u64} &
+Menor \code{vruntime} entre as tarefas execut\'aveis; usado para posicionar
+tarefas novas e acordadas. \\
+\code{pick\_next(table)}, \code{pick\_ready(table)} &
+Escolhem a tarefa execut\'avel (ou apenas pronta) de menor \code{vruntime}. \\
 \code{yield\_now()} &
-Troca \emph{round-robin} expl\'icita para a pr\'oxima tarefa pronta; reinicia
-o quantum. \\
+Marca a tarefa atual como pronta e deixa o escalonador escolher de novo o menor
+\code{vruntime}. \\
 \code{sleep(ticks: u64)} &
 Bloqueia a tarefa atual at\'e um tick de prazo e troca de contexto
 (\code{schedule\_timeout}); usa \code{hlt} quando n\~ao h\'a tarefa pronta. \\
 \code{on\_tick()} &
-Hook da IRQ0: avan\c{c}a o rel\'ogio do escalonador, acorda tarefas vencidas,
-decrementa o quantum e preempta a tarefa atual quando ele expira. \\
+Hook da IRQ0: avan\c{c}a o rel\'ogio do escalonador, contabiliza
+\code{cpu\_ticks} e \code{vruntime}, acorda tarefas vencidas e preempta para o
+menor \code{vruntime}. \\
 \code{block\_current(queue, deadline) -> bool} &
 Bloqueia quem chama em uma fila com prazo opcional; devolve se um evento
 chegou antes do timeout. \\
@@ -664,22 +701,54 @@ Tornam um ou todos os waiters da fila \code{Ready}, sem trocar de contexto
 imediatamente. \\
 \code{waiters()} &
 Conta as tarefas bloqueadas na fila. \\
+\code{for\_each(visit)} &
+Percorre a tabela com um registro \code{TaskInfo} para \code{ps}, \code{sig}
+e \code{/proc}. \\
+\code{set\_nice(pid, nice)}, \code{get\_nice(pid)} &
+Alteram ou leem a prioridade de uma tarefa, presa a $-20..=19$. \\
+\code{current\_nice()}, \code{current\_cpu\_ticks() -> u64} &
+Prioridade e ticks reais de CPU da tarefa atual. \\
+\code{kill(pid, sig) -> Result<(), \&'static str>} &
+Envia um sinal (0 s\'o verifica exist\^encia); aplica a\c{c}\~oes padr\~ao
+imediatamente a tarefas que n\~ao s\~ao a corrente e enfileira sinais com
+handler. \\
+\code{signal\_name(sig)}, \code{parse\_signal(arg)} &
+Mapeiam n\'umeros para nomes can\^onicos e interpretam nomes/n\'umeros
+(\code{TERM}, \code{SIGUSR1}, \ldots). \\
+\code{set\_signal\_action(pid, sig, action)}, \code{signal\_action(pid, sig)} &
+Leem ou instalam a disposi\c{c}\~ao, recusando altera\c{c}\~oes em
+\code{SIGKILL} e \code{SIGSTOP}. \\
+\code{set\_signal\_blocked(pid, sig, block)} &
+Bloqueia ou desbloqueia um sinal (\code{sigprocmask}) e acorda a tarefa cujo
+sinal pendente se tornou entreg\'avel. \\
+\code{check\_signals()} &
+Entrega sinais pendentes n\~ao bloqueados em ponto seguro; roda handlers,
+aplica a\c{c}\~oes padr\~ao e evita recurs\~ao com \code{in\_handler}. \\
+\code{stop\_current()}, \code{terminate\_locked(table, index, status, signal)} &
+Implementam \code{SIGSTOP} e o caminho comum de sa\'ida que guarda
+status/sinal e envia \code{SIGCHLD} ao pai. \\
+\code{exit\_current\_with\_status(status) -> !} &
+Encerra a tarefa atual com um status expl\'icito. \\
+\code{wait\_child(target) -> Result<WaitResult, \&'static str>} &
+Espera em \code{CHILD\_QUEUE}, colhe um filho zumbi e devolve PID, status e
+sinal fatal. \\
+\code{has\_zombie\_child(parent, target)} &
+Condi\c{c}\~ao usada por \code{wait\_event\_timeout} para fechar a corrida
+entre verificar e dormir. \\
 \code{exit\_current() -> !} &
-Marca a tarefa atual como \code{Exited} e troca de contexto. \\
+Marca a tarefa atual como \code{Exited} com status 0 e troca de contexto. \\
 \code{idle()} &
 Bloqueia por um tick e retorna, para o shell pollar a entrada a cada ~10 ms. \\
-\code{for\_each(visit)} &
-Percorre a tabela para \code{ps} e \code{/proc/ps}. \\
 \code{stats() -> Stats} &
-Conta tarefas totais, prontas, em execu\c{c}\~ao, dormindo, encerradas e
-preemp\c{c}\~oes. \\
+Conta tarefas totais, prontas, em execu\c{c}\~ao, dormindo, paradas,
+encerradas e preemp\c{c}\~oes. \\
 \code{task\_trampoline()} &
 Primeira fun\c{c}\~ao de uma nova tarefa; chama a entrada e depois
 \code{exit\_current}. \\
 \code{State::as\_str}, \code{Task::free}, \code{Task::name}, \code{Task::set\_name},
-\code{next\_ready}, \code{kernel\_stack\_layout}, \code{current\_pid\_locked},
+\code{kernel\_stack\_layout}, \code{current\_pid\_locked},
 \code{dummy\_entry} &
-Auxiliares internos de estados, nomes, escalonamento e layout de pilha. \\
+Auxiliares internos de estados, nomes, layout de pilha e busca de PID. \\
 \bottomrule
 \end{longtable}
 

@@ -18,14 +18,15 @@ Memory & Frame allocator, 4 KiB pages on demand, and a 1 MiB first-fit kernel
 heap with \code{Vec}/\code{String}. No slab or buddy allocator, no swap, no
 reclaim, and no NUMA. \\
 Processes & Task table, PID/PPID, context switch, a timer-preemptive
-round-robin scheduler with a five-tick quantum, blocking \code{sleep}
-(\code{schedule\_timeout}) and event wait queues
-(\code{wait\_event}/\code{wake\_up}). There is no
-\code{fork}/\code{exec}/\code{wait}, no CFS/EEVDF, no priorities and no
-per-process address space; the ring 3 programs are still not scheduled
-processes. Eleven syscalls
+weighted fair scheduler with \code{nice}, \code{sched\_prio\_to\_weight}-style
+weights and \code{vruntime}, blocking \code{sleep} (\code{schedule\_timeout}),
+event wait queues (\code{wait\_event}/\code{wake\_up}), Unix-style signals with
+pending/blocked masks and dispositions, stopped/continued tasks, exit status,
+zombies, \code{wait}/\code{SIGCHLD}. There is no \code{fork}/\code{exec}, no
+full CFS/EEVDF red--black tree and no per-process address space; the ring 3
+programs are still not scheduled processes. Twelve syscalls
 (\code{exit/write/read/get\_tty/open/close/read\_fd/write\_fd/lseek/getpid/
-getppid}). \\
+getppid/kill}). \\
 Storage & VFS with sixteen descriptors over the in-memory ramfs and a synthetic
 \code{/proc}. No disk driver, block layer, mounts, permissions, page cache,
 FAT, or ext2; the ISO is only the boot medium. \\
@@ -35,10 +36,10 @@ modes are not supported. \\
 Input & PS/2 keyboard by polling, with no native USB-HID, Caps Lock, AltGr,
 arrow keys, or ABNT2 layout. \\
 Serial & COM1 only, polling, no IRQ, DMA, or flow control. \\
-Concurrency & One CPU; the scheduler is timer-preemptive with a five-tick
-quantum, a blocking \code{sleep} and event wait queues, but preemption is
-suspended while a ring 3 program is active. The spinlocks use \code{irqsave},
-so the task table is safe against IRQ0. \\
+Concurrency & One CPU; the scheduler is timer-preemptive with weighted fair
+\code{nice}/\code{vruntime} accounting, a blocking \code{sleep} and event wait
+queues, but preemption is suspended while a ring 3 program is active. The
+spinlocks use \code{irqsave}, so the task table is safe against IRQ0. \\
 Security & U/S separates user and kernel, but there is no ASLR, NX,
 SMEP/SMAP, \emph{stack canary}, or per-process address spaces. User pointers
 are range-checked, but there is no \code{copy\_from\_user}-style helper. \\
@@ -91,10 +92,11 @@ adding complexity.
 \toprule
 \textbf{Prior.} & \textbf{Item} & \textbf{Goal} \\
 \midrule
-1 & Priorities and signals & Weighted scheduling classes and signal delivery
-(plus per-task kernel stacks for scheduled ring 3 tasks). \\
-2 & Real processes & \code{fork}/\code{exec}/\code{wait}, per-process page
-tables, and ring 3 tasks scheduled by the kernel. \\
+1 & Ring 3 signals and per-task stacks & Signal delivery already works for
+kernel tasks; extend it to ring 3 programs and scheduled processes with
+per-task kernel stacks. \\
+2 & Real processes & \code{fork}/\code{exec} (with \code{wait} already present),
+per-process page tables, and ring 3 tasks scheduled by the kernel. \\
 3 & VFS and filesystem & Inodes, dentries, mounts and permissions; a disk
 driver and an initramfs. \\
 4 & IRQ and keyboard robustness & IRQ1 with a scancode buffer and handling of
@@ -120,8 +122,10 @@ of a usable operating system, the following are still missing, at a minimum:
 
 \begin{itemize}
   \item process isolation and a per-process user space;
-  \item scheduling priorities, signals and per-task kernel stacks for ring 3
-        tasks (blocking sleep and event wait queues already exist);
+  \item scheduling signals into ring 3 programs and per-task kernel stacks for
+        ring 3 tasks (\code{nice}, weights, \code{vruntime}, blocking sleep,
+        event wait queues, kernel-context signals and \code{wait} already
+        exist);
   \item a persistent filesystem and a program \emph{loader};
   \item input/output drivers beyond VGA/PS/2/serial;
   \item error handling and recovery.

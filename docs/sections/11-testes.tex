@@ -46,6 +46,13 @@ T17 & \code{mem} shows U/S = 1 for user and 0 for kernel & Passed \\
 T18 & \code{tty} reports \code{tty0} and \code{tty 3} switches console & Passed \\
 T19 & \code{getty} logs in with \code{root}/\code{rinux} in ring 3 & Passed \\
 T20 & Password is not echoed; a wrong password exits with status 1 & Passed \\
+T21 & \code{spawn ... signal} + \code{kill <pid> USR1} runs the handler & Passed \\
+T22 & Default \code{SIGTERM}/\code{SIGKILL} actions terminate the target & Passed \\
+T23 & \code{SIGSTOP} shows \code{parada} in \code{ps}; \code{SIGCONT} resumes & Passed \\
+T24 & A blocked signal stays pending and is delivered after unblocking & Passed \\
+T25 & \code{wait} reaps a child with status 42 and reports signal status 143 & Passed \\
+T26 & \code{/proc/signals}, \code{sig} and \code{sigaction} show the masks & Passed \\
+T27 & \code{kill(pid, 0)} succeeds for a zombie and fails after \code{wait} & Passed \\
 \bottomrule
 \end{tabularx}
 \end{table}
@@ -123,6 +130,49 @@ rinux>
 
 The text typed on the serial socket appears on the VGA because the shell echoes
 each character and the console writes both to the VGA and to the serial port.
+
+\subsection{Signals and process lifecycle}
+
+A worker created with \code{spawn sig1 1 signal} installs a \code{SIGUSR1}
+handler and sleeps. Sending \code{kill 2 USR1} wakes it and the handler runs
+in the target's context:
+
+\begin{lstlisting}[style=shell,caption={Custom signal handler.},label={lst:testsignal}]
+rinux> spawn sig1 1 signal
+tarefa criada: pid=2 nome=sig1 nice=0
+[task 2] esperando SIGUSR1 (kill 2 USR1)
+rinux> kill 2 USR1
+pid=2 sinal=10 (SIGUSR1) enviado
+[task 2] handler: recebi SIGUSR1 (10)
+\end{lstlisting}
+
+Default actions, stopping and reaping are exercised with:
+
+\begin{lstlisting}[style=shell,caption={Default actions, SIGSTOP/SIGCONT and wait.},label={lst:testlifecycle}]
+rinux> spawn stop1 1 sleep
+tarefa criada: pid=2 nome=stop1 nice=0
+rinux> kill 2 STOP
+pid=2 sinal=19 (SIGSTOP) enviado
+rinux> ps
+*    1     0  rodando        ...  shell
+     2     1  parada         ...  stop1
+rinux> kill 2 CONT
+rinux> kill 2 TERM
+pid=2 sinal=15 (SIGTERM) enviado
+rinux> wait 2
+pid=2 terminado por SIGTERM (15), status=143
+rinux> spawn short 1 exit
+tarefa criada: pid=3 nome=short nice=0
+[task 3] encerrando com status 42 em 0,5 s
+rinux> wait 3
+pid=3 status=42
+\end{lstlisting}
+
+Blocking is symmetric: \code{sigblock <pid> USR1 on} keeps \code{SIGUSR1}
+pending (visible in \code{sig <pid>} and \code{/proc/signals}) until
+\code{sigblock <pid> USR1 off}; the next safe point then runs the handler.
+\code{kill <pid> 0} reports that a zombie still exists, and after
+\code{wait <pid>} the same call fails with \emph{tarefa nao encontrada}.
 
 \section{Headless test script}
 
@@ -235,6 +285,13 @@ Expected results:
         returns to \code{tty0}.
   \item[$\square$] \code{getty} accepts \code{root}/\code{rinux} and returns
         to the shell; a wrong password exits with status 1.
+  \item[$\square$] A \code{SIGUSR1} handler installed with \code{spawn ...
+        signal} runs after \code{kill <pid> USR1}.
+  \item[$\square$] \code{SIGTERM}/\code{SIGKILL} terminate a worker and
+        \code{SIGSTOP}/\code{SIGCONT} stop and resume it.
+  \item[$\square$] A blocked signal stays pending until \code{sigblock ... off}.
+  \item[$\square$] \code{wait} reaps status 42 and signal status 143 and shows
+        them; \code{/proc/signals} matches \code{sig}.
   \item[$\square$] \code{halt} stops the CPU and \code{reboot} restarts (when the
         environment supports it).
   \item[$\square$] The LaTeX documentation compiles and generates the PDF.

@@ -73,7 +73,7 @@ ing\^enua de que ``\'e um Linux em Rust'' quanto a conclus\~ao oposta de que
 \code{arch/x86/entry/syscalls/syscall\_64.tbl} & --- & \code{syscall.rs} \\
 \midrule
 \textbf{Total Linux (12 primeiros arquivos)} & \textbf{22.352} & --- \\
-\textbf{Total Rust (19 m\'odulos)} & \textbf{6.797} & --- \\
+\textbf{Total Rust (19 m\'odulos)} & \textbf{7.973} & --- \\
 \bottomrule
 \end{longtable}
 
@@ -85,7 +85,7 @@ usando os doze primeiros arquivos Linux.
 A raz\~ao de linhas \'e:
 
 \[
-\frac{6.797}{22.352} \approx 30{,}41\%.
+\frac{7.973}{22.352} \approx 35{,}67\%.
 \]
 
 Em rela\c{c}\~ao \`a \'arvore Linux completa, que tem aproximadamente
@@ -93,7 +93,7 @@ Em rela\c{c}\~ao \`a \'arvore Linux completa, que tem aproximadamente
 raz\~ao \'e:
 
 \[
-\frac{6.797}{38.062.672} \approx 0{,}0179\%.
+\frac{7.973}{38.062.672} \approx 0{,}0209\%.
 \]
 
 \begin{atencao}[Linhas de c\'odigo n\~ao medem similaridade]
@@ -127,29 +127,30 @@ Teclado e entrada & 12 & 100 & 18 & 2,16 \\
 Serial e tty & 5 & 100 & 20 & 1,00 \\
 Interrup\c{c}\~oes e exce\c{c}\~oes & 12 & 100 & 30 & 3,60 \\
 Mem\'oria f\'isica e heap & 8 & 100 & 25 & 2,00 \\
-Processos, scheduler e syscalls & 12 & 100 & 30 & 3,60 \\
+Processos, scheduler e syscalls & 12 & 100 & 45 & 5,40 \\
 Arquivos, rede e outros drivers & 6 & 100 & 10 & 0,60 \\
 \midrule
-\textbf{Total} & \textbf{100} & --- & --- & \textbf{25,51} \\
+\textbf{Total} & \textbf{100} & --- & --- & \textbf{27,31} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-O \'indice ponderado \'e \textbf{25,5\%}. Ele deve ser lido como:
+O \'indice ponderado \'e \textbf{27,3\%}. Ele deve ser lido como:
 
 \begin{quote}
-``Dentro das dez dimens\~oes escolhidas, o projeto reproduz cerca de 25,5\%
+``Dentro das dez dimens\~oes escolhidas, o projeto reproduz cerca de 27,3\%
 do que o Linux oferece, com peso maior para boot, console e teclado.''
 \end{quote}
 
-N\~ao significa que 25,5\% do c\'odigo do Linux foi reimplementado. Em
+N\~ao significa que 27,3\% do c\'odigo do Linux foi reimplementado. Em
 n\'umero de subsistemas e servi\c{c}os, a fra\c{c}\~ao \'e muito menor: o
-projeto tem apenas um heap \emph{first-fit}, um escalonador
-\emph{round-robin} preemptivo por timer com \code{sleep} bloqueante e filas
-de espera por evento, um sistema de arquivos em mem\'oria e um \code{/proc}
-sint\'etico, enquanto o Linux tamb\'em tem buddy allocator, slab, CFS/EEVDF
-com classes de tempo real, uma infraestrutura de wait queues e locks muito
-mais rica, um VFS completo com block devices e rede.
+projeto tem apenas um heap \emph{first-fit}, um escalonador preemptivo justo
+e ponderado com \code{nice}, pesos, \code{vruntime}, \code{sleep} bloqueante,
+filas de espera por evento, sinais no estilo Unix e colheita de zumbis, um
+sistema de arquivos em mem\'oria e um \code{/proc} sint\'etico, enquanto o
+Linux tamb\'em tem buddy allocator, slab, CFS/EEVDF completo com classes de
+tempo real, uma infraestrutura de sinais e wait queues muito mais rica, um VFS
+completo com block devices e rede.
 
 \subsection{Leitura por dimens\~ao}
 
@@ -184,14 +185,17 @@ mais rica, um VFS completo com block devices e rede.
         demand paging e um heap \emph{first-fit} de 1 MiB atr\'as de
         \code{\#[global\_allocator]}, mas n\~ao h\'a buddy allocator, slab,
         page cache, \code{vmalloc}, swap ou NUMA.
-  \item \textbf{Processos (30/100)}: h\'a tabela de tarefas com PID/PPID e
+  \item \textbf{Processos (45/100)}: h\'a tabela de tarefas com PID/PPID e
         estados, troca de contexto que preserva \code{RFLAGS}, escalonador
-        \emph{round-robin} preemptivo por timer com quantum de cinco ticks,
-        \code{sleep} bloqueante com sem\^antica de \code{schedule\_timeout},
-        filas de espera por evento com \code{wait\_event}/\code{wake\_up} e
-        onze syscalls; n\~ao h\'a \code{fork}/\code{exec}/\code{wait},
-        espa\c{c}os de endere\c{c}o separados, sinais, prioridades ou
-        CFS/EEVDF.
+        preemptivo justo e ponderado com \code{nice}, pesos no estilo
+        \code{sched\_prio\_to\_weight} e \code{vruntime}, \code{sleep}
+        bloqueante com sem\^antica de \code{schedule\_timeout}, filas de
+        espera por evento com \code{wait\_event}/\code{wake\_up}, sinais no
+        estilo Unix com m\'ascaras de pendentes/bloqueados, disposi\c{c}\~oes e
+        a\c{c}\~oes padr\~ao, tarefas paradas/continuadas, status de sa\'ida,
+        zumbis, \code{wait}/\code{SIGCHLD} e doze syscalls; n\~ao h\'a
+        \code{fork}/\code{exec}, espa\c{c}os de endere\c{c}o separados,
+        classes de tempo real nem \'arvore rubro-negra completa do CFS/EEVDF.
   \item \textbf{FS/rede (10/100)}: h\'a ramfs, VFS com dezesseis descritores e
         um \code{/proc} sint\'etico, mas n\~ao h\'a block layer, driver de
         disco, tabela de mounts, modelo de permiss\~oes, page cache, TCP/IP ou
@@ -225,14 +229,15 @@ Serial & 8250 + tty + termios & 16550 por polling \\
 Entrada & IRQ1/IRQ4, \emph{softirq}, workqueues & IRQ0 (timer) + polling no
 shell + \code{int 0x80} \\
 Tempo & PIT/APIC, \code{jiffies}, timers & PIT a ~100 Hz, contador de
-\emph{ticks}, quantum preemptivo \\
+\emph{ticks}, contabilidade ponderada de \code{vruntime} \\
 Mem\'oria & buddy, slab, \code{vmalloc}, page cache & Bitmap de frames,
 demand paging, heap \emph{first-fit} \\
 Processos & CFS/EEVDF, namespaces, cgroups & Tabela de tarefas,
-\emph{round-robin} preemptivo, \code{sleep} bloqueante e wait queues; sem
-\code{fork} ou namespaces \\
+escalonador justo e ponderado (\code{nice}/peso/\code{vruntime}), \code{sleep}
+bloqueante, wait queues, sinais e \code{wait}/zumbis; sem \code{fork} ou
+namespaces \\
 Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} com
-onze chamadas (\code{exit}..\code{getppid}) \\
+doze chamadas (\code{exit}..\code{kill}) \\
 Arquivos & VFS, inodes, dentries, page cache & ramfs, 16 descritores,
 \code{/proc} sint\'etico; sem block layer \\
 Rede & sockets, TCP/IP, netfilter & Ausente \\
@@ -270,9 +275,9 @@ Rede & sockets, TCP/IP, netfilter & Ausente \\
 \textbf{Medida} & \textbf{Resultado} \\
 \midrule
 C\'odigo copiado & 0\% (implementa\c{c}\~ao independente) \\
-Linhas vs.\ 12 arquivos an\'alogos & $\approx 30{,}41\%$ \\
-Linhas vs.\ \'arvore Linux completa & $\approx 0{,}0179\%$ \\
-Similaridade funcional ponderada (10 dimens\~oes) & $\approx 25{,}5\%$ \\
+Linhas vs.\ 12 arquivos an\'alogos & $\approx 35{,}67\%$ \\
+Linhas vs.\ \'arvore Linux completa & $\approx 0{,}0209\%$ \\
+Similaridade funcional ponderada (10 dimens\~oes) & $\approx 27{,}3\%$ \\
 Cobertura de subsistemas do kernel completo & muito baixa; ordem de 2\% \\
 Similaridade conceitual no boot & alta (mesmos mecanismos x86) \\
 Similaridade conceitual em drivers & m\'edia/baixa (subconjunto por polling) \\
@@ -293,7 +298,7 @@ Em uma escala qualitativa:
         VGA, PS/2 e serial; baixo para entender o Linux como sistema
         operacional completo.
   \item \textbf{Nota de 0 a 10 para ``quanto do Linux foi reimplementado''}:
-        aproximadamente \textbf{2,5/10} na pontua\c{c}\~ao ponderada; menos de
+        aproximadamente \textbf{2,7/10} na pontua\c{c}\~ao ponderada; menos de
         \textbf{0,1/10} se o crit\'erio for o kernel completo em
         funcionalidades.
 \end{itemize}
@@ -319,15 +324,16 @@ endurecimento de seguran\c{c}a.
 \textbf{Aspecto} & \textbf{Linux} & \textbf{Rust VGA Kernel} \\
 \midrule
 Linguagem & C e assembly & Rust e assembly \\
-Tamanho & $\sim$38 milh\~oes de linhas & 6.797 linhas \\
+Tamanho & $\sim$38 milh\~oes de linhas & 7.973 linhas \\
 Modelo de boot & Protocolo pr\'oprio, setup, EFI & Multiboot2/GRUB \\
 Interrup\c{c}\~oes & IDT, PIC/APIC, timers & IDT, PIC/PIT; teclado em polling \\
-Concorr\^encia & SMP, preemp\c{c}\~ao, RCU & Uma CPU, \emph{round-robin}
-preemptivo com sleep bloqueante e wait queues \\
+Concorr\^encia & SMP, preemp\c{c}\~ao, RCU & Uma CPU, escalonador preemptivo
+justo e ponderado com sleep bloqueante e wait queues \\
 Mem\'oria & Buddy, slab, VM, page cache & Bitmap de frames, demand paging,
 heap \emph{first-fit} \\
-Processos & Scheduler, namespaces, cgroups & Tabela de tarefas,
-\emph{round-robin} preemptivo, wait queues; sem namespaces \\
+Processos & Scheduler, sinais, namespaces, cgroups & Tabela de tarefas,
+escalonador justo e ponderado, wait queues, sinais e \code{wait}/zumbis; sem
+namespaces \\
 Entrada/sa\'ida & VFS, block, net, tty & ramfs, VFS, \code{/proc}, portas de I/O diretas \\
 Seguran\c{c}a & Rings, SMEP/SMAP, KASLR, LSM & Rings 0/3 e U/S; sem NX,
 SMEP ou SMAP \\

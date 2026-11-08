@@ -91,6 +91,112 @@ fn is_console_path(path: &[u8]) -> bool {
     path == b"/dev/tty" || path == b"/dev/console"
 }
 
+const PROC_PATH_MAX: usize = 256;
+
+/// Normaliza um caminho absoluto, removendo `.`, `..` e barras repetidas.
+fn normalize_path(input: &[u8], out: &mut [u8]) -> Option<usize> {
+    if input.first() != Some(&b'/') {
+        return None;
+    }
+
+    let mut len = 1;
+    out[0] = b'/';
+
+    let mut index = 1;
+    while index < input.len() {
+        while index < input.len() && input[index] == b'/' {
+            index += 1;
+        }
+        let start = index;
+        while index < input.len() && input[index] != b'/' {
+            index += 1;
+        }
+        let component = &input[start..index];
+
+        if component.is_empty() || component == b"." {
+            continue;
+        }
+        if component == b".." {
+            if len > 1 {
+                let mut cursor = len;
+                while cursor > 1 && out[cursor - 1] != b'/' {
+                    cursor -= 1;
+                }
+                len = if cursor > 1 { cursor - 1 } else { 1 };
+            }
+            continue;
+        }
+
+        if len > 1 {
+            if len >= out.len() {
+                return None;
+            }
+            out[len] = b'/';
+            len += 1;
+        }
+        if len + component.len() > out.len() {
+            return None;
+        }
+        out[len..len + component.len()].copy_from_slice(component);
+        len += component.len();
+    }
+
+    Some(len)
+}
+
+/// Converte um caminho absoluto ou relativo ao diretorio corrente em absoluto.
+fn absolute_path(path: &[u8], out: &mut [u8]) -> Option<usize> {
+    if path.first() == Some(&b'/') {
+        return normalize_path(path, out);
+    }
+
+    let mut cwd = [0u8; PROC_PATH_MAX];
+    let cwd_len = {
+        let fs = ramfs::lock();
+        fs.path(fs.cwd(), &mut cwd).ok()?
+    };
+
+    let mut joined = [0u8; PROC_PATH_MAX];
+    let mut joined_len = cwd_len;
+    joined[..joined_len].copy_from_slice(&cwd[..cwd_len]);
+    if joined_len == 0 || joined[joined_len - 1] != b'/' {
+        if joined_len >= joined.len() {
+            return None;
+        }
+        joined[joined_len] = b'/';
+        joined_len += 1;
+    }
+    if joined_len + path.len() > joined.len() {
+        return None;
+    }
+    joined[joined_len..joined_len + path.len()].copy_from_slice(path);
+    joined_len += path.len();
+
+    normalize_path(&joined[..joined_len], out)
+}
+
+/// Resolve uma entrada de `/proc` mesmo quando o caminho e relativo ao
+/// diretorio corrente (por exemplo `cd /proc; cat version`).
+fn proc_entry(path: &[u8]) -> Option<proc::Entry> {
+    if let Some(entry) = proc::lookup(path) {
+        return Some(entry);
+    }
+    let mut absolute = [0u8; PROC_PATH_MAX];
+    let len = absolute_path(path, &mut absolute)?;
+    proc::lookup(&absolute[..len])
+}
+
+fn proc_is_dir(path: &[u8]) -> bool {
+    if proc::is_dir(path) {
+        return true;
+    }
+    let mut absolute = [0u8; PROC_PATH_MAX];
+    match absolute_path(path, &mut absolute) {
+        Some(len) => proc::is_dir(&absolute[..len]),
+        None => false,
+    }
+}
+
 /// Abre um caminho do ramfs (ou `/dev/tty`) e devolve o descritor.
 pub fn open(path: &[u8], flags: u64) -> Result<usize, &'static str> {
     if path.is_empty() {
@@ -110,10 +216,10 @@ pub fn open(path: &[u8], flags: u64) -> Result<usize, &'static str> {
         return Ok(slot);
     }
 
-    if proc::is_dir(path) {
+    if proc_is_dir(path) {
         return Err("e um diretorio");
     }
-    if let Some(entry) = proc::lookup(path) {
+    if let Some(entry) = proc_entry(path) {
         let mut table = TABLE.lock();
         let slot = table.free_slot().ok_or("descritores esgotados")?;
         table.fds[slot] = Fd {

@@ -3,7 +3,7 @@
 \chapter{Function Catalog}
 \label{ap:funcoes}
 
-This section lists the 276 functions of the Rust code, grouped by
+This section lists the 316 functions of the Rust code, grouped by
 module. The \emph{stub} \code{\_start} is not a Rust function and
 appears separately in Chapter~\ref{cap:boot}. \code{extern} declarations
 without a body, such as \code{gdt\_reload\_cs}, \code{user\_enter} and
@@ -245,9 +245,9 @@ Wrapper around \code{write\_bytes} for strings. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{shell.rs} (61 functions)}
+\section{\code{shell.rs} (73 functions)}
 
-The shell is a static table of 37 applets plus the parser, dispatcher and demo
+The shell is a static table of 43 applets plus the parser, dispatcher and demo
 helpers. The table below lists the core functions; the remaining applets
 follow the same \code{fn(\&Command) -> Result<(), \&'static str>} pattern.
 
@@ -274,7 +274,17 @@ Looks up a command by name. \\
 \code{applet\_help}, \code{applet\_echo}, \code{applet\_cat}, \code{applet\_ls} &
 List, print, read through the VFS and list ramfs or \code{/proc}. \\
 \code{applet\_ps}, \code{applet\_spawn} &
-Print the task table and create preemptive or sleeping workers. \\
+Print the task table (with \code{nice}, CPU ticks and \code{vruntime}) and
+create workers with an optional mode and priority. \\
+\code{applet\_nice()} &
+Reads or changes a task's \code{nice} value, like \code{setpriority}. \\
+\code{applet\_kill()}, \code{applet\_sig()} &
+Send a signal by number or name and print pending/blocked masks, state and
+exit status. \\
+\code{applet\_sigaction()}, \code{applet\_sigblock()} &
+Read or install a signal disposition and change the blocked mask. \\
+\code{applet\_wait()} &
+Waits for a child, prints status and fatal signal and reaps the zombie. \\
 \code{applet\_sleep()} &
 Blocks the shell with \code{schedule\_timeout} semantics. \\
 \code{applet\_notify()} &
@@ -283,14 +293,24 @@ Advances the demo event counter and calls \code{wake\_up\_one} or
 \code{applet\_info}, \code{applet\_mem} &
 Print kernel, ramfs, heap, task, preemption, frame and fault statistics. \\
 \code{worker\_task()} &
-Kernel thread used by \code{spawn}; yields once, then busy-waits on timer
-ticks without further yields. \\
+Kernel thread used by \code{spawn ... cpu}; yields once, then consumes 10
+real CPU ticks per round without further yields. \\
 \code{sleeper\_task()} &
 Kernel thread used by \code{spawn ... sleep}; blocks in \code{task::sleep}
 between rounds. \\
 \code{waiter\_task()}, \code{waiter\_timeout\_task()} &
 Workers used by \code{spawn ... wait|timeout}; sleep on the demo event queue,
 with or without a deadline. \\
+\code{demo\_signal\_handler(sig)}, \code{signal\_task()} &
+Demo \code{SIGUSR1} handler and worker used by \code{spawn ... signal}. \\
+\code{exit\_task()} &
+Worker used by \code{spawn ... exit}; ends with status 42 to demonstrate
+\code{wait}. \\
+\code{print\_signal\_mask(label, mask)}, \code{describe\_signal\_action(action)} &
+Format pending/blocked masks and dispositions for \code{sig} and
+\code{sigaction}. \\
+\code{parse\_decimal}, \code{parse\_signed\_decimal} &
+Parse unsigned and signed decimal arguments for the applets. \\
 \code{memory\_info()} &
 Shows frames, heap, scheduler counters and U/S flags. \\
 \bottomrule
@@ -461,7 +481,7 @@ Called by exceptions/\emph{syscall}; stores the status and resumes the kernel. \
 \bottomrule
 \end{longtable}
 
-\section{\code{syscall.rs} (9 functions)}
+\section{\code{syscall.rs} (10 functions)}
 
 \begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
 \caption{Functions of \code{syscall.rs}.}\\
@@ -474,9 +494,10 @@ Called by exceptions/\emph{syscall}; stores the status and resumes the kernel. \
 \midrule
 \endhead
 \code{dispatch(frame: \&mut InterruptFrame)} &
-Dispatches the eleven calls (\code{exit}, \code{write}, \code{read},
+Dispatches the twelve calls (\code{exit}, \code{write}, \code{read},
 \code{get\_tty}, \code{open}, \code{close}, \code{read\_fd},
-\code{write\_fd}, \code{lseek}, \code{getpid}, \code{getppid}). \\
+\code{write\_fd}, \code{lseek}, \code{getpid}, \code{getppid},
+\code{kill}). \\
 \code{sys\_write(frame: \&mut InterruptFrame)} &
 Validates the user buffer, writes to the active console and returns the length. \\
 \code{sys\_read(frame: \&mut InterruptFrame)} &
@@ -493,6 +514,9 @@ Reads from a descriptor into a validated user buffer. \\
 Writes a validated user buffer to a descriptor. \\
 \code{sys\_lseek(frame: \&mut InterruptFrame)} &
 Repositions the descriptor offset. \\
+\code{sys\_kill(frame: \&mut InterruptFrame)} &
+Validates the signal and delegates to \code{task::kill}; \code{sig = 0} only
+checks existence. \\
 \bottomrule
 \end{longtable}
 
@@ -562,7 +586,7 @@ Returns the number of used nodes and bytes stored. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{proc.rs} (9 functions)}
+\section{\code{proc.rs} (10 functions)}
 
 \begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
 \caption{Functions of \code{proc.rs}.}\\
@@ -583,9 +607,9 @@ Render the entry and copy the requested slice. \\
 \code{Buffer::new}, \code{Buffer::write\_str} &
 Fixed 2 KiB \code{fmt::Write} buffer used for rendering. \\
 \code{render(entry, out) -> usize} &
-Formats version, uptime, meminfo, ps, cpuinfo, mounts or cmdline. \\
-\code{render\_meminfo}, \code{render\_ps} &
-Format frame, heap and task counters, and the task table. \\
+Formats version, uptime, meminfo, ps, signals, cpuinfo, mounts or cmdline. \\
+\code{render\_meminfo}, \code{render\_ps}, \code{render\_signals} &
+Format frame, heap and task counters, the task table and the signal masks. \\
 \bottomrule
 \end{longtable}
 
@@ -620,7 +644,7 @@ Recognizes \code{/dev/tty} and \code{/dev/console}. \\
 \bottomrule
 \end{longtable}
 
-\section{\code{task.rs} (29 functions)}
+\section{\code{task.rs} (55 functions)}
 
 \begin{longtable}{@{}p{5.6cm}p{8.9cm}@{}}
 \caption{Functions of \code{task.rs}.}\\
@@ -634,18 +658,29 @@ Recognizes \code{/dev/tty} and \code{/dev/console}. \\
 \endhead
 \code{init()} &
 Resets the table and installs the shell as PID 1. \\
-\code{spawn(name, entry) -> Result<u64, \&'static str>} &
-Allocates a 16 KiB stack, reuses an exited slot and returns the new PID. \\
+\code{spawn(name, entry, nice) -> Result<u64, \&'static str>} &
+Allocates a 16 KiB stack, reuses a free slot (after \code{wait}) and returns the
+new PID with the requested priority. \\
 \code{current\_pid()}, \code{current\_ppid()} &
 Return the identifiers of the running task. \\
+\code{weight\_for\_nice(nice)}, \code{vruntime\_delta(weight)} &
+Map a \code{nice} to a Linux-style weight and a weight to the per-tick
+\code{vruntime} increment. \\
+\code{min\_vruntime\_locked(table) -> u64} &
+Smallest \code{vruntime} among the runnable tasks; used to place new and woken
+tasks. \\
+\code{pick\_next(table)}, \code{pick\_ready(table)} &
+Choose the runnable (or only ready) task with the smallest \code{vruntime}. \\
 \code{yield\_now()} &
-Explicit round-robin switch to the next ready task; resets the quantum. \\
+Marks the current task ready and lets the scheduler pick the smallest
+\code{vruntime} again. \\
 \code{sleep(ticks: u64)} &
 Blocks the current task until a deadline tick and switches away
 (\code{schedule\_timeout}); uses \code{hlt} when nothing is runnable. \\
 \code{on\_tick()} &
-IRQ0 hook: advances the scheduler clock, wakes expired tasks, decrements the
-quantum and preempts the current task when it expires. \\
+IRQ0 hook: advances the scheduler clock, charges \code{cpu\_ticks} and
+\code{vruntime}, wakes expired tasks and preempts for the smallest
+\code{vruntime}. \\
 \code{block\_current(queue, deadline) -> bool} &
 Blocks the caller on a wait queue with an optional deadline; returns whether
 an event arrived before the timeout. \\
@@ -659,20 +694,51 @@ Makes one or every waiter of a queue \code{Ready}, without switching
 context immediately. \\
 \code{waiters()} &
 Counts the tasks blocked on the queue. \\
+\code{for\_each(visit)} &
+Walks the task table with a \code{TaskInfo} record for \code{ps},
+\code{sig} and \code{/proc}. \\
+\code{set\_nice(pid, nice)}, \code{get\_nice(pid)} &
+Change or read a task's priority, clamping it to $-20..=19$. \\
+\code{current\_nice()}, \code{current\_cpu\_ticks() -> u64} &
+Priority and real CPU ticks of the running task. \\
+\code{kill(pid, sig) -> Result<(), \&'static str>} &
+Sends a signal (0 only checks existence); applies default actions immediately
+to non-current tasks and queues handler signals. \\
+\code{signal\_name(sig)}, \code{parse\_signal(arg)} &
+Map numbers to canonical names and parse names/numbers (\code{TERM},
+\code{SIGUSR1}, \ldots). \\
+\code{set\_signal\_action(pid, sig, action)}, \code{signal\_action(pid, sig)} &
+Read or install the disposition, rejecting changes to \code{SIGKILL} and
+\code{SIGSTOP}. \\
+\code{set\_signal\_blocked(pid, sig, block)} &
+Blocks or unblocks a signal (\code{sigprocmask}) and wakes a task whose
+pending signal becomes deliverable. \\
+\code{check\_signals()} &
+Delivers pending unblocked signals at a safe point; runs handlers, applies
+default actions and prevents recursion with \code{in\_handler}. \\
+\code{stop\_current()}, \code{terminate\_locked(table, index, status, signal)} &
+Implement \code{SIGSTOP} and the common exit path that stores status/signal
+and sends \code{SIGCHLD} to the parent. \\
+\code{exit\_current\_with\_status(status) -> !} &
+Ends the current task with an explicit status. \\
+\code{wait\_child(target) -> Result<WaitResult, \&'static str>} &
+Waits on \code{CHILD\_QUEUE}, reaps a zombie child and returns PID, status and
+fatal signal. \\
+\code{has\_zombie\_child(parent, target)} &
+Condition used by \code{wait\_event\_timeout} to close the check/sleep race. \\
 \code{exit\_current() -> !} &
-Marks the current task \code{Exited} and switches away. \\
+Marks the current task \code{Exited} with status 0 and switches away. \\
 \code{idle()} &
 Blocks for one tick and returns, so the shell polls input every ~10 ms. \\
-\code{for\_each(visit)} &
-Walks the task table for \code{ps} and \code{/proc/ps}. \\
 \code{stats() -> Stats} &
-Counts total, ready, running, blocked and exited tasks and preemptions. \\
+Counts total, ready, running, blocked, stopped and exited tasks and
+preemptions. \\
 \code{task\_trampoline()} &
 First function of a new task; calls the entry and then \code{exit\_current}. \\
 \code{State::as\_str}, \code{Task::free}, \code{Task::name}, \code{Task::set\_name},
-\code{next\_ready}, \code{kernel\_stack\_layout}, \code{current\_pid\_locked},
+\code{kernel\_stack\_layout}, \code{current\_pid\_locked},
 \code{dummy\_entry} &
-Internal helpers for states, names, scheduling and stack layout. \\
+Internal helpers for states, names, stack layout and PID lookup. \\
 \bottomrule
 \end{longtable}
 

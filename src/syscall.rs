@@ -7,6 +7,14 @@
 //!   1  write(buf, len)              escreve no console ativo
 //!   2  read(buf, len, flags)        le uma linha (flags bit 0 = sem eco)
 //!   3  get_tty()                    devolve o indice do console ativo
+//!   4  open(path, len, flags)       abre um arquivo do VFS
+//!   5  close(fd)                    fecha um descritor
+//!   6  read(fd, buf, len)           le bytes de um descritor
+//!   7  write(fd, buf, len)          escreve bytes em um descritor
+//!   8  lseek(fd, offset, whence)    reposiciona o descritor
+//!   9  getpid()                     PID da tarefa corrente
+//!  10  getppid()                    PID do pai
+//!  11  kill(pid, sig)               envia um sinal (0 = so verifica)
 //!
 //! Toda syscall valida o intervalo do usuario antes de tocar no buffer. As
 //! paginas sob demanda do usuario sao materializadas por `ensure_user_range`,
@@ -26,6 +34,7 @@ pub const SYS_WRITE_FD: u64 = 7;
 pub const SYS_LSEEK: u64 = 8;
 pub const SYS_GETPID: u64 = 9;
 pub const SYS_GETPPID: u64 = 10;
+pub const SYS_KILL: u64 = 11;
 
 const READ_NO_ECHO: u64 = 1;
 const MAX_READ: u64 = 256;
@@ -49,6 +58,7 @@ pub fn dispatch(frame: &mut InterruptFrame) {
         SYS_LSEEK => sys_lseek(frame),
         SYS_GETPID => frame.rax = task::current_pid(),
         SYS_GETPPID => frame.rax = task::current_ppid(),
+        SYS_KILL => sys_kill(frame),
         _ => {
             crate::println!(
                 "[USER] syscall desconhecida: {} (rip={:#018x})",
@@ -237,6 +247,25 @@ fn sys_lseek(frame: &mut InterruptFrame) {
         Ok(offset) => frame.rax = offset,
         Err(reason) => {
             crate::println!("[USER] lseek: {}", reason);
+            frame.rax = ERR_SYSCALL;
+        }
+    }
+}
+
+/// `kill(pid, sig)`: envia um sinal ou apenas verifica a existencia da tarefa
+/// (`sig = 0`). O sinal e entregue no proximo ponto seguro da tarefa alvo.
+fn sys_kill(frame: &mut InterruptFrame) {
+    let pid = frame.rdi;
+    let sig = frame.rsi as u8;
+
+    if frame.rsi > 31 {
+        frame.rax = ERR_SYSCALL;
+        return;
+    }
+    match task::kill(pid, sig) {
+        Ok(()) => frame.rax = 0,
+        Err(reason) => {
+            crate::println!("[USER] kill: {}", reason);
             frame.rax = ERR_SYSCALL;
         }
     }

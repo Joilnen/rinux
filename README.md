@@ -4,7 +4,8 @@ Kernel mínimo escrito em Rust (`#![no_std]`) que inicializa um PC padrão em
 BIOS/x86_64, entra em modo longo e abre um terminal em **modo texto VGA 80x25**
 com oito consoles virtuais (`tty0`..`tty7`), teclado PS/2, heap de kernel,
 VFS/descritores de arquivo, syscalls via `int 0x80`, um escalonador preemptivo
-por timer e um `getty`/login executando em ring 3.
+por timer, sinais no estilo POSIX, ciclo de vida de processos com `wait` e um
+`getty`/login executando em ring 3.
 
 Este diretório é uma versão didática e reduzida dos módulos do Linux
 necessários para "sair do bootloader e abrir um console VGA". Não é um porte
@@ -36,18 +37,28 @@ reimplementa o caminho mínimo de boot, console e teclado.
 - Teclado PS/2 (controlador 8042) por polling, com Shift, Alt, Backspace e
   detecção de `Alt+F1`..`Alt+F8`.
 - Syscalls didáticas por `int 0x80`: `exit`, `write`, `read`, `get_tty`,
-  `open`, `close`, `read(fd)`, `write(fd)`, `lseek`, `getpid` e `getppid`, com
-  validação de ponteiros e materialização das páginas do usuário.
+  `open`, `close`, `read(fd)`, `write(fd)`, `lseek`, `getpid`, `getppid` e
+  `kill`, com validação de ponteiros e materialização das páginas do usuário.
+- Sinais no estilo POSIX: 32 sinais, disposição `Default`/`Ignore`/`Handler`,
+  máscaras de pendentes e bloqueados por tarefa, `SIGKILL`/`SIGSTOP`
+  inquebráveis, `SIGCONT` que sempre retoma, `SIGCHLD` a cada saída e entrega
+  apenas em pontos seguros (nunca dentro de IRQ). Inclui `sigaction`,
+  `sigblock` e `kill(pid, 0)` como teste de existência.
+- Ciclo de vida de processos: `wait`/`waitpid` colhem filhos zumbis, guardam
+  status de saída ou sinal fatal, e liberam o slot para reuso; tarefas paradas
+  aparecem em `ps` e em `/proc/signals`.
 - VFS mínimo com tabela de 16 descritores; `0`, `1` e `2` são pré-abertos no
   console (`/dev/tty`). O ramfs e o `/proc` didático são acessados pela mesma
   interface de arquivo.
 - `/proc` virtual gerado sob demanda: `version`, `uptime`, `meminfo`, `ps`,
-  `cpuinfo`, `mounts` e `cmdline`, legíveis por `cat`, `ls` e pelas syscalls
-  de descritor de arquivo.
-- Escalonador preemptivo de tarefas: tabela de 16 tarefas, PID/PPID, estados
-  `Ready`/`Running`/`Blocked`/`Exited`, pilhas de kernel no heap, troca de
-  contexto em assembly (com `RFLAGS`) e política round-robin com quantum de
-  5 ticks (~50 ms a 100 Hz). O timer IRQ0 preempta a tarefa corrente;
+  `signals`, `cpuinfo`, `mounts` e `cmdline`, legíveis por `cat`, `ls` e pelas
+  syscalls de descritor de arquivo.
+- Escalonador preemptivo de tarefas justo e ponderado, inspirado no CFS do
+  Linux: tabela de 16 tarefas, PID/PPID, estados
+  `Ready`/`Running`/`Blocked`/`Stopped`/`Exited`, pilhas de kernel no heap,
+  troca de contexto em assembly (com `RFLAGS`), `nice` de -20 a 19, pesos no
+  estilo `sched_prio_to_weight`, `vruntime` e escolha da tarefa de menor tempo
+  virtual. O timer IRQ0 contabiliza o tick e preempta a tarefa corrente;
   `yield_now` cede a CPU explicitamente, `sleep(ticks)` bloqueia a tarefa até
   um prazo (`schedule_timeout`) e `WaitQueue` implementa filas de espera por
   evento (`wait_event`/`wake_up`), sem busy-wait. Os spinlocks usam `irqsave`.
@@ -59,8 +70,9 @@ reimplementa o caminho mínimo de boot, console e teclado.
   `\`) e uma tabela estática de applets: `help`, `echo`, `clear`, `pwd`, `cd`,
   `ls`, `cat`, `mkdir`, `touch`, `write`, `rm`, `rmdir`, `cp`, `mv`, `tree`,
   `uname`, `uptime`, `free`, `heap`, `vfs`, `filetest`, `ps`, `tasks`, `spawn`,
-  `sleep`, `notify`, `whoami`, `hostname`, `info`, `tty`, `getty`, `demand`,
-  `usertest`, `userprot`, `mem`, `reboot`, `halt`.
+  `nice`, `kill`, `sig`, `sigaction`, `sigblock`, `wait`, `sleep`, `notify`,
+  `whoami`, `hostname`, `info`, `tty`, `getty`, `demand`, `usertest`,
+  `userprot`, `mem`, `reboot`, `halt`.
 - RamFS didático em memória: 48 nós, nomes de até 31 bytes e arquivos de até
   1024 bytes, com criação, leitura, escrita, leitura/escrita por deslocamento,
   truncamento, remoção e renomeação. Sem permissões, timestamps ou persistência.
@@ -86,11 +98,11 @@ Testado em QEMU 11.1.3 (SeaBIOS): boot, tela VGA, teclado e comandos funcionam.
     ├── paging.rs             # frames, tabelas de 4 KiB, demand paging e U/S
     ├── heap.rs               # heap do kernel e #[global_allocator]
     ├── ramfs.rs              # sistema de arquivos em memória
-    ├── proc.rs               # /proc virtual (uptime, meminfo, ps, ...)
+    ├── proc.rs               # /proc virtual (uptime, meminfo, ps, signals, ...)
     ├── vfs.rs                # VFS mínimo e tabela de descritores de arquivo
-    ├── task.rs               # tarefas, escalonador, sleep e wait queues
+    ├── task.rs               # tarefas, escalonador, sinais, wait e wait queues
     ├── user.rs               # ring 3, demos e getty/login
-    ├── syscall.rs            # exit/write/read/open/close/lseek/getpid via int 0x80
+    ├── syscall.rs            # exit/write/read/open/close/lseek/getpid/kill via int 0x80
     ├── arch.rs               # inb/outb, halt, reboot, sti
     ├── vga.rs                # renderizador de baixo nível do VGA texto
     ├── tty.rs                # consoles virtuais tty0..tty7 e filas de entrada
@@ -197,8 +209,14 @@ Não há pipes (`|`), redirecionamento (`>`, `>>`, `<`) nem variáveis.
 | `heap`                          | testa `Vec`/`String` e mostra o heap        |
 | `vfs`                           | testa `open`/`read`/`write`/`lseek`/`close` |
 | `filetest`                      | abre e lê `/etc/motd` em ring 3 via syscalls |
-| `ps` / `tasks`                  | lista PID, PPID, estado e nome das tarefas  |
-| `spawn [nome] [n] [modo]`       | cria `n` workers (`sleep`, `wait` ou `timeout`) |
+| `ps` / `tasks`                  | lista PID, PPID, estado, nice, CPU e nome    |
+| `spawn [nome] [n] [modo] [nice]` | cria `n` workers (`cpu`, `sleep`, `wait`, `timeout`, `signal` ou `exit`) com prioridade opcional |
+| `nice [pid] [valor]`            | lê ou ajusta a prioridade (`nice`) de uma tarefa |
+| `kill <pid> [sinal]`            | envia um sinal (`TERM` por padrão; `KILL`, `STOP`, ...) |
+| `sig [pid]`                     | mostra sinais pendentes e bloqueados         |
+| `sigaction <pid> <sinal> [ação]` | consulta ou instala `default`/`ignore`/`handler` |
+| `sigblock <pid> <sinal> <on\|off>` | bloqueia ou desbloqueia um sinal          |
+| `wait [pid]`                    | espera um filho, colhe status/sinal e libera o slot |
 | `sleep [segundos]`              | bloqueia o shell por N segundos             |
 | `notify [one]`                  | acorda waiters (`wake_up_all` ou `wake_up`) |
 | `whoami`                        | mostra o usuário da sessão (`root`)         |
@@ -230,6 +248,7 @@ cat /proc/version
 cat /proc/uptime
 cat /proc/meminfo
 cat /proc/ps
+cat /proc/signals
 cat -n /proc/mounts
 ```
 
@@ -318,6 +337,8 @@ em 1 MiB (endereços baixos); o código Rust é ligado em
 | `mm/slab_common.c`, `mm/slub.c` (alocador)       | `src/heap.rs`           |
 | `fs/open.c`, `fs/file_table.c` (VFS/descritores) | `src/vfs.rs`            |
 | `kernel/sched/core.c` (escalonador)              | `src/task.rs`           |
+| `kernel/signal.c` (sinais e máscaras)            | `src/task.rs`           |
+| `kernel/exit.c` (zumbis, `wait` e reaping)       | `src/task.rs`           |
 | `arch/x86/entry/syscalls/syscall_64.tbl`         | `src/syscall.rs`        |
 | `kernel/printk/printk.c`                         | macros + `src/tty.rs`   |
 | `kernel/panic.c`                                 | panic handler em `main.rs` |
@@ -327,21 +348,26 @@ em 1 MiB (endereços baixos); o código Rust é ligado em
 
 - Uma única CPU; IRQ0 (timer) habilitada, mas IRQ1 do teclado continua
   mascarada porque o driver usa polling.
-- O escalonador é preemptivo por timer (quantum de 5 ticks) e tem bloqueio
-  por prazo (`sleep`/`schedule_timeout`) e por evento (`wait_event`/`wake_up`),
-  mas é simples: todas as tarefas compartilham o mesmo espaço de endereços de
-  kernel e continuam sendo threads de kernel; não há `fork`, `exec`, `wait`,
-  sinais, prioridades nem processos de usuário concorrentes. A preempção é
+- O escalonador é preemptivo por timer, justo e ponderado (`nice`, peso e
+  `vruntime` no estilo do CFS) e tem bloqueio por prazo (`sleep`/
+  `schedule_timeout`), por evento (`wait_event`/`wake_up`), sinais por tarefa e
+  `wait` para colher filhos. Ainda é simples: não há árvore rubro-negra nem
+  EEVDF, todas as tarefas compartilham o mesmo espaço de endereços de kernel e
+  continuam sendo threads de kernel; não há `fork` nem `exec`. A preempção é
   suspensa enquanto um programa de ring 3 está ativo, porque ele usa a pilha
   de interrupção compartilhada do TSS.
+- Os handlers de sinal são funções de kernel (`fn(i32)`); não há frame de sinal
+  em ring 3, `sigreturn` nem `SA_RESTART`. A entrega só ocorre em pontos
+  seguros (`yield`, bloqueio, `wait` e laço ocioso), nunca dentro de IRQ, e um
+  handler não é interrompido por outro sinal.
 - O "processo" de usuário é um programa de máquina copiado para uma página e
   executado uma vez, no contexto da tarefa do shell (PID 1); não há troca de
-  contexto entre programas de ring 3.
+  contexto entre programas de ring 3 nem espaço de endereço por processo.
 - Os oito consoles virtuais compartilham o mesmo shell e o mesmo diretório
   corrente: não há um `getty` residente por terminal.
 - As syscalls são `exit`, `write`, `read`, `get_tty`, `open`, `close`,
-  `read(fd)`, `write(fd)`, `lseek`, `getpid` e `getppid`; não há cópia segura
-  como `copy_from_user`, apenas validação da região e materialização das
+  `read(fd)`, `write(fd)`, `lseek`, `getpid`, `getppid` e `kill`; não há cópia
+  segura como `copy_from_user`, apenas validação da região e materialização das
   páginas do usuário antes do acesso.
 - O heap tem limite de 1 MiB e usa lista encadeada first-fit, sem slab, buddy
   allocator ou NUMA.
@@ -355,11 +381,10 @@ em 1 MiB (endereços baixos); o código Rust é ligado em
 
 ## Próximos passos naturais
 
-1. Adicionar prioridades e sinais ao escalonador (o `sleep` por prazo e as
-   filas de espera por evento já existem), salvando o frame completo de
-   interrupção.
-2. Adicionar espaços de endereço por processo e `fork`/`exec`/`wait`, com um
-   `getty` residente em cada `tty`.
+1. Adicionar espaços de endereço por processo, `fork`/`exec` e um `getty`
+   residente em cada `tty`.
+2. Salvar e restaurar o frame completo de interrupção por tarefa para entregar
+   sinais a handlers em ring 3, com `sigreturn` e reinício de syscalls.
 3. Evoluir o VFS para inodes, dentries, mounts e permissões, e montar um
    segundo sistema de arquivos (por exemplo, um initramfs ou FAT read-only).
 4. Habilitar IRQ1 e transformar o teclado em entrada por interrupção.

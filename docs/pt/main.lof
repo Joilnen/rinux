@@ -2,15 +2,15 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {3.1}{\ignorespaces Camadas do Rust VGA Kernel.}}{16}{figure.caption.7}%
-\contentsline {figure}{\numberline {3.2}{\ignorespaces Cadeia de boot completa.}}{18}{figure.caption.10}%
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Camadas do Rust VGA Kernel.}}{16}{figure.caption.6}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Cadeia de boot completa.}}{18}{figure.caption.9}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {4.1}{\ignorespaces Estrutura de pagina\c {c}\~ao: uma \'unica PDPT e uma \'unica PD servem tanto \`a identidade baixa quanto \`a metade alta.}}{21}{figure.caption.14}%
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Estrutura de pagina\c {c}\~ao: uma \'unica PDPT e uma \'unica PD servem tanto \`a identidade baixa quanto \`a metade alta.}}{21}{figure.caption.13}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {6.1}{\ignorespaces Fluxo de uma chamada de impress\~ao: o buffer do TTY ativo \'e renderizado e o mesmo texto \'e espelhado na serial.}}{32}{figure.caption.21}%
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Fluxo de uma chamada de impress\~ao: o buffer do TTY ativo \'e renderizado e o mesmo texto \'e espelhado na serial.}}{32}{figure.caption.20}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {7.1}{\ignorespaces Fluxo de \texttt {read\_key()}. Caminhos de descarte levam a \texttt {None}.}}{37}{figure.caption.27}%
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Fluxo de \texttt {read\_key()}. Caminhos de descarte levam a \texttt {None}.}}{37}{figure.caption.26}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }

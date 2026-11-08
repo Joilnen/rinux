@@ -57,9 +57,10 @@ Interrupts & IDT with 256 gates; PIC remapped and timer IRQ0 at
 ~100 Hz. IRQ1 (keyboard) remains masked. \\
 Input & Polling of \code{0x60}/\code{0x64} and of COM1; timer via IRQ. \\
 Concurrency & IRQ-safe spinlocks in the console, ramfs, heap, VFS and task
-table. The round-robin scheduler preempts on the timer quantum (5 ticks),
-switches on explicit yield, blocks tasks in \code{sleep} until a deadline
-tick and suspends them on event wait queues until \code{wake\_up}. \\
+table. The weighted fair scheduler accounts \code{vruntime} every tick, picks
+the runnable task with the smallest \code{vruntime}, switches on explicit
+yield, blocks tasks in \code{sleep} until a deadline tick and suspends them on
+event wait queues until \code{wake\_up}. \\
 Memory & 4 KiB physical frames, on-demand tables and page faults, a 1 MiB
 first-fit heap, and \code{alloc}/\code{Vec}/\code{String}. \\
 Stacks & 8 KiB in the stub (low), 32 KiB in the kernel (high), 16 KiB for

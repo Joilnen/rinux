@@ -12,7 +12,7 @@ The shell runs as task 1 of the preemptive scheduler. While it waits for a
 byte, it calls \code{task::idle}, which now blocks for one tick
 (\code{task::sleep(1)}) and polls the keyboard and serial port again about
 every 10 ms. With no other runnable task the CPU executes \code{hlt} instead
-of spinning, so the prompt stays responsive without burning the quantum.
+of spinning, so the prompt stays responsive without wasting CPU.
 
 The main loop:
 
@@ -168,14 +168,17 @@ message.
 
 \section{Commands}
 
-\begin{table}[H]
-\centering
+\begin{longtable}{@{}p{5.6cm}p{9.9cm}@{}}
 \caption{Main applets (see \code{help} for the full list).}
-\label{tab:comandos}
-\begin{tabularx}{\linewidth}{@{}lX@{}}
+\label{tab:comandos}\\
 \toprule
 \textbf{Command} & \textbf{Effect} \\
 \midrule
+\endfirsthead
+\toprule
+\textbf{Command} & \textbf{Effect} \\
+\midrule
+\endhead
 \code{help [comando]} & Lists the applets or shows one usage line. \\
 \code{echo [-n] [texto...]} & Prints the arguments separated by spaces. \\
 \code{clear} & Clears the active virtual console with \code{ESC[2J ESC[H}. \\
@@ -190,11 +193,24 @@ and write or append text. \\
 \code{vfs} & Exercises \code{open/read/write/lseek/close} and reads
 \code{/proc/version}. \\
 \code{filetest} & Opens and reads \code{/etc/motd} from ring 3 via syscalls. \\
-\code{ps}, \code{tasks} & Lists PID, PPID, state, yields, preemptions and
-name of every task. \\
-\code{spawn [nome] [n] [sleep|wait|timeout]} & Creates up to eight kernel
-workers; the mode selects timed sleep, an event wait queue or a wait with
-timeout. \\
+\code{ps}, \code{tasks} & Lists PID, PPID, state, \code{nice}, CPU ticks,
+\code{vruntime}, yields, preemptions and name of every task. \\
+\code{spawn [nome] [n] [cpu|sleep|wait|timeout|signal|exit] [nice]} & Creates
+up to eight kernel workers; the mode selects CPU work, timed sleep, an event
+wait queue, a wait with timeout, a task with a \code{SIGUSR1} handler or a
+short-lived task, and the optional \code{nice} sets the priority. \\
+\code{nice [pid] [valor]} & Reads or changes the priority of a task
+(\code{setpriority}). \\
+\code{kill <pid> [sinal]} & Sends a signal to a task (default
+\code{SIGTERM}); the signal may be a number or a name such as \code{USR1}. \\
+\code{sig [pid]} & Shows the pending and blocked signal masks, the exit
+status and the fatal signal of every task. \\
+\code{sigaction <pid> <sinal> [default|ignore|handler]} & Reads or installs
+the disposition of a signal. \\
+\code{sigblock <pid> <sinal> <on|off>} & Blocks or unblocks a signal
+(\code{sigprocmask}). \\
+\code{wait [pid]} & Waits for a child to exit and prints its status and fatal
+signal, reaping the zombie. \\
 \code{sleep [segundos]} & Blocks the shell with \code{schedule\_timeout}
 semantics. \\
 \code{notify [one]} & Signals the demo event queue; \code{one} wakes a single
@@ -206,8 +222,7 @@ task (\code{wake\_up}) instead of all (\code{wake\_up\_all}). \\
 \code{mem} & Shows frame, heap and scheduler statistics. \\
 \code{reboot}, \code{halt} & Restart the PC or stop the CPU. \\
 \bottomrule
-\end{tabularx}
-\end{table}
+\end{longtable}
 
 \begin{nota}[Behavior details]
 \begin{itemize}
@@ -236,7 +251,7 @@ Memoria: paginas de 4 KiB, demand paging e frames fisicos
 RAMFS:  17 nos, 186 bytes em arquivos
 HEAP:   4 KiB mapeados, 266 B em uso
 Usuario: ring 3 com GDT/TSS, protecao U/S e int 0x80
-Tarefas: 1 na tabela, 0 prontas, 0 dormindo, 0 encerradas (escalonador preemptivo)
+Tarefas: 1 na tabela, 0 prontas, 0 dormindo, 0 paradas, 0 encerradas (escalonador preemptivo)
 Ticks do timer: 366
 \end{lstlisting}
 
@@ -300,9 +315,11 @@ Applet {
   \item No program execution: there is no \emph{loader}, \code{fork} or
         \code{exec}; applets are kernel functions.
   \item Tasks are timer-preemptive kernel threads and share the kernel
-        address space; preemption is suspended during ring 3 programs. Sleep
-        and event wait queues exist, but there are no signals, priorities or
-        per-task address spaces.
+        address space; preemption is suspended during ring 3 programs. Sleep,
+        event wait queues, weighted priorities, Unix-style signals and
+        \code{wait}/zombie reaping exist, but there is no per-task address
+        space or \code{fork}. Signal handlers run at safe kernel points, not
+        in ring 3 with a user-provided handler address.
   \item No UTF-8 translation: typed accents may become \code{?}.
   \item The line is limited to 128 bytes and excess is silently discarded.
 \end{itemize}

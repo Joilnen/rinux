@@ -12,6 +12,7 @@
 //!   /proc/uptime    tempo desde o boot (ticks do PIT)
 //!   /proc/meminfo   frames, heap e tarefas
 //!   /proc/ps        tabela de tarefas no formato do applet `ps`
+//!   /proc/signals   sinais pendentes/bloqueados e status de saida
 //!   /proc/cpuinfo   informacoes basicas da CPU
 //!   /proc/mounts    sistemas de arquivos montados
 //!   /proc/cmdline   linha de comando do boot
@@ -30,6 +31,7 @@ pub enum Entry {
     Uptime,
     Meminfo,
     Ps,
+    Signals,
     Cpuinfo,
     Mounts,
     Cmdline,
@@ -41,6 +43,7 @@ pub const FILES: &[(&str, Entry)] = &[
     ("uptime", Entry::Uptime),
     ("meminfo", Entry::Meminfo),
     ("ps", Entry::Ps),
+    ("signals", Entry::Signals),
     ("cpuinfo", Entry::Cpuinfo),
     ("mounts", Entry::Mounts),
     ("cmdline", Entry::Cmdline),
@@ -123,6 +126,7 @@ fn render(entry: Entry, out: &mut [u8]) -> usize {
         }
         Entry::Meminfo => render_meminfo(&mut writer),
         Entry::Ps => render_ps(&mut writer),
+        Entry::Signals => render_signals(&mut writer),
         Entry::Cpuinfo => write!(
             writer,
             "processor\t: 0\n\
@@ -158,6 +162,7 @@ fn render_meminfo(writer: &mut Buffer<'_>) -> fmt::Result {
          Tasks:          {:>8}\n\
          TasksReady:     {:>8}\n\
          TasksBlocked:   {:>8}\n\
+         TasksStopped:   {:>8}\n\
          TasksExited:    {:>8}\n",
         total_kib,
         memory.free * 4,
@@ -167,25 +172,61 @@ fn render_meminfo(writer: &mut Buffer<'_>) -> fmt::Result {
         tasks.total,
         tasks.ready,
         tasks.blocked,
+        tasks.stopped,
         tasks.exited
     )
 }
 
 fn render_ps(writer: &mut Buffer<'_>) -> fmt::Result {
-    write!(writer, "  PID  PPID  ESTADO      YIELDS  PREEMP  NOME\n")?;
-    task::for_each(|pid, ppid, state, name, yields, preemptions, current| {
-        let marker = if current { '*' } else { ' ' };
+    write!(
+        writer,
+        "  PID  PPID  ESTADO      NICE  CPU  VRUNTIME   YIELDS  PREEMP  NOME\n"
+    )?;
+    task::for_each(|info| {
+        let marker = if info.current { '*' } else { ' ' };
         let _ = write!(
             writer,
-            "{}{:>5} {:>5}  {:<11} {:>6}  {:>6}  {}\n",
+            "{}{:>5} {:>5}  {:<11} {:>4} {:>4}  {:>9}  {:>6}  {:>6}  {}\n",
             marker,
-            pid,
-            ppid,
-            state.as_str(),
-            yields,
-            preemptions,
-            name
+            info.pid,
+            info.ppid,
+            info.state.as_str(),
+            info.nice,
+            info.cpu_ticks,
+            info.vruntime,
+            info.yields,
+            info.preemptions,
+            info.name
         );
+    });
+    Ok(())
+}
+
+fn render_signals(writer: &mut Buffer<'_>) -> fmt::Result {
+    write!(
+        writer,
+        "  PID  NOME        PENDENTES  BLOQUEADOS  SITUACAO\n"
+    )?;
+    task::for_each(|info| {
+        let _ = write!(
+            writer,
+            "{:>5}  {:<10}  {:#08x}  {:#08x}",
+            info.pid, info.name, info.pending, info.blocked
+        );
+        if info.state == task::State::Exited {
+            if info.exit_signal != 0 {
+                let _ = write!(
+                    writer,
+                    "  sinal {} status {}\n",
+                    task::signal_name(info.exit_signal),
+                    info.exit_status
+                );
+            } else {
+                let _ = write!(writer, "  status {}\n", info.exit_status);
+            }
+        } else {
+            let _ = write!(writer, "  {}\n", info.state.as_str());
+        }
     });
     Ok(())
 }

@@ -17,26 +17,31 @@ PID 1, imprime um \emph{banner}, valida a assinatura Multiboot2 e entra no
 shell, que exibe o prompt \code{rinux>} no console ativo e processa comandos
 lidos do teclado ou da serial.
 
-O sistema inteiro cabe em cerca de 250 KiB de ELF e 6.797 linhas de Rust
-(5.365 linhas efetivas de c\'odigo, sem coment\'arios e linhas em branco).
+O sistema inteiro cabe em cerca de 283 KiB de ELF e 7.973 linhas de Rust
+(6.311 linhas efetivas de c\'odigo, sem coment\'arios e linhas em branco).
 Inclui um heap \emph{first-fit} atr\'as de \code{\#[global\_allocator]}, um VFS
 com dezesseis descritores sobre o ramfs e um \code{/proc} sint\'etico, um
-escalonador \emph{round-robin} preemptivo por timer com \code{sleep}
-bloqueante (\code{schedule\_timeout}) e filas de espera por evento
-(\code{wait\_event}/\code{wake\_up}), e onze chamadas de sistema. Ainda
-n\~ao h\'a \code{fork}/\code{exec}, espa\c{c}o de endere\c{c}os por processo
-nem sistema de arquivos em disco.
+escalonador preemptivo justo e ponderado com \code{nice}, pesos e
+\code{vruntime}, \code{sleep} bloqueante (\code{schedule\_timeout}), filas de
+espera por evento (\code{wait\_event}/\code{wake\_up}), sinais no estilo Unix
+com m\'ascaras de pendentes/bloqueados, disposi\c{c}\~oes, a\c{c}\~oes padr\~ao,
+tarefas paradas, status de sa\'ida, zumbis e \code{wait}, e doze chamadas de
+sistema. Ainda n\~ao h\'a \code{fork}/\code{exec}, espa\c{c}o de
+endere\c{c}os por processo nem sistema de arquivos em disco.
 
 \section{Funcionalidades}
 
-\begin{table}[H]
-\centering
+\begin{longtable}{@{}l p{9.5cm} l@{}}
 \caption{Funcionalidades implementadas e seu estado.}
-\label{tab:funcionalidades}
-\begin{tabularx}{\linewidth}{@{}lXc@{}}
+\label{tab:funcionalidades}\\
 \toprule
 \textbf{\'Area} & \textbf{Funcionalidade} & \textbf{Estado} \\
 \midrule
+\endfirsthead
+\toprule
+\textbf{\'Area} & \textbf{Funcionalidade} & \textbf{Estado} \\
+\midrule
+\endhead
 Boot & Cabe\c{c}alho Multiboot2 v\'alido & Completo \\
 Boot & Transi\c{c}\~ao 32 $\rightarrow$ 64 bits & Completo \\
 Mem\'oria & PML4/PDPT/PD est\'aticos, 1 GiB & Completo \\
@@ -61,22 +66,24 @@ Sistema & IDT, exce\c{c}\~oes e IRQ0 (timer) & Completo (subconjunto) \\
 Sistema & GDT/TSS, ring 3 e prote\c{c}\~ao U/S & Completo (demo) \\
 Sistema & Syscalls \code{exit/write/read/get\_tty} & Completo (subconjunto) \\
 Sistema & Syscalls de arquivo \code{open/close/read/write/lseek} & Completo (subconjunto) \\
-Sistema & \code{getpid}/\code{getppid} vindos da tabela de tarefas & Completo \\
+Sistema & \code{getpid}/\code{getppid}/\code{kill} vindos da tabela de tarefas & Completo \\
 Usu\'ario & \code{getty}/login em ring 3 & Completo (demo) \\
 Mem\'oria & Frames, p\'aginas 4 KiB e demand paging & Completo (subconjunto) \\
 Mem\'oria & Heap do kernel, crate \code{alloc} e \code{Vec}/\code{String} & Completo (subconjunto) \\
 Armazenamento & Ramfs em mem\'oria (48 n\'os, arquivos de 1 KiB) & Completo (subconjunto) \\
 Armazenamento & VFS, 16 descritores e \code{lseek} & Completo (subconjunto) \\
-Armazenamento & \code{/proc} sint\'etico (version, uptime, meminfo, ps) & Completo (subconjunto) \\
+Armazenamento & \code{/proc} sint\'etico (version, uptime, meminfo, ps, signals) & Completo (subconjunto) \\
 Processos & Tabela de tarefas, PID/PPID e estados & Completo (subconjunto) \\
-Processos & Escalonador \emph{round-robin} preemptivo por timer & Completo (subconjunto) \\
+Processos & Escalonador justo ponderado (\code{nice}, peso, \code{vruntime}) & Completo (subconjunto) \\
 Processos & \code{sleep} bloqueante (\code{schedule\_timeout}) & Completo (subconjunto) \\
 Processos & Filas de espera por evento (\code{wait\_event}/\code{wake\_up}) & Completo (subconjunto) \\
-Processos & \code{fork}/\code{exec}/\code{wait}, CFS/EEVDF & Ausente \\
+Processos & Sinais, disposi\c{c}\~oes e m\'ascaras pendentes/bloqueados & Completo (subconjunto) \\
+Processos & Tarefas paradas/continuadas e \code{SIGKILL} & Completo (subconjunto) \\
+Processos & Status de sa\'ida, zumbis, \code{wait} e \code{SIGCHLD} & Completo (subconjunto) \\
+Processos & \code{fork}/\code{exec}, \'arvore CFS/EEVDF completa & Ausente \\
 Armazenamento & Driver de disco, mounts e permiss\~oes & Ausente \\
 \bottomrule
-\end{tabularx}
-\end{table}
+\end{longtable}
 
 \section{Requisitos}
 
@@ -124,11 +131,11 @@ Armazenamento & Driver de disco, mounts e permiss\~oes & Ausente \\
 |   |-- paging.rs           frames, tabelas 4 KiB e demand paging
 |   |-- heap.rs             heap do kernel e #[global_allocator]
 |   |-- ramfs.rs            sistema de arquivos em memoria
-|   |-- proc.rs             /proc virtual (uptime, meminfo, ps, ...)
+|   |-- proc.rs             /proc virtual (uptime, meminfo, ps, signals, ...)
 |   |-- vfs.rs              VFS minimo e tabela de descritores
-|   |-- task.rs             tarefas, escalonador, sleep e wait queues
+|   |-- task.rs             tarefas, escalonador, sinais e wait queues
 |   |-- user.rs             ring 3, demos e getty/login
-|   |-- syscall.rs          exit/write/read/open/close/lseek/getpid
+|   |-- syscall.rs          exit/write/read/open/close/lseek/getpid/kill
 |   |-- vga.rs              renderizador VGA 80x25
 |   |-- tty.rs              consoles virtuais tty0..tty7
 |   |-- keyboard.rs         teclado PS/2 (8042)
@@ -159,26 +166,26 @@ Armazenamento & Driver de disco, mounts e permiss\~oes & Ausente \\
 \code{paging.rs}   &  559 & 23 & Frames, tabelas e demand paging \\
 \code{heap.rs}     &  270 &  9 & Heap do kernel e alocador global \\
 \code{ramfs.rs}    &  534 & 31 & Sistema de arquivos em mem\'oria \\
-\code{proc.rs}     &  191 &  9 & \code{/proc} sint\'etico \\
+\code{proc.rs}     &  232 & 10 & \code{/proc} sint\'etico \\
 \code{vfs.rs}      &  302 & 11 & VFS e tabela de descritores \\
-\code{task.rs}     &  746 & 29 & Tarefas, escalonador, sleep e wait queues \\
+\code{task.rs}     & 1480 & 55 & Tarefas, escalonador, sinais, sleep e wait queues \\
 \code{user.rs}     &  446 &  9 & Ring 3, demos e getty \\
-\code{syscall.rs}  &  244 &  9 & Syscalls de arquivo e processo \\
+\code{syscall.rs}  &  273 & 10 & Syscalls de arquivo, processo e sinal \\
 \code{vga.rs}      &   74 &  5 & Renderizador VGA texto \\
 \code{tty.rs}      &  448 & 31 & Consoles virtuais e filas \\
 \code{keyboard.rs} &  271 & 10 & Driver PS/2 8042 \\
 \code{serial.rs}   &   70 &  5 & UART 16550 / COM1 \\
-\code{shell.rs}    & 1468 & 61 & Linha de comando e applets \\
+\code{shell.rs}    & 1840 & 73 & Linha de comando e applets \\
 \code{main.rs}     &  139 &  2 & Entrada Rust, macros, panic \\
 \code{sync.rs}     &   66 &  5 & Spinlocks seguros para IRQ \\
 \midrule
-\textbf{Total}     & \textbf{6.797} & \textbf{276} & 5.365 linhas efetivas de c\'odigo \\
+\textbf{Total}     & \textbf{7.973} & \textbf{316} & 6.311 linhas efetivas de c\'odigo \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{nota}[Sobre a contagem]
-A contagem inclui 654 linhas de coment\'ario e 778 linhas em branco. O n\'umero
+A contagem inclui 798 linhas de coment\'ario e 864 linhas em branco. O n\'umero
 de fun\c{c}\~oes inclui m\'etodos de \code{impl}, fun\c{c}\~oes \code{const}
 e fun\c{c}\~oes de trait (\code{Deref}, \code{DerefMut}, \code{Drop} e
 \code{fmt::Write}); n\~ao inclui declara\c{c}\~oes \code{extern} sem corpo.

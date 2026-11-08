@@ -18,26 +18,31 @@ Multiboot2 signature and enters the shell, which displays the prompt
 \code{rinux>} on the active console and processes commands read from the
 keyboard or from the serial port.
 
-The entire system fits in about 250 KiB of ELF and 6,797 lines of Rust
-(5,365 effective lines of code, without comments and blank lines). It
+The entire system fits in about 283 KiB of ELF and 7,973 lines of Rust
+(6,311 effective lines of code, without comments and blank lines). It
 includes a first-fit kernel heap behind \code{\#[global\_allocator]}, a VFS
 with sixteen descriptors over the ramfs and a synthetic \code{/proc}, a
-timer-preemptive round-robin scheduler with blocking \code{sleep}
-(\code{schedule\_timeout}) and event wait queues (\code{wait\_event}/
-\code{wake\_up}), and eleven system calls. There is still no
+timer-preemptive weighted fair scheduler with \code{nice}, weights and
+\code{vruntime}, blocking \code{sleep} (\code{schedule\_timeout}), event
+wait queues (\code{wait\_event}/\code{wake\_up}), Unix-style signals with
+pending/blocked masks, dispositions, default actions, stopped tasks, exit
+status, zombies and \code{wait}, and twelve system calls. There is still no
 \code{fork}/\code{exec}, per-process address space or persistent disk
 filesystem.
 
 \section{Features}
 
-\begin{table}[H]
-\centering
+\begin{longtable}{@{}l p{9.9cm} l@{}}
 \caption{Implemented features and their status.}
-\label{tab:funcionalidades}
-\begin{tabularx}{\linewidth}{@{}lXc@{}}
+\label{tab:funcionalidades}\\
 \toprule
 \textbf{Area} & \textbf{Feature} & \textbf{Status} \\
 \midrule
+\endfirsthead
+\toprule
+\textbf{Area} & \textbf{Feature} & \textbf{Status} \\
+\midrule
+\endhead
 Boot & Valid Multiboot2 header & Complete \\
 Boot & 32 $\rightarrow$ 64 bit transition & Complete \\
 Memory & Static PML4/PDPT/PD, 1 GiB & Complete \\
@@ -62,22 +67,24 @@ System & IDT, exceptions and IRQ0 (timer) & Complete (subset) \\
 System & GDT/TSS, ring 3 and U/S protection & Complete (demo) \\
 System & Syscalls \code{exit/write/read/get\_tty} & Complete (subset) \\
 System & File syscalls \code{open/close/read/write/lseek} & Complete (subset) \\
-System & \code{getpid}/\code{getppid} from the task table & Complete \\
+System & \code{getpid}/\code{getppid}/\code{kill} from the task table & Complete \\
 User & \code{getty}/login in ring 3 & Complete (demo) \\
 Memory & Frames, 4 KiB pages and demand paging & Complete (subset) \\
 Memory & Kernel heap, \code{alloc} crate and \code{Vec}/\code{String} & Complete (subset) \\
 Storage & In-memory ramfs (48 nodes, 1 KiB files) & Complete (subset) \\
 Storage & VFS, 16 descriptors and \code{lseek} & Complete (subset) \\
-Storage & Synthetic \code{/proc} (version, uptime, meminfo, ps) & Complete (subset) \\
+Storage & Synthetic \code{/proc} (version, uptime, meminfo, ps, signals) & Complete (subset) \\
 Processes & Task table, PID/PPID and states & Complete (subset) \\
-Processes & Timer-preemptive round-robin scheduler & Complete (subset) \\
+Processes & Weighted fair scheduler (\code{nice}, weight, \code{vruntime}) & Complete (subset) \\
 Processes & Blocking \code{sleep} (\code{schedule\_timeout}) & Complete (subset) \\
 Processes & Event wait queues (\code{wait\_event}/\code{wake\_up}) & Complete (subset) \\
-Processes & \code{fork}/\code{exec}/\code{wait}, CFS/EEVDF & Absent \\
+Processes & Signals, dispositions, pending/blocked masks & Complete (subset) \\
+Processes & Stopped/continued tasks and \code{SIGKILL} & Complete (subset) \\
+Processes & Exit status, zombies, \code{wait} and \code{SIGCHLD} & Complete (subset) \\
+Processes & \code{fork}/\code{exec}, full CFS/EEVDF tree & Absent \\
 Storage & Disk driver, mounts and permissions & Absent \\
 \bottomrule
-\end{tabularx}
-\end{table}
+\end{longtable}
 
 \section{Requirements}
 
@@ -125,11 +132,11 @@ Storage & Disk driver, mounts and permissions & Absent \\
 |   |-- paging.rs           frames, tabelas 4 KiB e demand paging
 |   |-- heap.rs             heap do kernel e #[global_allocator]
 |   |-- ramfs.rs            sistema de arquivos em memoria
-|   |-- proc.rs             /proc virtual (uptime, meminfo, ps, ...)
+|   |-- proc.rs             /proc virtual (uptime, meminfo, ps, signals, ...)
 |   |-- vfs.rs              VFS minimo e tabela de descritores
-|   |-- task.rs             tarefas, escalonador, sleep e wait queues
+|   |-- task.rs             tarefas, escalonador, sinais e wait queues
 |   |-- user.rs             ring 3, demos e getty/login
-|   |-- syscall.rs          exit/write/read/open/close/lseek/getpid
+|   |-- syscall.rs          exit/write/read/open/close/lseek/getpid/kill
 |   |-- vga.rs              renderizador VGA 80x25
 |   |-- tty.rs              consoles virtuais tty0..tty7
 |   |-- keyboard.rs         teclado PS/2 (8042)
@@ -160,26 +167,26 @@ Storage & Disk driver, mounts and permissions & Absent \\
 \code{paging.rs}   &  559 & 23 & Frames, tables and demand paging \\
 \code{heap.rs}     &  270 &  9 & Kernel heap and global allocator \\
 \code{ramfs.rs}    &  534 & 31 & In-memory filesystem \\
-\code{proc.rs}     &  191 &  9 & Synthetic \code{/proc} \\
+\code{proc.rs}     &  232 & 10 & Synthetic \code{/proc} \\
 \code{vfs.rs}      &  302 & 11 & VFS and descriptor table \\
-\code{task.rs}     &  746 & 29 & Tasks, scheduler, sleep and wait queues \\
+\code{task.rs}     & 1480 & 55 & Tasks, scheduler, signals, sleep and wait queues \\
 \code{user.rs}     &  446 &  9 & Ring 3 entry, demos and getty \\
-\code{syscall.rs}  &  244 &  9 & File and process system calls \\
+\code{syscall.rs}  &  273 & 10 & File, process and signal system calls \\
 \code{vga.rs}      &   74 &  5 & VGA text renderer \\
 \code{tty.rs}      &  448 & 31 & Virtual consoles and queues \\
 \code{keyboard.rs} &  271 & 10 & PS/2 8042 driver \\
 \code{serial.rs}   &   70 &  5 & UART 16550 / COM1 \\
-\code{shell.rs}    & 1468 & 61 & Command line and applets \\
+\code{shell.rs}    & 1840 & 73 & Command line and applets \\
 \code{main.rs}     &  139 &  2 & Rust entry point, macros, panic \\
 \code{sync.rs}     &   66 &  5 & IRQ-safe spinlocks \\
 \midrule
-\textbf{Total}     & \textbf{6,797} & \textbf{276} & 5,365 effective lines of code \\
+\textbf{Total}     & \textbf{7,973} & \textbf{316} & 6,311 effective lines of code \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{nota}[On the counting]
-The count includes 654 comment lines and 778 blank lines. The number
+The count includes 798 comment lines and 864 blank lines. The number
 of functions includes \code{impl} methods, \code{const} functions
 and trait functions (\code{Deref}, \code{DerefMut}, \code{Drop} and
 \code{fmt::Write}); it does not include \code{extern} declarations without a

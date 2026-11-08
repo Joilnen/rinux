@@ -57,8 +57,9 @@ Interrup\c{c}\~oes & IDT com 256 portas; PIC remapeado e timer IRQ0 a
 ~100 Hz. IRQ1 (teclado) permanece mascarada. \\
 Entrada & Polling de \code{0x60}/\code{0x64} e de COM1; timer por IRQ. \\
 Concorr\^encia & Spinlocks seguros para IRQ no console, ramfs, heap, VFS e
-tabela de tarefas. O escalonador \emph{round-robin} preempta no quantum do
-timer (5 ticks), troca em yield expl\'icito, bloqueia tarefas em \code{sleep}
+tabela de tarefas. O escalonador justo e ponderado contabiliza
+\code{vruntime} a cada tick, escolhe a tarefa execut\'avel de menor
+\code{vruntime}, troca em yield expl\'icito, bloqueia tarefas em \code{sleep}
 at\'e um tick de prazo e as suspende em filas de espera at\'e um
 \code{wake\_up}. \\
 Mem\'oria & Frames f\'isicos de 4 KiB, tabelas sob demanda e page faults, um

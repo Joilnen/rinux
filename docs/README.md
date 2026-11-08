@@ -2,9 +2,9 @@
 
 Complete technical documentation for the kernel, written in LaTeX and compiled
 to PDF. The content covers the architecture, boot chain, virtual memory, demand
-paging, IDT/PIC/PIT, ring 3, the VGA/PS-2/serial drivers, the shell, the build
-process, tests and a quantitative analysis of the similarity with the Linux
-kernel.
+paging, IDT/PIC/PIT, ring 3, the VGA/PS-2/serial drivers, the shell, the
+scheduler, POSIX-style signals and process lifecycle, the build process, tests
+and a quantitative analysis of the similarity with the Linux kernel.
 
 **English is the primary version.** The Portuguese translation is kept under
 `pt/`.
@@ -76,20 +76,20 @@ command works even when the system `cargo` is first in `PATH`.
 7. PS/2 8042 keyboard.
 8. COM1 serial (UART 16550).
 9. Shell and commands.
-10. Virtual memory, frame allocator, demand paging, GDT/TSS, IDT, PIC/PIT and
-    ring 3 demos.
-10. Build, ISO, GRUB and execution in QEMU.
-11. Tests and execution evidence.
-12. Similarity with Linux, with weighted scoring and LOC comparison.
-13. Limitations, risks and roadmap.
-14. Appendices: catalog of the 276 functions, port/memory map, glossary and
+10. Virtual memory, frame allocator, demand paging, GDT/TSS, IDT, PIC/PIT,
+    ring 3 demos, scheduler, signals and process lifecycle.
+11. Build, ISO, GRUB and execution in QEMU.
+12. Tests and execution evidence.
+13. Similarity with Linux, with weighted scoring and LOC comparison.
+14. Limitations, risks and roadmap.
+15. Appendices: catalog of the 316 functions, port/memory map, glossary and
     references.
 
 ## Note on similarity
 
-The analysis in Chapter 12 estimates **≈25.5%** weighted functional similarity
+The analysis in Chapter 13 estimates **≈27.3%** weighted functional similarity
 across ten dimensions (boot, long mode, paging, console, keyboard, serial,
 interrupts, memory, processes and missing services). Compared with the complete
 Linux kernel, coverage is much smaller; in lines of code, the project has about
-**0.0179%** of the Linux tree used as reference. No code was copied from Linux:
+**0.0209%** of the Linux tree used as reference. No code was copied from Linux:
 the implementation is independent and written in Rust.

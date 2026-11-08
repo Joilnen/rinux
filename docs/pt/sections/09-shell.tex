@@ -13,7 +13,7 @@ O shell roda como a tarefa 1 do escalonador preemptivo. Enquanto espera um
 byte, chama \code{task::idle}, que agora bloqueia por um tick
 (\code{task::sleep(1)}) e volta a pollar teclado e serial a cada ~10 ms. Sem
 outra tarefa execut\'avel, a CPU executa \code{hlt} em vez de girar, ent\~ao o
-prompt continua responsivo sem consumir o quantum.
+prompt continua responsivo sem consumir CPU \`a toa.
 
 O la\c{c}o principal:
 
@@ -171,14 +171,17 @@ duas linhas de mensagem.
 
 \section{Comandos}
 
-\begin{table}[H]
-\centering
+\begin{longtable}{@{}p{5.6cm}p{9.9cm}@{}}
 \caption{Principais applets (veja \code{help} para a lista completa).}
-\label{tab:comandos}
-\begin{tabularx}{\linewidth}{@{}lX@{}}
+\label{tab:comandos}\\
 \toprule
 \textbf{Comando} & \textbf{Efeito} \\
 \midrule
+\endfirsthead
+\toprule
+\textbf{Comando} & \textbf{Efeito} \\
+\midrule
+\endhead
 \code{help [comando]} & Lista os applets ou mostra o uso de um deles. \\
 \code{echo [-n] [texto...]} & Imprime os argumentos separados por espa\c{c}os. \\
 \code{clear} & Limpa o console virtual ativo com \code{ESC[2J ESC[H}. \\
@@ -194,11 +197,24 @@ sistema e da mem\'oria. \\
 \code{vfs} & Exercita \code{open/read/write/lseek/close} e l\^e
 \code{/proc/version}. \\
 \code{filetest} & Abre e l\^e \code{/etc/motd} em ring 3 via syscalls. \\
-\code{ps}, \code{tasks} & Listam PID, PPID, estado, yields, preemp\c{c}\~oes e
-nome das tarefas. \\
-\code{spawn [nome] [n] [sleep|wait|timeout]} & Cria at\'e oito workers; o
-modo escolhe sleep por prazo, fila de espera por evento ou espera com
-timeout. \\
+\code{ps}, \code{tasks} & Listam PID, PPID, estado, \code{nice}, ticks de CPU,
+\code{vruntime}, yields, preemp\c{c}\~oes e nome das tarefas. \\
+\code{spawn [nome] [n] [cpu|sleep|wait|timeout|signal|exit] [nice]} & Cria
+at\'e oito workers; o modo escolhe trabalho de CPU, sleep por prazo, fila de
+espera por evento, espera com timeout, tarefa com handler de \code{SIGUSR1}
+ou tarefa de vida curta, e o \code{nice} opcional define a prioridade. \\
+\code{nice [pid] [valor]} & L\^e ou altera a prioridade de uma tarefa
+(\code{setpriority}). \\
+\code{kill <pid> [sinal]} & Envia um sinal para uma tarefa (padr\~ao
+\code{SIGTERM}); o sinal pode ser n\'umero ou nome, como \code{USR1}. \\
+\code{sig [pid]} & Mostra as m\'ascaras de sinais pendentes e bloqueados, o
+status de sa\'ida e o sinal fatal de cada tarefa. \\
+\code{sigaction <pid> <sinal> [default|ignore|handler]} & L\^e ou instala a
+disposi\c{c}\~ao de um sinal. \\
+\code{sigblock <pid> <sinal> <on|off>} & Bloqueia ou desbloqueia um sinal
+(\code{sigprocmask}). \\
+\code{wait [pid]} & Espera um filho encerrar, mostra o status e o sinal fatal
+e colhe o zumbi. \\
 \code{sleep [segundos]} & Bloqueia o shell com sem\^antica de
 \code{schedule\_timeout}. \\
 \code{notify [one]} & Sinaliza a fila de eventos; \code{one} acorda uma
@@ -210,8 +226,7 @@ timeout. \\
 \code{mem} & Mostra frames, heap e estat\'isticas do escalonador. \\
 \code{reboot}, \code{halt} & Reiniciam o PC ou param a CPU. \\
 \bottomrule
-\end{tabularx}
-\end{table}
+\end{longtable}
 
 \begin{nota}[Detalhes de comportamento]
 \begin{itemize}
@@ -241,7 +256,7 @@ Memoria: paginas de 4 KiB, demand paging e frames fisicos
 RAMFS:  17 nos, 186 bytes em arquivos
 HEAP:   4 KiB mapeados, 266 B em uso
 Usuario: ring 3 com GDT/TSS, protecao U/S e int 0x80
-Tarefas: 1 na tabela, 0 prontas, 0 dormindo, 0 encerradas (escalonador preemptivo)
+Tarefas: 1 na tabela, 0 prontas, 0 dormindo, 0 paradas, 0 encerradas (escalonador preemptivo)
 Ticks do timer: 366
 \end{lstlisting}
 
@@ -307,8 +322,11 @@ Applet {
   \item As tarefas s\~ao threads de kernel preemptivas por timer e
         compartilham o espa\c{c}o de endere\c{c}os do kernel; a
         preemp\c{c}\~ao fica suspensa durante programas de ring 3. Existem
-        sleep e filas de espera por evento, mas n\~ao h\'a sinais,
-        prioridades nem espa\c{c}o de endere\c{c}os por tarefa.
+        sleep, filas de espera por evento, prioridades ponderadas, sinais no
+        estilo Unix e \code{wait}/colheita de zumbis, mas n\~ao h\'a
+        espa\c{c}o de endere\c{c}os por tarefa nem \code{fork}. Handlers de
+        sinal rodam em pontos seguros do kernel, n\~ao em ring 3 com um
+        endere\c{c}o fornecido pelo usu\'ario.
   \item Sem tradu\c{c}\~ao de UTF-8: acentos digitados podem virar \code{?}.
   \item A linha \'e limitada a 128 bytes e o excesso \'e descartado em
         sil\^encio.

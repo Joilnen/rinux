@@ -41,7 +41,7 @@ Esta documenta\c{c}\~ao tem quatro objetivos:
   \item \textbf{Documentar as principais fun\c{c}\~oes} de cada m\'odulo,
         incluindo contratos, pr\'e-condi\c{c}\~oes, efeitos colaterais e
         limita\c{c}\~oes. O Ap\^endice~\ref{ap:funcoes} traz o cat\'alogo
-        completo das 276 fun\c{c}\~oes do projeto.
+        completo das 316 fun\c{c}\~oes do projeto.
   \item \textbf{Registrar o processo de build, execu\c{c}\~ao e valida\c{c}\~ao},
         de forma que outra pessoa consiga reproduzir o ambiente e os testes.
   \item \textbf{Comparar o projeto com o kernel Linux}, apresentando
@@ -68,16 +68,18 @@ Esta documenta\c{c}\~ao tem quatro objetivos:
   \item Driver de teclado PS/2 por \emph{polling}, com Shift, Enter, Tab e
         Backspace.
   \item Driver da UART 16550 em COM1, usado para depura\c{c}\~ao e entrada.
-  \item Shell com \emph{parsing} de argumentos entre aspas e 37 applets,
+  \item Shell com \emph{parsing} de argumentos entre aspas e 43 applets,
         despachados por uma tabela est\'atica.
   \item Heap do kernel atr\'as de \code{\#[global\_allocator]}, com
         \code{Vec} e \code{String}.
   \item Ramfs de 48 n\'os, VFS com dezesseis descritores e \code{/proc}
         sint\'etico.
-  \item Tabela de tarefas com PID/PPID e estados, escalonador
-        \emph{round-robin} preemptivo por timer e \code{sleep} bloqueante
-        com sem\^antica de \code{schedule\_timeout} e filas de espera por evento
-        (\code{wait\_event}/\code{wake\_up}).
+  \item Tabela de tarefas com PID/PPID e estados, escalonador preemptivo
+        justo e ponderado com \code{nice}, pesos e \code{vruntime},
+        \code{sleep} bloqueante com sem\^antica de \code{schedule\_timeout},
+        filas de espera por evento (\code{wait\_event}/\code{wake\_up}) e
+        sinais no estilo Unix, com m\'ascaras de pendentes/bloqueados,
+        disposi\c{c}\~oes, a\c{c}\~oes padr\~ao, status de sa\'ida e \code{wait}.
   \item \emph{Panic handler} que imprime a falha e para a CPU.
   \item Build reprodut\'ivel com Cargo, \code{ld.lld}, \code{grub-mkrescue}
         e QEMU.
@@ -86,9 +88,9 @@ Esta documenta\c{c}\~ao tem quatro objetivos:
 \subsection*{O que n\~ao est\'a inclu\'ido}
 
 \begin{itemize}
-  \item \code{fork}/\code{exec}/\code{wait}, espa\c{c}os de endere\c{c}o por
-        processo, sinais, CFS/EEVDF ou um conjunto amplo de chamadas de
-        sistema.
+  \item \code{fork}/\code{exec}, espa\c{c}os de endere\c{c}o por processo,
+        frames de sinal em ring 3, \'arvore rubro-negra completa do CFS/EEVDF
+        ou um conjunto amplo de chamadas de sistema.
   \item Sistema de arquivos persistente em disco, block layer, mounts, rede,
         USB, ACPI, SMP ou suporte UEFI nativo.
   \item Drivers para outros v\'ideos al\'em do VGA texto legado.

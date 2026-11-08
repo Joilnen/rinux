@@ -363,6 +363,7 @@ files are:
 \code{/proc/uptime}  & seconds and centiseconds from the PIT ticks \\
 \code{/proc/meminfo} & frames, heap and task counters \\
 \code{/proc/ps}      & task table in the same format as the \code{ps} applet \\
+\code{/proc/signals} & pending/blocked masks, state and exit status of tasks \\
 \code{/proc/cpuinfo} & a small static CPU description \\
 \code{/proc/mounts}  & ramfs, proc and devtmpfs lines \\
 \code{/proc/cmdline} & boot command line \\
@@ -376,13 +377,14 @@ same code path used by the ring 3 syscalls. There is no \code{seq\_file},
 
 \section{Tasks and preemptive scheduler}
 
-\code{src/task.rs} adds PID/PPID, task states and a round-robin scheduler.
-The shell is task 1 and runs on the boot stack. \code{spawn} creates a kernel
-thread with a 16 KiB stack from the heap, a copy of the name and an entry
-function. Each task has its own saved stack pointer and a start frame
-consumed by the assembly routine below; besides the callee-saved registers,
-the routine saves and restores \code{RFLAGS}, so the interrupt flag follows
-the task across a switch:
+\code{src/task.rs} adds PID/PPID, task states and a \emph{weighted fair}
+scheduler inspired by the Linux CFS. The shell is task 1 and runs on the boot
+stack. \code{spawn(name, entry, nice)} creates a kernel thread with a 16 KiB
+stack from the heap, a copy of the name, an entry function and a priority.
+Each task has its own saved stack pointer and a start frame consumed by the
+assembly routine below; besides the callee-saved registers, the routine saves
+and restores \code{RFLAGS}, so the interrupt flag follows the task across a
+switch:
 
 \begin{lstlisting}[caption={Context switch with \code{RFLAGS}.},label={lst:ctxswitch}]
 task_switch:
@@ -406,28 +408,40 @@ task_switch:
 \end{lstlisting}
 
 A new task starts at \code{task\_trampoline}, which calls the entry function
-and then \code{exit\_current}. The scheduler rotates over the \code{Ready}
-tasks; \code{yield\_now} marks the current task ready and switches, while
-\code{exit\_current} marks it \code{Exited}. Exited slots are reused by the
-next \code{spawn}, like a zombie being reaped, and the old stack is returned
-to the heap.
+and then \code{exit\_current}. \code{yield\_now} marks the current task ready
+and lets the scheduler choose again, while \code{exit\_current} marks it
+\code{Exited}. An exited task remains as a zombie until its parent calls
+\code{wait}, which frees the slot; the next \code{spawn} then returns the old
+stack to the heap.
 
-The policy is timer-preemptive round-robin. Each task owns a quantum of
-\code{QUANTUM\_TICKS = 5} timer interrupts (about 50 ms at 100 Hz). IRQ0
-increments the tick counter, sends the PIC EOI and calls
-\code{task::on\_tick}; when the quantum expires and another task is
-\code{Ready}, \code{on\_tick} saves the current context and switches without
-any cooperation from the task. The scan starts after the current slot, so a
-task can never be selected to switch to itself. \code{yield\_now} remains
-available for explicit hand-off and resets the quantum.
+The policy is weighted fair scheduling with \code{nice},
+\code{sched\_prio\_to\_weight}-style weights and a virtual runtime. Every task
+stores \code{nice} ($-20$ to $19$), its weight (from 88761 at $-20$ down to 15
+at $19$, with 1024 at $0$) and \code{vruntime}. At each IRQ0 the current task
+adds
+\[
+  \Delta \mathrm{vruntime} = \frac{1024 \ll 10}{\mathrm{weight}}
+\]
+to its virtual runtime, so a high-priority task accumulates virtual time more
+slowly. \code{on\_tick} then chooses the runnable task (\code{Ready} or
+\code{Running}) with the smallest \code{vruntime}; ties keep the current task
+to avoid a needless switch. There is no fixed quantum: fairness emerges from
+the per-tick accounting, and equal-weight tasks alternate roughly every tick
+while a task with \code{nice} $-5$ receives about three times the CPU of a
+\code{nice} $0$ task. New tasks and woken tasks are clamped to the minimum
+\code{vruntime} of the runnable set, the same idea as \code{place\_entity} in
+\code{kernel/sched/fair.c}, so they do not monopolize the CPU while catching
+up. This is a didactic CFS: there is no red--black tree, \emph{lag} or EEVDF.
 
 Because the timer handler itself can take the task-table lock, the spinlocks
 of \code{sync.rs} follow the \code{irqsave} model: acquiring a lock disables
 local interrupts and the guard restores the previous \code{RFLAGS} on drop.
 Preemption is suspended while a ring 3 program is active, since that program
-runs on the shared TSS interrupt stack instead of a per-task stack. All tasks
-share the kernel address space; there is no \code{fork}, \code{exec},
-\code{wait} or per-process page table.
+runs on the shared TSS interrupt stack instead of a per-task stack; the clock
+and \code{vruntime} keep advancing. All tasks share the kernel address space;
+there is no \code{fork}, \code{exec} or per-process page table. \code{wait}
+exists as a parent/child operation over the same address space and reaps
+zombies, as described below.
 
 The scheduler also has a real blocking state. \code{task::sleep(ticks)} is the
 equivalent of \code{schedule\_timeout}: the current task stores an absolute
@@ -444,22 +458,92 @@ queue in \code{wait\_queue}, changes to \code{Blocked} and is only made
 \code{Ready} when another context calls \code{wake\_up\_one} or
 \code{wake\_up\_all}. \code{wait\_event} rechecks a condition after every
 wakeup, and \code{wait\_event\_timeout} adds a deadline, like
-\code{wait\_event\_timeout} in Linux. The queue identity is the address of
-the static structure, and the waiters live in the task table, which is a
-simplified version of Linux's intrusive linked lists.
+\code{wait\_event\_timeout} in Linux. A woken task has its \code{vruntime}
+raised to the current minimum before becoming runnable, so it cannot arrive
+far behind the others. The queue identity is the address of the static
+structure, and the waiters live in the task table, which is a simplified
+version of Linux's intrusive linked lists.
 
-The \code{spawn [nome] [n] [sleep|wait|timeout]} applet creates up to eight
-workers. Each worker yields once and then busy-waits for timer ticks without
-further yields, so the observed interleaving comes from preemption. With the
-optional \code{sleep} mode (\code{spawn nap 2 sleep}), the worker calls
-\code{task::sleep} between rounds. With \code{wait}, it sleeps on the event
-queue until the \code{notify} applet calls \code{wake\_up\_all} (or
-\code{notify one} for \code{wake\_up}); \code{timeout} uses
-\code{wait\_event\_timeout} and reports whether the event arrived within one
-second. In all blocking modes \code{ps} shows the task as \code{dormindo}
-while the shell stays responsive. \code{ps} prints PID, PPID, state, yield
-count, preemption count (\code{PREEMP}) and name. For example, two busy
-workers advance one step at a time and each accumulates three preemptions.
+The \code{spawn [nome] [n] [cpu|sleep|wait|timeout|signal|exit] [nice]} applet
+creates up to eight workers. In the default \code{cpu} mode each worker yields
+once and then consumes 10 real CPU ticks per round, measured by the per-task
+\code{cpu\_ticks} counter, so the observed interleaving comes from preemption
+and the same work takes longer at a lower priority. With \code{sleep}
+(\code{spawn nap 2 sleep -5}) the worker calls \code{task::sleep} between
+rounds. With \code{wait}, it sleeps on the event queue until the
+\code{notify} applet calls \code{wake\_up\_all} (or \code{notify one} for
+\code{wake\_up}); \code{timeout} uses \code{wait\_event\_timeout} and reports
+whether the event arrived within one second; \code{signal} installs a
+\code{SIGUSR1} handler and sleeps; \code{exit} ends with status 42 after half
+a second, leaving a zombie for \code{wait}. In all blocking modes \code{ps}
+shows the task as \code{dormindo} (or \code{parada} after \code{SIGSTOP})
+while the shell stays responsive. The \code{nice [pid] [valor]} applet reads
+or changes a task's priority, like \code{setpriority}. \code{ps} prints PID,
+PPID, state, \code{NICE}, \code{CPU} ticks, \code{VRUNTIME}, yield count,
+preemption count (\code{PREEMP}) and name. Two equal workers finish with the
+same CPU ticks and \code{vruntime}; a worker created with \code{nice} $-5$
+finishes well before an equal \code{nice} $0$ worker and accumulates much
+less \code{vruntime} per tick.
+
+\section{Signals and process lifecycle}
+
+Signals follow the Unix model in a compact form. Each task stores a 32-bit
+\code{pending} mask, a \code{blocked} mask and an array of 32
+\code{SignalAction} values, numbered from 1 (traditional Unix signals). The
+disposition is one of:
+
+\begin{lstlisting}[caption={Signal dispositions.},label={lst:signals}]
+pub enum SignalAction {
+    Default,
+    Ignore,
+    Handler(fn(i32)),
+}
+\end{lstlisting}
+
+\code{Default} applies the classic action: terminate, stop or ignore,
+depending on the signal. \code{SIGKILL} (9) and \code{SIGSTOP} (19) are
+special: they cannot be blocked, ignored or have their disposition changed.
+\code{SIGCONT} (18) always removes a task from \code{Stopped}, even when the
+signal itself is blocked. \code{SIGCHLD} (17) and \code{SIGURG}/\code{SIGWINCH}
+are ignored by default; \code{SIGTSTP}/\code{SIGTTIN}/\code{SIGTTOU} stop by
+default; the remaining signals terminate by default.
+
+Delivery happens only at safe points, never inside an IRQ handler, because a
+handler may sleep or switch tasks. \code{check\_signals} is called from
+\code{yield\_now}, \code{sleep}, \code{block\_current}, \code{wait\_child}, the
+shell loop/idle path and the CPU worker loop. It takes the lowest pending
+signal not in the blocked mask, clears its bit and executes the disposition.
+The \code{in\_handler} flag prevents recursive delivery while a handler runs;
+a signal that arrives during a handler waits for the next safe point.
+
+Sending a signal goes through \code{task::kill(pid, sig)}. For the current
+task the bit is only queued. For another task, \code{SIGKILL}, \code{SIGSTOP}
+and default-terminating signals are applied immediately, since the target is
+not executing and there is no kernel context to save; handler signals are
+queued and a blocked target is woken so it reaches a safe point. A signal
+handler is a kernel function pointer, not a user address: it runs in the
+context of the target task, with the same kernel stack and address space.
+\code{kill(pid, 0)} only checks existence and therefore succeeds for a
+zombie.
+
+The applets mirror the API: \code{kill} sends a number or a name;
+\code{sigaction} reads or installs the disposition; \code{sigblock} changes
+the mask; \code{sig} prints pending/blocked masks plus the exit status; and
+\code{/proc/signals} exposes the same table. Handler signals are queued and
+delivered at a safe point; default terminating or stopping signals sent to a
+non-current task take effect immediately.
+
+Lifecycle is tied to the same table. A task that calls
+\code{exit\_current\_with\_status(status)} becomes \code{Exited}, stores its
+status and, when killed by a signal, the fatal signal number
+(\code{128 + sig}). Its parent receives \code{SIGCHLD} and, if it was blocked
+in \code{wait}, is woken. \code{wait\_child(target)} waits on a global
+\code{CHILD\_QUEUE}; when a zombie child is present it returns a
+\code{WaitResult} (pid, status, signal) and marks the slot \code{Free}. A
+ten-tick timeout covers the race between checking the condition and sleeping,
+so a wakeup cannot be lost. Until reaped, a zombie keeps its PID and can
+fill the 16-slot table; calling \code{wait} is therefore required before
+respawning many short-lived children.
 
 \section{New system calls}
 
@@ -481,6 +565,7 @@ The \code{int 0x80} table was extended with file and process calls:
 8  & \code{lseek}    & \code{fd, offset, whence} \\
 9  & \code{getpid}   & -- \\
 10 & \code{getppid}  & -- \\
+11 & \code{kill}     & \code{pid, sig} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -489,3 +574,5 @@ The \code{int 0x80} table was extended with file and process calls:
 \code{open}, reads it with \code{read\_fd}, writes the content with
 \code{write\_fd} and closes the descriptor. \code{getpid} and \code{getppid}
 read the current task from the scheduler instead of returning constants.
+\code{kill} validates the signal number and delegates to \code{task::kill};
+\code{sig = 0} only checks that the target exists.

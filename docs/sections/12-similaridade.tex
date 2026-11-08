@@ -71,7 +71,7 @@ in Rust'' and the opposite conclusion that ``it has nothing to do with it''.
 \code{arch/x86/entry/syscalls/syscall\_64.tbl} & --- & \code{syscall.rs} \\
 \midrule
 \textbf{Linux total (first 12 files)} & \textbf{22,352} & --- \\
-\textbf{Rust total (19 modules)} & \textbf{6,797} & --- \\
+\textbf{Rust total (19 modules)} & \textbf{7,973} & --- \\
 \bottomrule
 \end{longtable}
 
@@ -82,7 +82,7 @@ line-count comparison, which still uses the first twelve Linux files.
 The line ratio is:
 
 \[
-\frac{6{,}797}{22{,}352} \approx 30.41\%.
+\frac{7{,}973}{22{,}352} \approx 35.67\%.
 \]
 
 Relative to the complete Linux tree, which has approximately
@@ -90,7 +90,7 @@ Relative to the complete Linux tree, which has approximately
 the ratio is:
 
 \[
-\frac{6{,}797}{38{,}062{,}672} \approx 0.0179\%.
+\frac{7{,}973}{38{,}062{,}672} \approx 0.0209\%.
 \]
 
 \begin{atencao}[Lines of code do not measure similarity]
@@ -124,27 +124,28 @@ Keyboard and input & 12 & 100 & 18 & 2.16 \\
 Serial and tty & 5 & 100 & 20 & 1.00 \\
 Interrupts and exceptions & 12 & 100 & 30 & 3.60 \\
 Memory and heap & 8 & 100 & 25 & 2.00 \\
-Processes, scheduler, and syscalls & 12 & 100 & 30 & 3.60 \\
+Processes, scheduler, and syscalls & 12 & 100 & 45 & 5.40 \\
 Files, networking, and other drivers & 6 & 100 & 10 & 0.60 \\
 \midrule
-\textbf{Total} & \textbf{100} & --- & --- & \textbf{25.51} \\
+\textbf{Total} & \textbf{100} & --- & --- & \textbf{27.31} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The weighted index is \textbf{25.5\%}. It should be read as:
+The weighted index is \textbf{27.3\%}. It should be read as:
 
 \begin{quote}
-``Within the ten chosen dimensions, the project reproduces about 25.5\% of
+``Within the ten chosen dimensions, the project reproduces about 27.3\% of
 what Linux offers, with greater weight on boot, console, and keyboard.''
 \end{quote}
 
-It does not mean that 25.5\% of the Linux code was reimplemented. In
+It does not mean that 27.3\% of the Linux code was reimplemented. In
 number of subsystems and services, the fraction is much smaller: the
-project has only a first-fit heap, a timer-preemptive round-robin scheduler
-with a blocking \code{sleep} and event wait queues, an in-memory filesystem
+project has only a first-fit heap, a timer-preemptive weighted fair scheduler
+with \code{nice}, weights, \code{vruntime}, a blocking \code{sleep}, event
+wait queues, Unix-style signals and zombie reaping, an in-memory filesystem
 and a synthetic \code{/proc}, while Linux also has a buddy allocator, slab,
-CFS/EEVDF with real-time classes, a much richer wait queue and locking
+full CFS/EEVDF with real-time classes, a much richer signal and wait queue
 infrastructure, a full VFS with block devices, and networking.
 
 \subsection{Reading by dimension}
@@ -178,14 +179,17 @@ infrastructure, a full VFS with block devices, and networking.
         demand paging and a 1 MiB first-fit heap behind
         \code{\#[global\_allocator]}, but there is no buddy allocator, slab,
         page cache, \code{vmalloc}, swap or NUMA.
-  \item \textbf{Processes (30/100)}: there is a task table with PID/PPID and
+  \item \textbf{Processes (45/100)}: there is a task table with PID/PPID and
         states, a context switch that preserves \code{RFLAGS}, a
-        timer-preemptive round-robin scheduler with a five-tick quantum, a
+        timer-preemptive weighted fair scheduler with \code{nice},
+        \code{sched\_prio\_to\_weight}-style weights and \code{vruntime}, a
         blocking \code{sleep} with \code{schedule\_timeout} semantics, event
         wait queues with \code{wait\_event}/\code{wait\_event\_timeout} and
-        \code{wake\_up}, and eleven syscalls; there is no
-        \code{fork}/\code{exec}/\code{wait}, separate address spaces, signals,
-        priorities or CFS/EEVDF.
+        \code{wake\_up}, Unix-style signals with pending/blocked masks,
+        dispositions and default actions, stopped/continued tasks, exit
+        status, zombies, \code{wait}/\code{SIGCHLD} and twelve syscalls;
+        there is no \code{fork}/\code{exec}, separate address spaces,
+        real-time classes or a full CFS/EEVDF red--black tree.
   \item \textbf{FS/networking (10/100)}: there is a ramfs, a VFS with sixteen
         descriptors and a synthetic \code{/proc}, but there is no block layer,
         disk driver, mount table, permission model, page cache, TCP/IP or
@@ -218,14 +222,15 @@ Serial & 8250 + tty + termios & 16550 by polling \\
 Input & IRQ1/IRQ4, \emph{softirq}, workqueues & IRQ0 (timer) + polling in the
 shell + \code{int 0x80} \\
 Time & PIT/APIC, \code{jiffies}, timers & PIT at ~100 Hz, tick
-counter, preemptive quantum \\
+counter, weighted \code{vruntime} accounting \\
 Memory & buddy, slab, \code{vmalloc}, page cache & Frame bitmap,
 demand paging, first-fit heap \\
 Processes & CFS/EEVDF, namespaces, cgroups & Task table, preemptive
-round-robin, blocking \code{sleep} and wait queues; no \code{fork} or
+weighted fair scheduler (\code{nice}/weight/\code{vruntime}), blocking
+\code{sleep}, wait queues, signals and \code{wait}/zombies; no \code{fork} or
 namespaces \\
 Syscalls & \code{syscall}/\code{sysret}, \code{ptrace} & \code{int 0x80} with
-eleven calls (\code{exit}..\code{getppid}) \\
+twelve calls (\code{exit}..\code{kill}) \\
 Files & VFS, inodes, dentries, page cache & ramfs, 16 descriptors,
 synthetic \code{/proc}; no block layer \\
 Networking & sockets, TCP/IP, netfilter & Absent \\
@@ -263,9 +268,9 @@ Networking & sockets, TCP/IP, netfilter & Absent \\
 \textbf{Measure} & \textbf{Result} \\
 \midrule
 Copied code & 0\% (independent implementation) \\
-Lines vs.\ 12 analogous files & $\approx 30.41\%$ \\
-Lines vs.\ complete Linux tree & $\approx 0.0179\%$ \\
-Weighted functional similarity (10 dimensions) & $\approx 25.5\%$ \\
+Lines vs.\ 12 analogous files & $\approx 35.67\%$ \\
+Lines vs.\ complete Linux tree & $\approx 0.0209\%$ \\
+Weighted functional similarity (10 dimensions) & $\approx 27.3\%$ \\
 Coverage of complete kernel subsystems & very low; on the order of 2\% \\
 Conceptual similarity in boot & high (same x86 mechanisms) \\
 Conceptual similarity in drivers & medium/low (polling subset) \\
@@ -286,7 +291,7 @@ On a qualitative scale:
         VGA, PS/2, and serial; low for understanding Linux as a complete
         operating system.
   \item \textbf{Score from 0 to 10 for ``how much of Linux was reimplemented''}:
-        approximately \textbf{2.5/10} on the weighted score; less than
+        approximately \textbf{2.7/10} on the weighted score; less than
         \textbf{0.1/10} if the criterion is the complete kernel in
         terms of features.
 \end{itemize}
@@ -311,15 +316,16 @@ networking, drivers, and security hardening.
 \textbf{Aspect} & \textbf{Linux} & \textbf{Rust VGA Kernel} \\
 \midrule
 Language & C and assembly & Rust and assembly \\
-Size & $\sim$38 million lines & 6,797 lines \\
+Size & $\sim$38 million lines & 7,973 lines \\
 Boot model & Proprietary protocol, setup, EFI & Multiboot2/GRUB \\
 Interrupts & IDT, PIC/APIC, timers & IDT, PIC/PIT; keyboard by polling \\
-Concurrency & SMP, preemption, RCU & One CPU, timer-preemptive round-robin
-with blocking sleep and wait queues \\
+Concurrency & SMP, preemption, RCU & One CPU, timer-preemptive weighted fair
+scheduler with blocking sleep and wait queues \\
 Memory & Buddy, slab, VM, page cache & Frame bitmap, demand paging,
 first-fit heap \\
-Processes & Scheduler, namespaces, cgroups & Task table, preemptive
-round-robin, wait queues; no namespaces \\
+Processes & Scheduler, signals, namespaces, cgroups & Task table, preemptive
+weighted fair scheduler, wait queues, signals and \code{wait}/zombies; no
+namespaces \\
 Input/output & VFS, block, net, tty & ramfs, VFS, \code{/proc}, direct I/O ports \\
 Security & Rings, SMEP/SMAP, KASLR, LSM & Rings 0/3 and U/S; no NX,
 SMEP, or SMAP \\

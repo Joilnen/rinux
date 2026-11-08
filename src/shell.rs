@@ -6,8 +6,8 @@
 //!
 //! Nao ha pipes, redirecionamento, variaveis de ambiente, `fork` ou `exec`.
 //! O shell roda como a tarefa de PID 1 de `task.rs`; tarefas de kernel podem
-//! ser criadas com `spawn` e sao escalonadas de forma preemptiva (round-robin
-//! com quantum de ticks).
+//! ser criadas com `spawn` e sao escalonadas de forma preemptiva (weighted fair
+//! com `nice`, peso e `vruntime`, no estilo do CFS).
 
 use core::sync::atomic::{AtomicU64, Ordering};
 
@@ -285,9 +285,45 @@ static APPLETS: &[Applet] = &[
     },
     Applet {
         name: "spawn",
-        usage: "spawn [nome] [n] [sleep|wait|timeout]",
-        summary: "cria tarefas de kernel preemptivas, dormentes ou em wait queue",
+        usage: "spawn [nome] [n] [cpu|sleep|wait|timeout|signal|exit] [nice]",
+        summary: "cria tarefas de kernel preemptivas, dormentes, em wait queue ou com handler",
         run: applet_spawn,
+    },
+    Applet {
+        name: "nice",
+        usage: "nice [pid] [valor]",
+        summary: "consulta ou ajusta a prioridade (nice) de uma tarefa",
+        run: applet_nice,
+    },
+    Applet {
+        name: "kill",
+        usage: "kill <pid> [sinal]",
+        summary: "envia um sinal para uma tarefa (padrao: TERM)",
+        run: applet_kill,
+    },
+    Applet {
+        name: "sig",
+        usage: "sig [pid]",
+        summary: "mostra sinais pendentes e bloqueados das tarefas",
+        run: applet_sig,
+    },
+    Applet {
+        name: "sigaction",
+        usage: "sigaction <pid> <sinal> [default|ignore|handler]",
+        summary: "consulta ou instala a acao de um sinal",
+        run: applet_sigaction,
+    },
+    Applet {
+        name: "sigblock",
+        usage: "sigblock <pid> <sinal> <on|off>",
+        summary: "bloqueia ou desbloqueia um sinal de uma tarefa",
+        run: applet_sigblock,
+    },
+    Applet {
+        name: "wait",
+        usage: "wait [pid]",
+        summary: "espera um filho encerrar e mostra o status",
+        run: applet_wait,
     },
     Applet {
         name: "sleep",
@@ -371,6 +407,10 @@ static APPLETS: &[Applet] = &[
 
 pub fn run() -> ! {
     loop {
+        // O shell e a tarefa PID 1: entrega sinais pendentes (por exemplo,
+        // SIGCHLD ou um SIGUSR1 instalado por `sigaction`) antes do prompt.
+        task::check_signals();
+
         let mut line = [0u8; LINE_MAX];
         let mut len = 0usize;
         let mut console = tty::active();
@@ -397,6 +437,7 @@ pub fn run() -> ! {
                     // Bloqueia por um tick e volta a pollar em ~10 ms; sem
                     // outra tarefa, o `hlt` interno evita busy-wait.
                     task::idle();
+                    task::check_signals();
                     continue;
                 }
             };
@@ -1100,8 +1141,8 @@ fn applet_info(command: &Command<'_>) -> Result<(), &'static str> {
     println!("Usuario: ring 3 com GDT/TSS, protecao U/S e int 0x80");
     let tasks = task::stats();
     println!(
-        "Tarefas: {} na tabela, {} prontas, {} dormindo, {} encerradas (escalonador preemptivo)",
-        tasks.total, tasks.ready, tasks.blocked, tasks.exited
+        "Tarefas: {} na tabela, {} prontas, {} dormindo, {} paradas, {} encerradas (escalonador preemptivo)",
+        tasks.total, tasks.ready, tasks.blocked, tasks.stopped, tasks.exited
     );
     println!("Ticks do timer: {}", idt::ticks());
     Ok(())
@@ -1176,16 +1217,20 @@ fn applet_userprot(command: &Command<'_>) -> Result<(), &'static str> {
 }
 
 /// Tarefa de kernel usada pelo applet `spawn`. Ha um yield inicial, mas o
-/// laco seguinte nao cede a CPU: a pausa apenas espera ticks do timer, entao a
-/// intercalacao vem da preempcao.
+/// laco seguinte nao cede a CPU: cada passo consome 10 ticks reais de CPU
+/// (`cpu_ticks`), entao tarefas com `nice` diferentes levam tempos de parede
+/// diferentes para concluir o mesmo trabalho.
 fn worker_task() {
     let pid = task::current_pid();
     println!("[task {}] inicio (kernel thread, ppid={})", pid, task::current_ppid());
     task::yield_now();
     for round in 1..=3 {
         println!("[task {}] passo {}/3", pid, round);
-        let start = idt::ticks();
-        while idt::ticks().wrapping_sub(start) < 10 {
+        let start = task::current_cpu_ticks();
+        while task::current_cpu_ticks().wrapping_sub(start) < 10 {
+            // Ponto seguro: permite que `kill -USR1` execute o handler mesmo
+            // em uma tarefa que ainda nao cedeu a CPU.
+            task::check_signals();
             core::hint::spin_loop();
         }
     }
@@ -1231,28 +1276,78 @@ fn waiter_timeout_task() {
     }
 }
 
+/// Handler de demonstracao instalado por `sigaction` e por
+/// `spawn ... signal`. Roda no contexto da propria tarefa em um ponto seguro.
+fn demo_signal_handler(sig: i32) {
+    println!(
+        "[task {}] handler: recebi {} ({})",
+        task::current_pid(),
+        task::signal_name(sig as u8),
+        sig
+    );
+}
+
+/// Tarefa que instala um handler para `SIGUSR1` e dorme ate ser sinalizada.
+/// `kill <pid> USR1` acorda a tarefa; `SIGTERM`/`SIGKILL` a encerram.
+fn signal_task() {
+    let pid = task::current_pid();
+    match task::set_signal_action(
+        pid,
+        task::SIGUSR1,
+        task::SignalAction::Handler(demo_signal_handler),
+    ) {
+        Ok(_) => println!(
+            "[task {}] esperando {} (kill {} USR1)",
+            pid,
+            task::signal_name(task::SIGUSR1),
+            pid
+        ),
+        Err(reason) => {
+            println!("[task {}] sigaction: {}", pid, reason);
+            return;
+        }
+    }
+
+    loop {
+        task::sleep(1000);
+    }
+}
+
+/// Tarefa de vida curta que termina com status 42, deixando um zumbi para o
+/// applet `wait` colher e demonstrar `SIGCHLD`/status de saida.
+fn exit_task() {
+    let pid = task::current_pid();
+    println!("[task {}] encerrando com status 42 em 0,5 s", pid);
+    task::sleep(50);
+    task::exit_current_with_status(42)
+}
+
 fn applet_ps(command: &Command<'_>) -> Result<(), &'static str> {
     no_args(command)?;
-    println!("  PID  PPID  ESTADO      YIELDS  PREEMP  NOME");
-    task::for_each(|pid, ppid, state, name, yields, preemptions, current| {
-        let marker = if current { '*' } else { ' ' };
+    println!("  PID  PPID  ESTADO      NICE  CPU  VRUNTIME   YIELDS  PREEMP  NOME");
+    task::for_each(|info| {
+        let marker = if info.current { '*' } else { ' ' };
         println!(
-            "{}{:>5} {:>5}  {:<11} {:>6}  {:>6}  {}",
+            "{}{:>5} {:>5}  {:<11} {:>4} {:>4}  {:>9}  {:>6}  {:>6}  {}",
             marker,
-            pid,
-            ppid,
-            state.as_str(),
-            yields,
-            preemptions,
-            name
+            info.pid,
+            info.ppid,
+            info.state.as_str(),
+            info.nice,
+            info.cpu_ticks,
+            info.vruntime,
+            info.yields,
+            info.preemptions,
+            info.name
         );
     });
     Ok(())
 }
 
 fn applet_spawn(command: &Command<'_>) -> Result<(), &'static str> {
-    const USAGE: &str = "uso: spawn [nome] [n] [sleep|wait|timeout]";
-    if command.len() > 4 {
+    const USAGE: &str =
+        "uso: spawn [nome] [n] [cpu|sleep|wait|timeout|signal|exit] [nice]";
+    if command.len() > 5 {
         return Err(USAGE);
     }
     let name = command.arg(1).unwrap_or(b"worker");
@@ -1260,23 +1355,37 @@ fn applet_spawn(command: &Command<'_>) -> Result<(), &'static str> {
         Some(arg) => parse_decimal(arg).ok_or(USAGE)?.clamp(1, 8),
         None => 1,
     };
-    // Terceiro argumento opcional escolhe a entrada da tarefa: sem ele, o
-    // worker preemptivo de sempre; "sleep" bloqueia por prazo; "wait" e
-    // "timeout" bloqueiam em uma fila de espera acordada por `notify`.
+    // Terceiro argumento opcional escolhe a entrada da tarefa: sem ele (ou com
+    // "cpu"), o worker preemptivo de sempre; "sleep" bloqueia por prazo;
+    // "wait" e "timeout" bloqueiam em uma fila de espera acordada por
+    // `notify`; "signal" instala um handler de SIGUSR1; "exit" encerra com
+    // status para demonstrar `wait`.
     let entry: fn() = match command.arg(3) {
         None => worker_task,
+        Some(mode) if mode == b"cpu" => worker_task,
         Some(mode) if mode == b"sleep" => sleeper_task,
         Some(mode) if mode == b"wait" => waiter_task,
         Some(mode) if mode == b"timeout" => waiter_timeout_task,
+        Some(mode) if mode == b"signal" => signal_task,
+        Some(mode) if mode == b"exit" => exit_task,
         Some(_) => return Err(USAGE),
+    };
+    // Quarto argumento opcional: prioridade `nice` (-20..19).
+    let nice = match command.arg(4) {
+        Some(arg) => parse_signed_decimal(arg).ok_or(USAGE)?.clamp(
+            task::NICE_MIN as i32,
+            task::NICE_MAX as i32,
+        ) as i8,
+        None => 0,
     };
 
     for _ in 0..count {
-        let pid = task::spawn(name, entry)?;
+        let pid = task::spawn(name, entry, nice)?;
         println!(
-            "tarefa criada: pid={} nome={}",
+            "tarefa criada: pid={} nome={} nice={}",
             pid,
-            core::str::from_utf8(name).unwrap_or("?")
+            core::str::from_utf8(name).unwrap_or("?"),
+            nice
         );
     }
     Ok(())
@@ -1348,6 +1457,268 @@ fn parse_decimal(arg: &[u8]) -> Option<usize> {
         value = value.checked_mul(10)?.checked_add((byte - b'0') as usize)?;
     }
     Some(value)
+}
+
+/// Interpreta um inteiro decimal com sinal opcional (`-20`, `+5`, `10`).
+fn parse_signed_decimal(arg: &[u8]) -> Option<i32> {
+    let (negative, digits) = match arg.first()? {
+        b'-' => (true, &arg[1..]),
+        b'+' => (false, &arg[1..]),
+        _ => (false, arg),
+    };
+    if digits.is_empty() {
+        return None;
+    }
+    let mut value = 0i32;
+    for &byte in digits {
+        if !byte.is_ascii_digit() {
+            return None;
+        }
+        value = value
+            .checked_mul(10)?
+            .checked_add((byte - b'0') as i32)?;
+    }
+    Some(if negative { -value } else { value })
+}
+
+/// `nice` sem argumentos mostra a prioridade do shell; `nice pid` consulta uma
+/// tarefa; `nice pid valor` ajusta (como `setpriority`).
+fn applet_nice(command: &Command<'_>) -> Result<(), &'static str> {
+    const USAGE: &str = "uso: nice [pid] [valor]";
+    if command.len() > 3 {
+        return Err(USAGE);
+    }
+
+    if command.len() == 1 {
+        let pid = task::current_pid();
+        println!("nice: {} (pid={})", task::current_nice(), pid);
+        return Ok(());
+    }
+
+    let pid = parse_decimal(command.arg(1).unwrap()).ok_or(USAGE)? as u64;
+    let current = task::get_nice(pid).ok_or("tarefa nao encontrada")?;
+    if command.len() == 2 {
+        println!("pid={} nice={}", pid, current);
+        return Ok(());
+    }
+
+    let requested = parse_signed_decimal(command.arg(2).unwrap()).ok_or(USAGE)?;
+    let applied = task::set_nice(
+        pid,
+        requested.clamp(task::NICE_MIN as i32, task::NICE_MAX as i32) as i8,
+    )?;
+    println!("pid={} nice {} -> {}", pid, current, applied);
+    Ok(())
+}
+
+fn applet_kill(command: &Command<'_>) -> Result<(), &'static str> {
+    const USAGE: &str = "uso: kill <pid> [sinal]";
+    if command.len() < 2 || command.len() > 3 {
+        return Err(USAGE);
+    }
+    let pid = parse_decimal(command.arg(1).unwrap()).ok_or(USAGE)? as u64;
+    let sig = match command.arg(2) {
+        Some(arg) => task::parse_signal(arg).ok_or("sinal invalido")?,
+        None => task::SIGTERM,
+    };
+
+    task::kill(pid, sig)?;
+    if sig == 0 {
+        println!("pid={} existe", pid);
+    } else {
+        println!(
+            "pid={} sinal={} ({}) enviado",
+            pid,
+            sig,
+            task::signal_name(sig)
+        );
+    }
+    Ok(())
+}
+
+/// Imprime uma mascara de sinais como nomes, no estilo `/proc/<pid>/status`.
+fn print_signal_mask(label: &str, mask: u32) {
+    crate::print!("{}:", label);
+    let mut any = false;
+    for sig in 1..=31u8 {
+        if mask & (1u32 << (sig - 1)) != 0 {
+            crate::print!(" {}", task::signal_name(sig));
+            any = true;
+        }
+    }
+    if !any {
+        crate::print!(" (vazio)");
+    }
+    println!();
+}
+
+fn applet_sig(command: &Command<'_>) -> Result<(), &'static str> {
+    const USAGE: &str = "uso: sig [pid]";
+    if command.len() > 2 {
+        return Err(USAGE);
+    }
+
+    if let Some(arg) = command.arg(1) {
+        let pid = parse_decimal(arg).ok_or(USAGE)? as u64;
+        let mut found = false;
+        task::for_each(|info| {
+            if info.pid != pid || found {
+                return;
+            }
+            found = true;
+            println!(
+                "pid={} ppid={} nome={} estado={}",
+                info.pid,
+                info.ppid,
+                info.name,
+                info.state.as_str()
+            );
+            print_signal_mask("pendentes", info.pending);
+            print_signal_mask("bloqueados", info.blocked);
+            if info.state == task::State::Exited {
+                if info.exit_signal != 0 {
+                    println!(
+                        "terminado por {} ({}), status={}",
+                        task::signal_name(info.exit_signal),
+                        info.exit_signal,
+                        info.exit_status
+                    );
+                } else {
+                    println!("status de saida={}", info.exit_status);
+                }
+            }
+        });
+        if !found {
+            return Err("tarefa nao encontrada");
+        }
+        return Ok(());
+    }
+
+    println!("  PID  NOME        PENDENTES  BLOQUEADOS  SITUACAO");
+    task::for_each(|info| {
+        crate::print!(
+            "{:>5}  {:<10}  {:#08x}  {:#08x}",
+            info.pid, info.name, info.pending, info.blocked
+        );
+        if info.state == task::State::Exited {
+            if info.exit_signal != 0 {
+                println!(
+                    "  sinal {} status {}",
+                    task::signal_name(info.exit_signal),
+                    info.exit_status
+                );
+            } else {
+                println!("  status {}", info.exit_status);
+            }
+        } else {
+            println!("  {}", info.state.as_str());
+        }
+    });
+    Ok(())
+}
+
+fn describe_signal_action(action: task::SignalAction) -> &'static str {
+    match action {
+        task::SignalAction::Default => "default",
+        task::SignalAction::Ignore => "ignore",
+        task::SignalAction::Handler(_) => "handler",
+    }
+}
+
+fn applet_sigaction(command: &Command<'_>) -> Result<(), &'static str> {
+    const USAGE: &str = "uso: sigaction <pid> <sinal> [default|ignore|handler]";
+    if command.len() < 3 || command.len() > 4 {
+        return Err(USAGE);
+    }
+
+    let pid = parse_decimal(command.arg(1).unwrap()).ok_or(USAGE)? as u64;
+    let sig = task::parse_signal(command.arg(2).unwrap()).ok_or("sinal invalido")?;
+    if sig == 0 {
+        return Err("sinal invalido");
+    }
+
+    if command.len() == 3 {
+        let action = task::signal_action(pid, sig).ok_or("tarefa nao encontrada")?;
+        println!(
+            "pid={} sinal={} ({}) acao={}",
+            pid,
+            sig,
+            task::signal_name(sig),
+            describe_signal_action(action)
+        );
+        return Ok(());
+    }
+
+    let action = match command.arg(3).unwrap() {
+        b"default" => task::SignalAction::Default,
+        b"ignore" => task::SignalAction::Ignore,
+        b"handler" => task::SignalAction::Handler(demo_signal_handler),
+        _ => return Err(USAGE),
+    };
+    let old = task::set_signal_action(pid, sig, action)?;
+    println!(
+        "pid={} sinal={} ({}) acao {} -> {}",
+        pid,
+        sig,
+        task::signal_name(sig),
+        describe_signal_action(old),
+        describe_signal_action(action)
+    );
+    Ok(())
+}
+
+fn applet_sigblock(command: &Command<'_>) -> Result<(), &'static str> {
+    const USAGE: &str = "uso: sigblock <pid> <sinal> <on|off>";
+    if command.len() != 4 {
+        return Err(USAGE);
+    }
+
+    let pid = parse_decimal(command.arg(1).unwrap()).ok_or(USAGE)? as u64;
+    let sig = task::parse_signal(command.arg(2).unwrap()).ok_or("sinal invalido")?;
+    if sig == 0 {
+        return Err("sinal invalido");
+    }
+    let block = match command.arg(3).unwrap() {
+        b"on" => true,
+        b"off" => false,
+        _ => return Err(USAGE),
+    };
+
+    let mask = task::set_signal_blocked(pid, sig, block)?;
+    println!(
+        "pid={} sinal={} ({}) {}; mascara={:#010x}",
+        pid,
+        sig,
+        task::signal_name(sig),
+        if block { "bloqueado" } else { "desbloqueado" },
+        mask
+    );
+    Ok(())
+}
+
+fn applet_wait(command: &Command<'_>) -> Result<(), &'static str> {
+    const USAGE: &str = "uso: wait [pid]";
+    if command.len() > 2 {
+        return Err(USAGE);
+    }
+
+    let target = match command.arg(1) {
+        Some(arg) => Some(parse_decimal(arg).ok_or(USAGE)? as u64),
+        None => None,
+    };
+    let result = task::wait_child(target)?;
+    if result.signal != 0 {
+        println!(
+            "pid={} terminado por {} ({}), status={}",
+            result.pid,
+            task::signal_name(result.signal),
+            result.signal,
+            result.status
+        );
+    } else {
+        println!("pid={} status={}", result.pid, result.status);
+    }
+    Ok(())
 }
 
 fn applet_mem(command: &Command<'_>) -> Result<(), &'static str> {
@@ -1451,6 +1822,7 @@ fn memory_info() {
     println!("  na tabela: {}", tasks.total);
     println!("  prontas  : {}", tasks.ready);
     println!("  dormindo : {}", tasks.blocked);
+    println!("  paradas  : {}", tasks.stopped);
     println!("  encerradas: {}", tasks.exited);
     println!("  criadas  : {}", tasks.spawned);
     println!("  preempcoes: {}", tasks.preemptions);

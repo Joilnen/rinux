@@ -2,15 +2,15 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {3.1}{\ignorespaces Layers of the Rust VGA Kernel.}}{16}{figure.caption.7}%
-\contentsline {figure}{\numberline {3.2}{\ignorespaces Complete boot chain.}}{18}{figure.caption.10}%
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Layers of the Rust VGA Kernel.}}{16}{figure.caption.6}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Complete boot chain.}}{18}{figure.caption.9}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {4.1}{\ignorespaces Paging structure: a single PDPT and a single PD serve both the low identity and the higher half.}}{21}{figure.caption.14}%
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Paging structure: a single PDPT and a single PD serve both the low identity and the higher half.}}{21}{figure.caption.13}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {6.1}{\ignorespaces Flow of a print call: the active TTY buffer is rendered and the same text is mirrored to the serial port.}}{31}{figure.caption.21}%
+\contentsline {figure}{\numberline {6.1}{\ignorespaces Flow of a print call: the active TTY buffer is rendered and the same text is mirrored to the serial port.}}{31}{figure.caption.20}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {7.1}{\ignorespaces Flow of \texttt {read\_key()}. Discard paths lead to \texttt {None}.}}{36}{figure.caption.27}%
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Flow of \texttt {read\_key()}. Discard paths lead to \texttt {None}.}}{36}{figure.caption.26}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }

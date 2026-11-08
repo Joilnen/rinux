@@ -438,6 +438,7 @@ INPUT /usr/share/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam10.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/amsfonts/symbols/msam5.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm10.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/amsfonts/symbols/msbm5.tfm
+INPUT /usr/share/texmf-dist/fonts/tfm/public/lm/ec-lmr9.tfm
 INPUT /usr/share/texmf-dist/tex/latex/lm/ts1lmtt.fd
 INPUT /usr/share/texmf-dist/tex/latex/lm/ts1lmtt.fd
 INPUT /usr/share/texmf-dist/tex/latex/lm/ts1lmtt.fd
@@ -461,7 +462,6 @@ INPUT /usr/share/texmf-dist/fonts/tfm/public/lm/ec-lmr6.tfm
 INPUT /usr/share/texmf-dist/fonts/enc/dvips/lm/lm-rm.enc
 INPUT /usr/share/texmf-dist/fonts/enc/dvips/lm/lm-mathex.enc
 INPUT /usr/share/texmf-dist/fonts/enc/dvips/lm/lm-mathit.enc
-INPUT /usr/share/texmf-dist/fonts/tfm/public/lm/ec-lmr9.tfm
 INPUT /usr/share/texmf-dist/fonts/tfm/public/lm/ec-lmtti10.tfm
 INPUT ./sections/05-base.tex
 INPUT ./sections/05-base.tex
